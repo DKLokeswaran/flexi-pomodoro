@@ -4,7 +4,7 @@
 | --- | --- |
 | **Product name** | Flexi Pomodoro (working title — see §14 Q10) |
 | **Document type** | Product Requirements Document (PRD) |
-| **Version** | 1.2 |
+| **Version** | 1.3 |
 | **Status** | Draft |
 | **Last updated** | 2026-07-12 |
 | **Audience** | Solo builders / self-hosters implementing the app |
@@ -86,7 +86,7 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 | **Extended work** | Continuation of work after planned duration + decision window resolves to “stay in flow” (explicit Continue **or** decision timeout). Tracked separately in persistence for analytics |
 | **Decision state** | Brief window (default **15s**, configurable **10–20s**) after planned work ends: user may acknowledge → start applicable rest; if they do not, system enters extended work |
 | **Session runtime** (session) | A committed run of **N cycles**. Starts only on explicit user action |
-| **Soft pause** (default) | Planned work **end time does not change**. The work countdown keeps running toward the original planned end; a separate accumulator tracks how long the user was soft-paused (not focusing). That interruption time is for analytics / insight only—it does **not** buy more planned work |
+| **Soft pause** (default) | Planned work **end time does not change**. The work countdown keeps running toward the original planned end; a separate accumulator tracks how long the user was soft-paused (not focusing). That interruption time is for analytics only—it does **not** buy more planned work. Soft pause ends on **manual resume**, or **automatically at planned end** (see FR-PAUSE-S7: auto-rest, skip decision) |
 | **Hard pause** (experimental) | Work timer **stops**. On resume, remaining time continues and the **planned end time is shifted** by the paused duration. Behind experimental feature flag |
 | **Defaults** | Persistent user settings used when starting a session without overrides |
 | **Session override** | One-time values applied only to the session about to start |
@@ -204,7 +204,7 @@ Alerts exist to notify the user of **system-maintained timer events**, not of th
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| FR-FLOW-1 | When planned work reaches its **original planned end** (soft pause does not move this; hard pause may have shifted it earlier), alert `work_planned_end` and enter **decision state** | P0 |
+| FR-FLOW-1 | When planned work reaches its planned end **and the user is not soft-paused**: alert `work_planned_end` and enter **decision state**. If the user **is soft-paused** at that instant, see FR-PAUSE-S7 (skip decision; auto-rest) instead | P0 |
 | FR-FLOW-2 | Decision state lasts a short configurable window (**10–20s**, default **15s**) | P0 |
 | FR-FLOW-3 | If user **acknowledges** → transition to applicable rest (short or long); play rest-entry alert | P0 |
 | FR-FLOW-4 | If user **does not** acknowledge within the window → treat as wishing to keep flow: enter **extended work** automatically; play `extended_work_auto_start`; persist extended segment as first-class data | P0 |
@@ -235,9 +235,13 @@ Applies to **planned work only**. Short rest and long rest are never pausable. L
 | FR-PAUSE-S3 | **Planned end time does not change.** Soft pause only accumulates `softPausedSec` (time the user marked as not focusing) | P0 |
 | FR-PAUSE-S4 | Soft-paused time is persisted for analytics (interruption load vs focus); it does not extend planned work | P0 |
 | FR-PAUSE-S5 | Soft pause does not end the session and does not unlock mid-session cancel | P0 |
-| FR-PAUSE-S6 | Soft pause ends only via **manual** resume (or equivalent user action)—not automatically | P0 |
+| FR-PAUSE-S6 | Soft pause is available **only during planned work**. It is not available in decision, extended work, or rest | P0 |
+| FR-PAUSE-S7 | **Soft pause at planned end (normative):** If planned work reaches its end while still soft-paused: (1) auto-close the soft-pause slice (count soft-paused time through planned end); (2) **skip the decision window**; (3) **automatically start** the applicable rest (short or long)—user was not focusing, so do not offer / auto-enter extended work; (4) play the usual planned-work-end and rest-entry alerts | P0 |
+| FR-PAUSE-S8 | Otherwise, soft pause ends via **manual resume** (or equivalent). Soft pause does not clear by itself before planned end | P0 |
 
-Illustrative: work 25:00 from T0→T25. Soft-pause 3:00 mid-block → decision still at **T25**; `softPausedSec = 180`; focused time within the plan ≈ 22:00.
+Illustrative (mid-block resume): work 25:00 from T0→T25. Soft-pause 3:00 mid-block, then resume → decision still at **T25**; `softPausedSec = 180`; focused ≈ 22:00.
+
+Illustrative (never resume): soft-pause at 40:00 of a 50:00 work block, never resume → at **T50** soft pause auto-closes, **no decision / no extended work**, auto-start applicable rest; `softPausedSec` includes 40:00→50:00.
 
 #### 4.6.2 Hard pause (experimental)
 
@@ -312,11 +316,13 @@ Example: `N = 3`, work 25m, short rest 5m, long rest 15m, decision window 15s.
 
 ```
 User starts session
-  Cycle 1: Work 25m → [alert work_planned_end] → Decision ≤15s
-           ├─ ack rest → Short rest 5m → [alert short_rest_end]
-           └─ timeout / continue → Extended work… → user Start rest (no end alarm)
-              → Short rest 5m → [alert short_rest_end]
-  Cycle 2: (auto) Work … → … → Short rest …
+  Cycle 1: Work 25m
+           ├─ (focusing) → [alert work_planned_end] → Decision ≤15s
+           │    ├─ ack rest → Short rest 5m → [alert short_rest_end]
+           │    └─ timeout / continue → Extended work… → user Start rest (no end alarm)
+           │       → Short rest 5m → [alert short_rest_end]
+           └─ (still soft-paused at planned end) → skip decision → Short rest 5m (auto)
+  Cycle 2: (auto) Work … → …
   Cycle 3: Work … → … → Long rest 15m
            ├─ timer complete → [alert long_rest_end] → IDLE
            └─ user early end → IDLE (no alarm required)
@@ -356,7 +362,9 @@ IDLE
 
 WORK_PLANNED
   ├─[soft/hard pause per strategy]→ WORK_PLANNED (still in work; timing per module)
-  └─[effective planned work elapsed]→ WORK_DECISION   // alert work_planned_end
+  ├─[planned end AND soft-paused]→ REST_SHORT or REST_LONG
+  │     // auto-close soft pause; skip decision; alerts work_planned_end + rest-entry
+  └─[planned end AND not soft-paused]→ WORK_DECISION   // alert work_planned_end
 
 WORK_DECISION  // duration: decisionWindowSec (10–20)
   ├─[user: Acknowledge rest]→ REST_SHORT or REST_LONG   // rest-entry alert
@@ -378,9 +386,10 @@ REST_LONG    // not pausable; early-endable
 
 - Cancel session to IDLE from WORK_* / REST_SHORT  
 - Increase any rest (or work) duration after Start  
-- Pause on REST_SHORT or REST_LONG  
+- Pause on REST_SHORT, REST_LONG, WORK_DECISION, or WORK_EXTENDED  
 - Early-end REST_SHORT  
 - Scale rest upward because of overtime  
+- Soft-paused planned end → WORK_DECISION or WORK_EXTENDED (must auto-rest)  
 
 ---
 
@@ -457,7 +466,7 @@ PlannedWorkSegment {
   plannedEndAt                // authoritative end (may be shifted only by hard pause)
   startedAt, endedAt
   softPausedSec               // interruption accumulator; does not change plannedEndAt under soft
-  endedReason: "planned_complete" | "recovery"
+  endedReason: "planned_complete" | "soft_paused_auto_rest" | "recovery"
 }
 
 ExtendedWorkSegment {
@@ -551,7 +560,8 @@ docker run -d \
 | Defaults edited mid-session | Affect future sessions only |
 | `N = 1` | Work → decision → (optional extended) → long rest only |
 | Decision window spans tab blur | Wall clock still counts server-side; timeout → extended work |
-| Soft pause across refresh / downtime | Restore soft-pause active flag; **planned end unchanged**; downtime while soft-paused **counts toward** `softPausedSec` (soft pause ends only on manual resume) |
+| Soft pause across refresh / downtime | Restore soft-pause active flag; **planned end unchanged**; downtime while soft-paused **counts toward** `softPausedSec` until manual resume **or** planned-end auto-rest (FR-PAUSE-S7) |
+| Soft pause held through planned end | Auto-close soft pause; **skip decision**; **auto-start** applicable rest (no extended work) |
 
 ---
 
@@ -579,7 +589,8 @@ docker run -d \
 8. Session start user-only; cycles auto-chain inside session.  
 9. Analytics expose extended duration and frequency clearly.  
 10. No built-in auth in current scope.  
-11. After container downtime, resume via **strict wall-clock catch-up** (Q9 Option A), including soft-pause downtime accumulation.
+11. After container downtime, resume via **strict wall-clock catch-up** (Q9 Option A), including soft-pause downtime accumulation.  
+12. Soft pause held through planned end → auto-rest (skip decision / extended).
 
 ---
 
@@ -614,7 +625,7 @@ When the **service/container** was down and wall time advanced, what should happ
 | S4 | Down through decision window | Per FR-FLOW-4: decision elapsed → **extended work** started at decision expiry; overtime includes downtime | Still in decision with remaining window | Enter extended work now with overtime = 0 | **A** |
 | S5 | Down through most of long rest | Long rest completed → **IDLE**, session complete | Still in long rest | IDLE | **A** |
 | S6 | Down during extended work | Extended work continued (overtime includes downtime) until user Start rest | Extended frozen | Keep extended; overtime only while app up | **A** |
-| S7 | Down during soft pause | Soft-pause accumulator **includes** downtime (soft pause ends only via manual resume; user will notice the service was down) | Soft pause frozen | — | **A** (include downtime) |
+| S7 | Down during soft pause | Soft-pause accumulator **includes** downtime until manual resume **or** planned-end auto-rest (FR-PAUSE-S7) | Soft pause frozen | — | **A** (include downtime) |
 
 **Why Option A:** Matches real-world elapsed time. Multi-phase catch-up is allowed when wall clock requires it; closed-over segments are marked `"recovery"`.
 
@@ -654,3 +665,4 @@ When the **service/container** was down and wall time advanced, what should happ
 | 1.0 | 2026-07-11 | Initial PRD from product brief |
 | 1.1 | 2026-07-12 | Flow/decision/alerts/pause modules/auth/sounds; clarifications: soft vs hard end-time semantics; planned-work lock ≠ extended; overrides at start; single pause setting; separate planned/extended shapes; open-questions Decision column; technique summary trimmed |
 | 1.2 | 2026-07-12 | Q9 recovery: Option A strict wall-clock catch-up for S1–S7; soft-pause downtime included; edge cases / acceptance updated |
+| 1.3 | 2026-07-12 | Soft pause through planned end: auto-close pause, skip decision, auto-transition to rest |

@@ -2,11 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| **Product name** | Flexi Pomodoro (working title) |
+| **Product name** | Flexi Pomodoro (working title — see §14 Q10) |
 | **Document type** | Product Requirements Document (PRD) |
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Status** | Draft |
-| **Last updated** | 2026-07-11 |
+| **Last updated** | 2026-07-12 |
 | **Audience** | Solo builders / self-hosters implementing the app |
 
 ---
@@ -23,29 +23,34 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 
 - Configurable defaults for work, short rest, cycles-before-long-rest, and long rest.
 - Per-session overrides before start.
-- Alerts at every period boundary.
+- Unique audible alerts at **system-maintained** period boundaries (not on manual button presses that merely confirm intent).
 - Optional **extended work** after a work period ends (stay in flow) without earning a longer break.
+- Short decision window after planned work ends; silence → assume extended work.
 - **Committed session runtime**: once started, the user cannot abandon the session until all planned cycles complete.
-- Persistent analytics with clear personal stats.
+- Soft-pause (default) and experimental hard-pause for **work only**, implemented as swappable modules.
+- Persistent analytics with first-class extended-work metrics.
 
 ### 1.3 Goals
 
 | Goal | Success signal |
 | --- | --- |
 | Easy self-host | One Docker image + minimal config brings the app up |
-| Flow without cheating breaks | Extended work is allowed; break length stays as configured |
+| Flow without cheating breaks | Extended work is allowed; break lengths stay as configured (never increased mid-session) |
 | Commitment | Session cannot be cancelled mid-runtime; cycles auto-advance |
-| Insight | Historical work/rest data is stored and surfaced as useful stats |
+| Insight | Historical work/rest/extended data is stored and surfaced as useful stats |
 | Lightweight | Small image, low resource use, no mandatory external cloud services |
+| Removable pause strategies | Soft vs hard pause live in isolated modules; either can be deleted without surgery |
 
 ### 1.4 Non-goals (v1)
 
 - Multi-user accounts, teams, or social features
+- Built-in authentication (trusted private network / reverse-proxy only)
 - Mobile native apps (responsive web is enough)
 - Cloud SaaS hosting as a product offering
 - Integrations (calendar, Slack, Todoist, etc.)
 - AI coaching, gamification badges, or leaderboards
 - Sync across multiple devices beyond shared backend data for one user
+- LLM-generated alarm tones (use curated open-license samples chosen by the product owner)
 
 ---
 
@@ -57,15 +62,16 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 
 - Runs apps on a homelab, VPS, or local Docker host
 - Wants structure but hates being yanked out of flow
-- Cares about personal history (time worked, completion rates, streaks)
+- Cares about personal history (time worked, extended-work patterns, completion rates)
 
 ### 2.2 Core use cases
 
 1. Set personal defaults once; reuse them daily.
 2. Start a committed session (optionally overriding defaults for that run).
-3. Work → alert → take short rest (or continue working if in flow) → alert → next cycle, automatically.
+3. Work → alert → short decision window → rest **or** extended work → later start rest → next cycle automatically.
 4. After N cycles, take a long rest (skippable early); then manually start the next session when ready.
-5. Review analytics: time in focus, overwork (extended) minutes, sessions completed, etc.
+5. Soft-pause work when interrupted (default); optionally try experimental hard-pause.
+6. Review analytics: focus time, extended-work duration/count, rest time, sessions completed, etc.
 
 ---
 
@@ -73,15 +79,18 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 
 | Term | Definition |
 | --- | --- |
-| **Work period** | Timed focus block within a cycle |
-| **Short rest** | Break after a work period that is not the long-rest boundary |
-| **Long rest** (big / extended break) | Break granted after completing the configured number of cycles in a session |
-| **Cycle** | One work period + its following rest (short or long). Cycle count increments when a work period is **completed** (including if the user used extended work before resting) |
-| **Extended work** | Continuation of a work period after the planned work duration ends, while the user chooses to stay in flow |
-| **Session runtime** (session) | A committed run of **N cycles**, where N is the default or the session override. Starts only on explicit user action |
+| **Work period** | Timed focus block within a cycle (planned portion). Capabilities: soft/hard pause (per feature flags), can enter extended work |
+| **Short rest** | Break after a non-final cycle. **Not** pausable, **not** early-endable, duration **not** increasable mid-session |
+| **Long rest** | Break after the Nth cycle. **Not** pausable; **may** be ended early; duration **not** increasable mid-session |
+| **Cycle** | One work period + its following rest (short or long). Cycle count increments when work is left for rest (after planned work and any extended work) |
+| **Extended work** | Continuation of work after planned duration + decision window resolves to “stay in flow” (explicit Continue **or** decision timeout). Tracked separately in persistence for analytics |
+| **Decision state** | Brief window (default **15s**, configurable **10–20s**) after planned work ends: user may acknowledge → start applicable rest; if they do not, system enters extended work |
+| **Session runtime** (session) | A committed run of **N cycles**. Starts only on explicit user action |
+| **Soft pause** (default) | Planned work **end time does not change**. The work countdown keeps running toward the original planned end; a separate accumulator tracks how long the user was soft-paused (not focusing). That interruption time is for analytics / insight only—it does **not** buy more planned work |
+| **Hard pause** (experimental) | Work timer **stops**. On resume, remaining time continues and the **planned end time is shifted** by the paused duration. Behind experimental feature flag |
 | **Defaults** | Persistent user settings used when starting a session without overrides |
 | **Session override** | One-time values applied only to the session about to start |
-| **Period boundary** | Instant when a planned work or rest duration reaches zero (triggers alert + UI state change) |
+| **System period boundary** | Instant when a **timer-driven** phase reaches its end (planned work, short rest, long rest). Triggers unique alert. Manual UI actions (e.g. End extended work, End long rest early) do **not** fire “end” alarms |
 
 ---
 
@@ -117,8 +126,10 @@ Users must be able to persist:
 | Short rest duration | Rest after non-final cycles | Positive duration; suggested range 1–60 min |
 | Cycles before long rest (`N`) | Number of cycles in a session runtime | Integer ≥ 1; suggested range 1–12 |
 | Long rest duration | Rest after the Nth cycle | Positive duration; suggested range 1–120 min |
+| Decision window | Seconds to acknowledge rest after planned work | 10–20s (default 15s) |
+| Work pause strategy | `soft` (default) or `hard` (experimental) | Single setting; `hard` is the experimental option (no separate boolean) |
 
-Optional v1 niceties (P2): sound pack selection, alert volume preference, theme.
+Optional v1 niceties (P2): sound pack selection (from shipped curated assets), alert volume, theme.
 
 #### 4.2.2 Session overrides
 
@@ -126,72 +137,167 @@ Optional v1 niceties (P2): sound pack selection, alert volume preference, theme.
 | --- | --- | --- |
 | FR-SET-1 | Before starting a session, user may override any of: work, short rest, `N`, long rest | P0 |
 | FR-SET-2 | Overrides apply only to that session; defaults remain unchanged unless user saves defaults separately | P0 |
-| FR-SET-3 | After session **start**, work / short rest / `N` / long rest for that session are **locked** except where rules explicitly allow early end of long rest (see FR-SESS) | P0 |
-| FR-SET-4 | Long rest duration cannot be **increased** after session start (neither default edit mid-session nor in-session bump) | P0 |
-| FR-SET-5 | UI clearly distinguishes “Defaults” vs “This session” | P0 |
+| FR-SET-3 | After session **start**, session params are locked except: early end of **long rest** only | P0 |
+| FR-SET-4 | **Neither short rest nor long rest duration may be increased** after session start | P0 |
+| FR-SET-5 | The session’s **planned work duration** (default or override captured at start) cannot be increased after session start. This does **not** constrain extended work, which has no fixed planned end | P0 |
+| FR-SET-6 | UI clearly distinguishes “Defaults” vs “This session” | P0 |
 
 ---
 
 ### 4.3 Alerts (FR-ALERT)
 
+Alerts exist to notify the user of **system-maintained timer events**, not of their own deliberate clicks.
+
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| FR-ALERT-1 | At the end of every planned work period, play an audible alert | P0 |
-| FR-ALERT-2 | At the end of every short rest and long rest, play an audible alert | P0 |
-| FR-ALERT-3 | Alert also fires when extended work is later paused/ended and rest is about to begin (same “work finished → rest” cue, or a dedicated cue—see open questions) | P0 |
-| FR-ALERT-4 | Visual alert/state change accompanies sound (phase banner, color shift, browser notification if permitted) | P1 |
-| FR-ALERT-5 | User can mute/unmute alerts; mute preference persisted | P1 |
-| FR-ALERT-6 | Alerts must work when the tab is in background **as far as browsers allow** (Audio unlock / Notification API documented) | P1 |
+| FR-ALERT-1 | At end of **planned work** → enter decision state: play unique alert `work_planned_end` | P0 |
+| FR-ALERT-2 | At end of **short rest**: play unique alert `short_rest_end` | P0 |
+| FR-ALERT-3 | At end of **long rest** (timer completed, not early-ended): play unique alert `long_rest_end` | P0 |
+| FR-ALERT-4 | When decision window expires and system auto-enters extended work: play unique alert `extended_work_auto_start` (or reuse a distinct “still working” cue—must differ from rest-start cues) | P0 |
+| FR-ALERT-5 | **Do not** play an end-of-work / transition alarm when the user manually ends extended work (they initiated it; UI state change is enough) | P0 |
+| FR-ALERT-6 | **Do not** require an alarm for “End long rest early” (manual); optional quiet confirmation is fine, not an alarm | P1 |
+| FR-ALERT-7 | If user explicitly acknowledges rest from decision state, play unique alert `rest_ack` (or phase-specific `short_rest_start` / `long_rest_start`) so rest entry is audibly distinct from work-end | P0 |
+| FR-ALERT-8 | **Each transition type has a unique sound asset** — never one shared beep for all events | P0 |
+| FR-ALERT-9 | Visual state change accompanies alerts; browser notification if permitted | P1 |
+| FR-ALERT-10 | Mute preference persisted | P1 |
+| FR-ALERT-11 | Document browser autoplay / audio unlock constraints | P1 |
 
-**Acceptance:** Each period boundary produces a noticeable sound without requiring a page reload.
+**Sound sourcing (process, not codegen):**
+
+- Do **not** ship LLM-synthesized tones as product defaults.
+- Product owner picks free/open-license samples. Candidate libraries (verify license per file before shipping):
+
+  | Source | Notes |
+  | --- | --- |
+  | [Freesound](https://freesound.org/) | Filter by CC0 / CC-BY; good for distinct UI beeps & chimes |
+  | [Mixkit](https://mixkit.co/free-sound-effects/alarm/) | Free Mixkit License; alarms & notifications |
+  | [Pixabay Sounds](https://pixabay.com/sound-effects/) | Pixabay content license; notification packs |
+  | [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) | CC0 game/UI packs |
+  | [OpenGameArt](https://opengameart.org/) | Various free licenses; check each asset |
+
+- Suggested distinct cues to pick (6): planned-work-end, rest-acknowledged / short-rest-start, long-rest-start, short-rest-end, long-rest-end, extended-work-auto-enter.
+
+**Acceptance:** Timer-driven boundaries produce unique sounds; manual End extended work does not alarm.
 
 ---
 
-### 4.4 Flow-aware work continuation (FR-FLOW)
+### 4.4 Phase model: asymmetric shapes (FR-SHAPE)
 
-This is the primary behavioral difference from classic Pomodoro.
+**Decision:** Do **not** force one shared shape across planned work, extended work, and rest. Capabilities differ enough that a single “timer phase” type invites illegal states.
+
+| Capability | Planned work | Extended work | Short rest | Long rest |
+| --- | --- | --- | --- | --- |
+| Soft / hard pause | Yes (modules) | **No** — only end → rest | **No** | **No** |
+| Fixed planned end | Yes (wall-clock end from session params; soft pause does not move it) | **No** — theoretically unbounded until user ends | Yes | Yes |
+| Early end by user | No (runs to plan → decision) | Yes → start rest | **No** | **Yes** → idle |
+| System end alert | Yes (planned end) | No (manual end) | Yes | Yes (timer complete only) |
+
+**Shape guidance:**
+
+- **Short rest vs long rest:** Same rest shape is fine; the only material difference is long rest may be ended early.
+- **Planned work vs extended work:** **Separate shapes** — planned work has a fixed end + pause strategies; extended work has no planned end, is not pausable, and only supports “Start rest”. Do not model them as one `WorkSegment` with a `kind` flag if that collapses policy into conditionals; prefer distinct types (e.g. `PlannedWorkPhase` / `ExtendedWorkPhase`) plus distinct persistence records.
+- Shared code: low-level clock helpers only—not phase policy.
+
+---
+
+### 4.5 Flow-aware work continuation (FR-FLOW)
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| FR-FLOW-1 | When planned work duration reaches zero, the app **alerts** and enters a **decision state**: Start rest **or** Continue working (extended work) | P0 |
-| FR-FLOW-2 | If user chooses continue, the timer **keeps running** and remains labeled as work / extended work; elapsed time beyond plan is tracked separately for analytics | P0 |
-| FR-FLOW-3 | User may **pause / end extended work at any time**; doing so transitions to the rest that belongs to this cycle | P0 |
-| FR-FLOW-4 | Rest duration after extended work equals the **configured short rest** (or long rest if this cycle is the Nth)—**not** scaled by overtime | P0 |
-| FR-FLOW-5 | Extended work does **not** advance or grant long rest early; long rest is earned only by completing `N` cycles | P0 |
-| FR-FLOW-6 | Decision state should not auto-start rest without user input (avoid forcing break while user is still deciding). Timeout behavior is an open question | P0 / TBD |
-| FR-FLOW-7 | UI must show planned vs elapsed vs overtime clearly during extended work | P0 |
+| FR-FLOW-1 | When planned work reaches its **original planned end** (soft pause does not move this; hard pause may have shifted it earlier), alert `work_planned_end` and enter **decision state** | P0 |
+| FR-FLOW-2 | Decision state lasts a short configurable window (**10–20s**, default **15s**) | P0 |
+| FR-FLOW-3 | If user **acknowledges** → transition to applicable rest (short or long); play rest-entry alert | P0 |
+| FR-FLOW-4 | If user **does not** acknowledge within the window → treat as wishing to keep flow: enter **extended work** automatically; play `extended_work_auto_start`; persist extended segment as first-class data | P0 |
+| FR-FLOW-5 | User may also explicitly choose Continue / Extended work during the window (same outcome as timeout, without waiting) | P0 |
+| FR-FLOW-6 | During extended work, timer continues as work; UI labels overtime clearly | P0 |
+| FR-FLOW-7 | User ends extended work manually → start applicable rest **without** an end-of-extended alarm | P0 |
+| FR-FLOW-8 | Rest duration after extended work equals configured short/long rest—**not** scaled by overtime | P0 |
+| FR-FLOW-9 | Extended work does **not** grant long rest early; long rest only after `N` cycles | P0 |
+| FR-FLOW-10 | Persistence must mark extended work distinctly (`isExtended` / `extendedWorkSec` / separate segment rows) so analytics can answer duration and frequency questions | P0 |
 
 **Cycle counting rule (normative):**
 
-- A cycle’s work portion is **complete** when the user leaves work for rest (either immediately at the planned boundary, or after ending extended work).
+- Work for a cycle is complete when the user leaves work for rest (from decision ack or after ending extended work).
 - Overtime does not create extra cycles and does not change rest length.
 
 ---
 
-### 4.5 Session runtime & cycle automation (FR-SESS)
+### 4.6 Work pause strategies (FR-PAUSE)
 
-#### 4.5.1 Starting a session
+Applies to **planned work only**. Short rest and long rest are never pausable. Long rest may only be **ended early**.
+
+#### 4.6.1 Soft pause (default)
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-PAUSE-S1 | Soft pause is the **default** work-pause behavior | P0 |
+| FR-PAUSE-S2 | While soft-paused, planned work **keeps counting down**; the session stays active | P0 |
+| FR-PAUSE-S3 | **Planned end time does not change.** Soft pause only accumulates `softPausedSec` (time the user marked as not focusing) | P0 |
+| FR-PAUSE-S4 | Soft-paused time is persisted for analytics (interruption load vs focus); it does not extend planned work | P0 |
+| FR-PAUSE-S5 | Soft pause does not end the session and does not unlock mid-session cancel | P0 |
+| FR-PAUSE-S6 | Soft pause ends only via **manual** resume (or equivalent user action)—not automatically | P0 |
+
+Illustrative: work 25:00 from T0→T25. Soft-pause 3:00 mid-block → decision still at **T25**; `softPausedSec = 180`; focused time within the plan ≈ 22:00.
+
+#### 4.6.2 Hard pause (experimental)
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-PAUSE-H1 | Hard pause is the **experimental** strategy: selected via `workPauseStrategy: "hard"` (default remains `"soft"`). No separate redundant boolean | P0 |
+| FR-PAUSE-H2 | Hard pause **stops** the work countdown; on resume, remaining time continues and **planned end is shifted** by paused duration | P0 |
+| FR-PAUSE-H3 | Hard-paused intervals persisted for analytics / debugging | P1 |
+| FR-PAUSE-H4 | Soft and hard modules both ship; strategy setting selects which is active. Deleting either later must stay straightforward | P0 |
+
+Illustrative: work 25:00, hard-pause 3:00 with 10:00 left → on resume still 10:00 left; planned end moves +3:00.
+
+#### 4.6.3 Modular encapsulation (mandatory)
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-PAUSE-M1 | Implement soft and hard pause as **separate, encapsulated modules** (e.g. `pause/softPause.ts`, `pause/hardPause.ts`) behind a narrow interface (`WorkPauseStrategy`) | P0 |
+| FR-PAUSE-M2 | Core session engine depends only on the interface; no soft/hard conditionals scattered through rest/flow/analytics | P0 |
+| FR-PAUSE-M3 | Deleting either strategy later = remove module + setting option + tests for that module; no rewrite of rest/extended-work logic | P0 |
+| FR-PAUSE-M4 | Single setting `workPauseStrategy: "soft" \| "hard"` selects the active module (`"soft"` default) | P0 |
+
+Suggested interface (illustrative):
+
+```
+WorkPauseStrategy {
+  onPause(ctx): void
+  onResume(ctx): void
+  // soft: returns plannedEnd unchanged
+  // hard: returns plannedEnd shifted by paused duration
+  resolvePlannedEnd(plannedEnd, pauseState): datetime
+  getAnalyticsSlices(pauseState): PauseSlice[]
+}
+```
+
+---
+
+### 4.7 Session runtime & cycle automation (FR-SESS)
+
+#### 4.7.1 Starting a session
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
 | FR-SESS-1 | A session runtime starts **only** when the user explicitly starts it | P0 |
-| FR-SESS-2 | Starting captures immutable session parameters: work, short rest, `N`, long rest (from defaults + overrides) | P0 |
+| FR-SESS-2 | At start, the user may apply **session overrides** (work, short rest, `N`, long rest, etc.). The **effective** params for that runtime are then locked for the rest of the session—overrides are allowed at start, not mid-runtime | P0 |
 | FR-SESS-3 | On start, cycle 1 work begins immediately | P0 |
 
-#### 4.5.2 During a session
+#### 4.7.2 During a session
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| FR-SESS-4 | Once started, the user **cannot abort / stop / cancel** the session until all `N` cycles are finished (including their rests as defined below) | P0 |
-| FR-SESS-5 | Inside a session, transitions between cycles are **automatic** after each rest completes (next work starts without requiring a new “Start session”) | P0 |
-| FR-SESS-6 | User cannot increase long rest duration after start | P0 |
+| FR-SESS-4 | Once started, the user **cannot abort / stop / cancel** the session until all `N` cycles are finished | P0 |
+| FR-SESS-5 | Inside a session, after each short rest completes, next work starts **automatically** | P0 |
+| FR-SESS-6 | **No rest duration** (short or long) may be increased after start | P0 |
 | FR-SESS-7 | After cycles `1 .. N-1`, rest is **short rest**; after cycle `N`, rest is **long rest** | P0 |
-| FR-SESS-8 | User **may prematurely end the long rest**; this ends the session runtime and returns the app to idle (ready for a **manual** next session start) | P0 |
+| FR-SESS-8 | User **may prematurely end the long rest** → session complete → idle; next session is manual | P0 |
 | FR-SESS-9 | Premature end of long rest must **not** auto-start a new session | P0 |
-| FR-SESS-10 | Short rests are **not** skippable in v1 (unless open question decides otherwise)—only long rest is early-endable | P0 (assumed) |
-| FR-SESS-11 | Pause during **planned** work / short rest: see open questions; pause during **extended work** is required (FR-FLOW-3) | TBD |
+| FR-SESS-10 | Short rests are **not** skippable and **not** pausable | P0 |
+| FR-SESS-11 | Long rests are **not** pausable (only early-endable) | P0 |
 
-#### 4.5.3 Session completion
+#### 4.7.3 Session completion
 
 A session is **complete** when:
 
@@ -200,40 +306,45 @@ A session is **complete** when:
 
 After completion → idle; next session requires explicit start.
 
-#### 4.5.4 Illustrative timeline
+#### 4.7.4 Illustrative timeline
 
-Example: `N = 3`, work 25m, short rest 5m, long rest 15m.
+Example: `N = 3`, work 25m, short rest 5m, long rest 15m, decision window 15s.
 
 ```
 User starts session
-  Cycle 1: Work 25m → [alert] → (optional extended work) → Short rest 5m → [alert]
-  Cycle 2: Work 25m → [alert] → (optional extended) → Short rest 5m → [alert]   // auto
-  Cycle 3: Work 25m → [alert] → (optional extended) → Long rest 15m → [alert]
-Idle (or idle immediately if user ends long rest early)
+  Cycle 1: Work 25m → [alert work_planned_end] → Decision ≤15s
+           ├─ ack rest → Short rest 5m → [alert short_rest_end]
+           └─ timeout / continue → Extended work… → user Start rest (no end alarm)
+              → Short rest 5m → [alert short_rest_end]
+  Cycle 2: (auto) Work … → … → Short rest …
+  Cycle 3: Work … → … → Long rest 15m
+           ├─ timer complete → [alert long_rest_end] → IDLE
+           └─ user early end → IDLE (no alarm required)
 User must Start again for a new session runtime
 ```
 
 ---
 
-### 4.6 Analytics (FR-AN)
+### 4.8 Analytics (FR-AN)
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| FR-AN-1 | Persist every completed work period, rest period, extended-work segment, and session | P0 |
-| FR-AN-2 | Record timestamps, durations, session id, cycle index, phase type, whether overtime occurred, planned vs actual durations | P0 |
-| FR-AN-3 | Dashboard shows at least: total focus time, total overtime (extended), total rest time, sessions started/completed, average cycles/session, overtime frequency | P0 |
-| FR-AN-4 | Time-range filters: today / 7 days / 30 days / all (or custom range P2) | P1 |
-| FR-AN-5 | Simple charts (e.g. focus minutes per day, sessions per day) | P1 |
-| FR-AN-6 | Data stays local to the self-hosted instance (export JSON/CSV P2) | P0 / P2 |
+| FR-AN-1 | Persist every work period, rest period, **extended-work segment**, soft/hard pause slices, and session | P0 |
+| FR-AN-2 | Extended work must be **explicitly labeled** in DB / volume data (not merely inferred from actual > planned) | P0 |
+| FR-AN-3 | Record timestamps, durations, session id, cycle index, phase type, planned vs actual, extended flag/seconds, pause strategy used | P0 |
+| FR-AN-4 | Dashboard: total focus time, **extended duration**, **extended occurrence count / rate**, total rest, soft-paused time, sessions completed, avg cycles/session | P0 |
+| FR-AN-5 | Time-range filters: today / 7 days / 30 days / all | P1 |
+| FR-AN-6 | Simple charts (focus/day, extended/day, sessions/day) | P1 |
+| FR-AN-7 | Data local to instance (export JSON/CSV P2) | P0 / P2 |
 
-**“Nice to know” stats (v1 target set):**
+**“Nice to know” stats (v1):**
 
-- Focus minutes (planned + overtime broken out)
-- Overtime minutes and % of sessions/cycles that used extended work
-- Rest minutes (short vs long)
-- Sessions completed vs abandoned (abandon should be impossible mid-session in v1; still track incomplete only if crash/restart recovery leaves a session open—see reliability)
-- Longest focus streak (consecutive days with ≥1 completed session)
-- Average overtime when extended work is used
+- Focus minutes (planned focus vs extended broken out)
+- Extended-work minutes, times used, % of cycles that extended
+- Soft-paused minutes (interruption load)
+- Rest minutes (short vs long; long rest early-ended count)
+- Sessions completed; streak of days with ≥1 completed session
+- Average extended duration when extension happens
 
 ---
 
@@ -244,28 +355,32 @@ IDLE
   └─[user: Start session]→ WORK_PLANNED
 
 WORK_PLANNED
-  └─[planned work elapsed]→ WORK_BOUNDARY   // alert
+  ├─[soft/hard pause per strategy]→ WORK_PLANNED (still in work; timing per module)
+  └─[effective planned work elapsed]→ WORK_DECISION   // alert work_planned_end
 
-WORK_BOUNDARY
-  ├─[user: Start rest]→ REST_SHORT or REST_LONG   // based on cycle index vs N
-  └─[user: Continue work]→ WORK_EXTENDED
+WORK_DECISION  // duration: decisionWindowSec (10–20)
+  ├─[user: Acknowledge rest]→ REST_SHORT or REST_LONG   // rest-entry alert
+  ├─[user: Continue / extend]→ WORK_EXTENDED            // optional explicit
+  └─[window elapsed, no ack]→ WORK_EXTENDED             // alert extended_work_auto_start
 
 WORK_EXTENDED
-  └─[user: Pause / end extended work]→ REST_SHORT or REST_LONG
+  └─[user: Start rest]→ REST_SHORT or REST_LONG         // NO end-extended alarm
 
-REST_SHORT
-  └─[short rest elapsed]→ WORK_PLANNED       // next cycle, automatic; alert at boundary
+REST_SHORT   // not pausable, not early-endable
+  └─[short rest elapsed]→ WORK_PLANNED                  // alert short_rest_end; auto next cycle
 
-REST_LONG
-  ├─[long rest elapsed]→ IDLE                // session complete; alert
-  └─[user: End long rest early]→ IDLE        // session complete; no auto-start
+REST_LONG    // not pausable; early-endable
+  ├─[long rest elapsed]→ IDLE                           // alert long_rest_end
+  └─[user: End long rest early]→ IDLE                   // no alarm required; no auto-start
 ```
 
 **Forbidden transitions (v1):**
 
-- IDLE ← cancel from WORK_* / REST_SHORT  
-- Any increase of session long-rest parameter after Start  
-- REST_* → longer rest because of overtime  
+- Cancel session to IDLE from WORK_* / REST_SHORT  
+- Increase any rest (or work) duration after Start  
+- Pause on REST_SHORT or REST_LONG  
+- Early-end REST_SHORT  
+- Scale rest upward because of overtime  
 
 ---
 
@@ -273,18 +388,20 @@ REST_LONG
 
 ### 6.1 Primary surfaces
 
-1. **Timer / session** — dominant view: phase, countdown/count-up, cycle `k / N`, primary actions  
-2. **Defaults** — edit persistent settings  
-3. **Analytics** — stats and charts  
-4. **About / self-host help** — link to run instructions (can be minimal)
+1. **Timer / session** — phase, countdown/count-up, cycle `k / N`, primary actions  
+2. **Defaults** — persistent settings + experimental flags  
+3. **Analytics** — stats and charts (extended work first-class)  
+4. **About / self-host help** — run instructions; credit sound licenses  
 
 ### 6.2 Session view essentials
 
-- Large remaining time for planned phases; clear count-up or “+overtime” during extended work  
+- Large remaining time for planned phases; clear overtime during extended work  
+- Visible decision countdown (e.g. “Rest in 12s — or keep working”)  
 - Cycle progress (`2 / 3`)  
-- Phase label: Work / Extended work / Short rest / Long rest / Decide  
-- Actions depend on state (Start; Continue work / Start rest; End extended work; End long rest early)  
-- No destructive “Stop session” control while session is active  
+- Phase labels: Work / Decision / Extended work / Short rest / Long rest  
+- Soft-pause control on work (default); hard-pause only if experimental flag on  
+- Actions: Start; Acknowledge rest; Continue; Start rest (from extended); End long rest early  
+- No “Stop session” while active  
 
 ### 6.3 Accessibility & clarity
 
@@ -294,7 +411,7 @@ REST_LONG
 
 ### 6.4 Design note
 
-Keep the UI minimal and calm; one primary composition on the timer screen. Avoid dashboard clutter on the main timer view—analytics live on their own surface.
+Keep the timer screen one calm composition; analytics on their own surface.
 
 ---
 
@@ -308,8 +425,9 @@ Settings {
   shortRestDurationSec: number
   cyclesBeforeLongRest: number  // N
   longRestDurationSec: number
+  decisionWindowSec: number     // 10–20, default 15
   alertsMuted: boolean
-  // optional: soundId, theme, timezone
+  workPauseStrategy: "soft" | "hard"  // default "soft"; "hard" is experimental
 }
 ```
 
@@ -320,34 +438,52 @@ Session {
   id: string
   startedAt: datetime
   completedAt: datetime | null
-  status: "active" | "completed" | "interrupted"  // interrupted = unclean shutdown recovery
-  params: {
-    workDurationSec
-    shortRestDurationSec
-    cyclesBeforeLongRest
-    longRestDurationSec
-  }
+  status: "active" | "completed" | "interrupted"
+  params: { workDurationSec, shortRestDurationSec, cyclesBeforeLongRest, longRestDurationSec, decisionWindowSec }
+  pauseStrategy: "soft" | "hard"
 }
 ```
 
-### 7.3 Period events
+### 7.3 Period / segment events
+
+**Rest:** one shared rest record shape is fine (`short_rest` | `long_rest`); early-end applies only to long.
+
+**Work:** planned and extended are **different shapes** (not one row type with a kind switch for policy):
 
 ```
-Period {
-  id: string
-  sessionId: string
-  cycleIndex: number        // 1..N
-  phase: "work" | "short_rest" | "long_rest"
-  plannedDurationSec: number
-  startedAt: datetime
-  endedAt: datetime | null
-  actualDurationSec: number | null
-  extendedWorkSec: number   // 0 if none; overtime after planned work
-  endedReason: "completed" | "extended_then_rest" | "long_rest_skipped" | "recovery"
+PlannedWorkSegment {
+  id, sessionId, cycleIndex
+  plannedDurationSec          // fixed; end not moved by soft pause
+  plannedEndAt                // authoritative end (may be shifted only by hard pause)
+  startedAt, endedAt
+  softPausedSec               // interruption accumulator; does not change plannedEndAt under soft
+  endedReason: "planned_complete" | "recovery"
+}
+
+ExtendedWorkSegment {
+  id, sessionId, cycleIndex
+  startedAt, endedAt          // no plannedDurationSec / plannedEndAt
+  actualDurationSec           // unbounded until user Start rest
+  endedReason: "user_start_rest" | "recovery"
+}
+
+RestSegment {
+  id, sessionId, cycleIndex
+  kind: "short_rest" | "long_rest"
+  plannedDurationSec
+  startedAt, endedAt
+  actualDurationSec
+  endedReason: "completed" | "long_rest_skipped_early" | "recovery"
+}
+
+PauseSlice {
+  id, sessionId, cycleIndex, plannedWorkSegmentId
+  strategy: "soft" | "hard"
+  startedAt, endedAt, durationSec
 }
 ```
 
-Exact schema may differ in implementation; fields above are the analytics contract.
+Analytics contract: sum `ExtendedWorkSegment` durations/counts; soft-paused time from `PlannedWorkSegment.softPausedSec` / `PauseSlice`.
 
 ---
 
@@ -355,27 +491,27 @@ Exact schema may differ in implementation; fields above are the analytics contra
 
 | ID | Area | Requirement | Priority |
 | --- | --- | --- | --- |
-| NFR-1 | Performance | Timer UI updates smoothly; server is optional for tick authenticity—see architecture assumption | P0 |
-| NFR-2 | Reliability | Wall-clock based timing (not only `setInterval` drift); survive refresh via persisted session state | P0 |
-| NFR-3 | Resources | Target ≤ ~256MB RAM typical for container under single-user load | P1 |
-| NFR-4 | Privacy | All data local to instance; no telemetry by default | P0 |
-| NFR-5 | Security | v1 may be network-open single-user; document putting behind reverse proxy / SSO / basic auth | P1 |
-| NFR-6 | Browser support | Latest Chrome/Firefox/Safari; document autoplay/audio policies | P1 |
-| NFR-7 | Observability | Structured logs to stdout for Docker | P2 |
+| NFR-1 | Performance | Smooth timer UI; wall-clock anchors | P0 |
+| NFR-2 | Reliability | Survive refresh; recover active session from volume | P0 |
+| NFR-3 | Resources | ≤ ~256MB RAM typical single-user | P1 |
+| NFR-4 | Privacy | Local data; no telemetry by default | P0 |
+| NFR-5 | Security | No built-in auth in scope; document reverse-proxy / network isolation | P0 |
+| NFR-6 | Browser support | Latest Chrome/Firefox/Safari; document audio policies | P1 |
+| NFR-7 | Observability | Structured logs to stdout | P2 |
+| NFR-8 | Modularity | Pause strategies and phase policies deletable in isolation | P0 |
 
 ---
 
 ## 9. Architecture assumptions (implementation guidance, not locked)
 
-These are **recommendations** for a lightweight v1; final stack can change if goals are met.
-
 | Layer | Assumption |
 | --- | --- |
 | Delivery | Single Docker image |
 | App | Web UI + small backend API |
-| DB | SQLite on mounted volume (zero external DB dependency) |
-| Timing | Client displays; server stores authoritative session start + params; reconcile on load |
-| Auth | None in v1 (trusted private network); optional reverse-proxy auth |
+| DB | SQLite on mounted volume |
+| Timing | Wall-clock anchors persisted; client renders |
+| Auth | None in current scope |
+| Pause | `WorkPauseStrategy` plugins; `workPauseStrategy` setting (`soft` default, `hard` experimental) |
 
 ---
 
@@ -383,12 +519,8 @@ These are **recommendations** for a lightweight v1; final stack can change if go
 
 ### 10.1 Expected artifacts
 
-- `Dockerfile` producing a runnable image  
-- `docker-compose.yml` example with:
-
-  - service port mapping (e.g. `8080:8080`)  
-  - named/bound volume for data  
-  - optional `TZ` env  
+- `Dockerfile`  
+- `docker-compose.yml` with port, data volume, optional `TZ`  
 
 ### 10.2 Example (illustrative)
 
@@ -403,8 +535,8 @@ docker run -d \
 
 ### 10.3 Upgrade
 
-- Image pull + recreate must keep `/data`  
-- Migrations must be automatic on startup  
+- Recreate keeps `/data`  
+- Automatic migrations on startup  
 
 ---
 
@@ -412,12 +544,14 @@ docker run -d \
 
 | Scenario | Expected behavior |
 | --- | --- |
-| Browser tab closed mid-session | Session remains active server-side; reopening resumes correct phase from wall clock |
-| Container restart mid-session | Same: recompute phase from stored anchors; if phase fully elapsed while down, land on boundary/decision or next phase per rules |
-| Multiple tabs | One logical session; secondary tabs reflect shared state (poll/SSE/websocket) or show “session active elsewhere” |
-| Audio blocked by browser | Show persistent visual + prompt to enable sound |
-| User tries to change defaults mid-session | Allow editing defaults for **future** sessions only; active session params unchanged |
-| `N = 1` | Single work → long rest only (no short rest) |
+| Browser tab closed mid-session | Authoritative timing is **server/volume state**, not the tab. Closing the tab does not pause or rewrite the schedule; reopen only reattaches UI (and may need a gesture to unlock audio). See §14 Q9 for container-down recovery (deferred) |
+| Container restart mid-session | Recompute from stored anchors (see §14 Q9 — policy TBD / deferred to next PRD revision) |
+| Multiple tabs | One logical session; sync or “active elsewhere” |
+| Audio blocked | Visual + enable-sound prompt |
+| Defaults edited mid-session | Affect future sessions only |
+| `N = 1` | Work → decision → (optional extended) → long rest only |
+| Decision window spans tab blur | Wall clock still counts server-side; timeout → extended work |
+| Soft pause across refresh | Restore whether soft-pause is active and `softPausedSec` so far; **planned end unchanged** |
 
 ---
 
@@ -425,55 +559,74 @@ docker run -d \
 
 | Milestone | Scope |
 | --- | --- |
-| **M1 – Timer core** | Defaults, session start, work/rest, alerts, flow continuation, session lock rules, Docker image |
-| **M2 – Persistence & resume** | SQLite, crash/refresh recovery, multi-tab safety |
-| **M3 – Analytics** | Event logging + stats UI + basic charts |
-| **M4 – Polish** | Notifications, mute, export, reverse-proxy notes, PWA optional |
+| **M1 – Timer core** | Separate work/rest shapes, defaults, session lock, decision window, extended work, soft pause, unique alerts (placeholders OK), Docker |
+| **M2 – Pause modules** | Soft strategy default + hard strategy behind flag; encapsulation + tests for delete-ability |
+| **M3 – Persistence & resume** | SQLite, labeled extended segments, recovery policy (after Q9) |
+| **M4 – Analytics** | Extended/pause stats + charts |
+| **M5 – Polish** | Final sound pack (owner-picked), mute, export, proxy notes |
 
 ---
 
 ## 13. Acceptance criteria (product-level)
 
-v1 is acceptable when all of the following hold:
-
-1. App runs from Docker with persistent volume and no external managed DB.  
-2. User can set defaults and override them per session before start.  
-3. Audible alerts fire at work/rest boundaries.  
-4. At work end, user can continue (extended work) and later take the **same** configured rest—not a longer one.  
-5. Extended work never grants long rest early; long rest only after `N` completed cycles.  
-6. After start, session cannot be stopped until `N` cycles are done; long rest can be ended early → idle; next session is manual.  
-7. Within a session, cycles after the first start automatically.  
-8. Analytics store history and show the v1 “nice to know” stats.
+1. Docker + persistent volume; no managed external DB.  
+2. Defaults + per-session overrides; **no rest (or work) duration increase** after start.  
+3. Unique alerts on system timer boundaries; **no** alarm on manual end of extended work.  
+4. Decision window 10–20s; ack → rest; timeout → extended work; extended labeled in DB.  
+5. Extended work never lengthens rest or grants long rest early.  
+6. Soft pause default; hard pause experimental; both modular/removable.  
+7. Short rest: no pause, no early end. Long rest: no pause, early end → idle (manual next session).  
+8. Session start user-only; cycles auto-chain inside session.  
+9. Analytics expose extended duration and frequency clearly.  
+10. No built-in auth in current scope.
 
 ---
 
 ## 14. Open questions
 
-Resolved answers should update this PRD and bump the version.
+Where **Decision** is filled, that is the product ruling. Where **Decision** is empty, the **Default assumption** column is accepted as final (no further clarification needed)—except **Q9**, which remains deferred pending the scenario table below.
 
-| # | Question | Impact | Default assumption if unanswered |
-| --- | --- | --- | --- |
-| Q1 | Can the user **pause** planned work or short rest (not only extended work)? | Timer controls, commitment philosophy | **No pause** during planned work/short rest in v1; only end extended work |
-| Q2 | Can short rest be ended early? | Symmetry with long rest | **No** in v1—only long rest is early-endable |
-| Q3 | Does WORK_BOUNDARY auto-timeout into rest if the user ignores the alert? | Flow vs structure | **No auto-rest**; wait indefinitely (with repeating gentle alert optional) |
-| Q4 | Should “End extended work” be framed as Pause or as Start rest? | Copy / UX | Single action: **Start rest** (ends overtime) |
-| Q5 | Auth for exposure on public VPS? | Security | Document reverse-proxy auth; no built-in auth in v1 |
-| Q6 | PWA / installable / offline timer? | Scope | Not required for v1 |
-| Q7 | Exact sound assets / custom upload? | Packaging | Ship 1–2 built-in alarm sounds |
-| Q8 | Time units in UI: minutes only or mm:ss? | UX | Minutes for settings; mm:ss on live timer |
-| Q9 | If container was down through an entire rest, skip ahead how many phases? | Recovery | Advance through completed phases by wall clock; stop at next **user decision** boundary (WORK_BOUNDARY) |
-| Q10 | Product name “Flexi Pomodoro” final? | Branding | Working title only |
+| # | Question | Impact | Default assumption if unanswered | Decision |
+| --- | --- | --- | --- | --- |
+| Q1 | Can the user **pause** planned work or short rest (not only extended work)? | Timer controls, commitment philosophy | **No pause** during planned work/short rest in v1; only end extended work | **Resolved:** planned work only. Soft pause = default (end time unchanged; track interruption). Hard pause = experimental (end time shifts). Short rest never pausable. Long rest not pausable; early-end only. Both pause strategies modular/removable |
+| Q2 | Can short rest be ended early? | Symmetry with long rest | **No** in v1—only long rest is early-endable | **Resolved:** No |
+| Q3 | Does WORK_BOUNDARY auto-timeout into rest if the user ignores the alert? | Flow vs structure | **No auto-rest**; wait indefinitely (with repeating gentle alert optional) | **Resolved:** Short decision window (10–20s, default 15s). Ack → rest; no ack → extended work |
+| Q4 | Should “End extended work” be framed as Pause or as Start rest? | Copy / UX | Single action: **Start rest** (ends overtime) | **Resolved:** **Start rest**; no alarm on this manual action |
+| Q5 | Auth for exposure on public VPS? | Security | Document reverse-proxy auth; no built-in auth in v1 | **Resolved:** No auth in current scope |
+| Q6 | PWA / installable / offline timer? | Scope | Not required for v1 | |
+| Q7 | Exact sound assets / custom upload? | Packaging | Ship 1–2 built-in alarm sounds | **Resolved (process):** Owner picks free/open-license samples; **unique sound per transition**; no LLM-generated default tones |
+| Q8 | Time units in UI: minutes only or mm:ss? | UX | Minutes for settings; mm:ss on live timer | |
+| Q9 | If container was down through an entire rest, skip ahead how many phases? | Recovery | Advance through completed phases by wall clock; stop at next **user decision** boundary (WORK_BOUNDARY) | |
+| Q10 | Product name “Flexi Pomodoro” final? | Branding | Working title only | |
+
+### Q9 — Recovery scenarios (discussion; decisions deferred)
+
+When the **service/container** was down and wall time advanced, what should happen on resume? (Closing a browser tab is not the same problem if timing is server-authoritative—see §11.)
+
+| # | Situation | Option A — Strict catch-up | Option B — Freeze while down | Option C — Land on next decision |
+| --- | --- | --- | --- | --- |
+| S1 | Down 2 min during a 25 min work; 10 min were left | Resume with ~8 min left | Resume with 10 min left (downtime ignored) | Same as A if still in work |
+| S2 | Down 40 min; was in work with 5 min left | Work already “ended” while down → open in **decision** (or auto-extended if decision window also elapsed while down) | Still show 5 min left | Jump to decision immediately |
+| S3 | Down through entire short rest | Short rest completed while down → auto-start next work at “rest ended” anchor, possibly already partially into next work | Still in short rest with original remaining | Enter next work at full planned duration (skip leftover rest) |
+| S4 | Down through decision window | Per FR-FLOW-4: decision elapsed → **extended work** started at decision expiry; overtime includes downtime | Still in decision with remaining window | Enter extended work now with overtime = 0 |
+| S5 | Down through most of long rest | Long rest completed → **IDLE**, session complete | Still in long rest | IDLE |
+| S6 | Down during extended work | Extended work continued (overtime includes downtime) until user Start rest | Extended frozen | Keep extended; overtime only while app up |
+| S7 | Down during soft pause | Soft-pause accumulator includes or excludes downtime? | Soft pause frozen | — |
+
+**Why this matters:** Strict catch-up preserves “real world time” and matches a kitchen timer. Freeze-while-down feels fairer if the host crashed. Hybrid (C) avoids surprising auto-jumps across multiple phases.
+
+**Note:** Product decisions on this table are **deferred** (next PRD revision). Do not treat rows as accepted yet.
 
 ---
 
 ## 15. Out-of-scope backlog (post-v1)
 
-- Tasks / project tags on sessions  
-- Multi-profile on one instance  
-- Built-in OIDC / basic auth  
-- Sync/export to external tools  
-- Adaptive durations based on analytics  
+- Tasks / project tags  
+- Multi-profile / built-in OIDC  
+- External integrations  
+- Adaptive durations  
 - Mobile apps  
+- Deleting soft or hard pause after a winner is chosen (architecture already supports this)
 
 ---
 
@@ -484,7 +637,7 @@ Resolved answers should update this PRD and bump the version.
 **Flexi Pomodoro:**
 
 1. User commits to **N cycles** (session runtime)—no bailout until done.  
-2. Work end → alert → **optional extended work** (flow).  
+2. Work end → alert → short decision window → rest, or stay in flow via **extended work**.  
 3. Break length stays as configured (short or long)—**never** stretched by overtime.  
 4. Long rest only after **N** cycles; may be cut short; **does not** auto-start the next session.  
 5. Only the user starts a session; cycles inside auto-chain.  
@@ -498,3 +651,4 @@ Resolved answers should update this PRD and bump the version.
 | Version | Date | Notes |
 | --- | --- | --- |
 | 1.0 | 2026-07-11 | Initial PRD from product brief |
+| 1.1 | 2026-07-12 | Flow/decision/alerts/pause modules/auth/sounds; clarifications: soft vs hard end-time semantics; planned-work lock ≠ extended; overrides at start; single pause setting; separate planned/extended shapes; open-questions Decision column; technique summary trimmed. Recovery scenario **decisions deferred** |

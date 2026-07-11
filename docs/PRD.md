@@ -4,7 +4,7 @@
 | --- | --- |
 | **Product name** | Flexi Pomodoro (working title — see §14 Q10) |
 | **Document type** | Product Requirements Document (PRD) |
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Status** | Draft |
 | **Last updated** | 2026-07-12 |
 | **Audience** | Solo builders / self-hosters implementing the app |
@@ -544,14 +544,14 @@ docker run -d \
 
 | Scenario | Expected behavior |
 | --- | --- |
-| Browser tab closed mid-session | Authoritative timing is **server/volume state**, not the tab. Closing the tab does not pause or rewrite the schedule; reopen only reattaches UI (and may need a gesture to unlock audio). See §14 Q9 for container-down recovery (deferred) |
-| Container restart mid-session | Recompute from stored anchors (see §14 Q9 — policy TBD / deferred to next PRD revision) |
+| Browser tab closed mid-session | Authoritative timing is **server/volume state**, not the tab. Closing the tab does not pause or rewrite the schedule; reopen only reattaches UI (and may need a gesture to unlock audio) |
+| Container restart mid-session | **Strict wall-clock catch-up (Option A)** — see §14 Q9. Recompute phase from stored anchors as if the kitchen timer never stopped; close skipped segments with `endedReason: "recovery"` where needed |
 | Multiple tabs | One logical session; sync or “active elsewhere” |
 | Audio blocked | Visual + enable-sound prompt |
 | Defaults edited mid-session | Affect future sessions only |
 | `N = 1` | Work → decision → (optional extended) → long rest only |
 | Decision window spans tab blur | Wall clock still counts server-side; timeout → extended work |
-| Soft pause across refresh | Restore whether soft-pause is active and `softPausedSec` so far; **planned end unchanged** |
+| Soft pause across refresh / downtime | Restore soft-pause active flag; **planned end unchanged**; downtime while soft-paused **counts toward** `softPausedSec` (soft pause ends only on manual resume) |
 
 ---
 
@@ -561,7 +561,7 @@ docker run -d \
 | --- | --- |
 | **M1 – Timer core** | Separate work/rest shapes, defaults, session lock, decision window, extended work, soft pause, unique alerts (placeholders OK), Docker |
 | **M2 – Pause modules** | Soft strategy default + hard strategy behind flag; encapsulation + tests for delete-ability |
-| **M3 – Persistence & resume** | SQLite, labeled extended segments, recovery policy (after Q9) |
+| **M3 – Persistence & resume** | SQLite, labeled extended segments, strict wall-clock recovery (Q9 Option A) |
 | **M4 – Analytics** | Extended/pause stats + charts |
 | **M5 – Polish** | Final sound pack (owner-picked), mute, export, proxy notes |
 
@@ -578,13 +578,14 @@ docker run -d \
 7. Short rest: no pause, no early end. Long rest: no pause, early end → idle (manual next session).  
 8. Session start user-only; cycles auto-chain inside session.  
 9. Analytics expose extended duration and frequency clearly.  
-10. No built-in auth in current scope.
+10. No built-in auth in current scope.  
+11. After container downtime, resume via **strict wall-clock catch-up** (Q9 Option A), including soft-pause downtime accumulation.
 
 ---
 
 ## 14. Open questions
 
-Where **Decision** is filled, that is the product ruling. Where **Decision** is empty, the **Default assumption** column is accepted as final (no further clarification needed)—except **Q9**, which remains deferred pending the scenario table below.
+Where **Decision** is filled, that is the product ruling. Where **Decision** is empty, the **Default assumption** column is accepted as final (no further clarification needed).
 
 | # | Question | Impact | Default assumption if unanswered | Decision |
 | --- | --- | --- | --- | --- |
@@ -596,26 +597,26 @@ Where **Decision** is filled, that is the product ruling. Where **Decision** is 
 | Q6 | PWA / installable / offline timer? | Scope | Not required for v1 | |
 | Q7 | Exact sound assets / custom upload? | Packaging | Ship 1–2 built-in alarm sounds | **Resolved (process):** Owner picks free/open-license samples; **unique sound per transition**; no LLM-generated default tones |
 | Q8 | Time units in UI: minutes only or mm:ss? | UX | Minutes for settings; mm:ss on live timer | |
-| Q9 | If container was down through an entire rest, skip ahead how many phases? | Recovery | Advance through completed phases by wall clock; stop at next **user decision** boundary (WORK_BOUNDARY) | |
+| Q9 | If container was down through an entire rest, skip ahead how many phases? | Recovery | Advance through completed phases by wall clock; stop at next **user decision** boundary (WORK_BOUNDARY) | **Resolved:** **Option A — strict wall-clock catch-up** for all scenarios below (S1–S7). Soft-pause downtime is included in `softPausedSec` |
 | Q10 | Product name “Flexi Pomodoro” final? | Branding | Working title only | |
 
-### Q9 — Recovery scenarios (discussion; decisions deferred)
+### Q9 — Recovery scenarios
 
 When the **service/container** was down and wall time advanced, what should happen on resume? (Closing a browser tab is not the same problem if timing is server-authoritative—see §11.)
 
-| # | Situation | Option A — Strict catch-up | Option B — Freeze while down | Option C — Land on next decision |
-| --- | --- | --- | --- | --- |
-| S1 | Down 2 min during a 25 min work; 10 min were left | Resume with ~8 min left | Resume with 10 min left (downtime ignored) | Same as A if still in work |
-| S2 | Down 40 min; was in work with 5 min left | Work already “ended” while down → open in **decision** (or auto-extended if decision window also elapsed while down) | Still show 5 min left | Jump to decision immediately |
-| S3 | Down through entire short rest | Short rest completed while down → auto-start next work at “rest ended” anchor, possibly already partially into next work | Still in short rest with original remaining | Enter next work at full planned duration (skip leftover rest) |
-| S4 | Down through decision window | Per FR-FLOW-4: decision elapsed → **extended work** started at decision expiry; overtime includes downtime | Still in decision with remaining window | Enter extended work now with overtime = 0 |
-| S5 | Down through most of long rest | Long rest completed → **IDLE**, session complete | Still in long rest | IDLE |
-| S6 | Down during extended work | Extended work continued (overtime includes downtime) until user Start rest | Extended frozen | Keep extended; overtime only while app up |
-| S7 | Down during soft pause | Soft-pause accumulator includes or excludes downtime? | Soft pause frozen | — |
+**Policy:** Option A — strict catch-up (kitchen timer never stopped). Segments closed only by recovery use `endedReason: "recovery"`.
 
-**Why this matters:** Strict catch-up preserves “real world time” and matches a kitchen timer. Freeze-while-down feels fairer if the host crashed. Hybrid (C) avoids surprising auto-jumps across multiple phases.
+| # | Situation | Option A — Strict catch-up | Option B — Freeze while down | Option C — Land on next decision | Decision |
+| --- | --- | --- | --- | --- | --- |
+| S1 | Down 2 min during a 25 min work; 10 min were left | Resume with ~8 min left | Resume with 10 min left (downtime ignored) | Same as A if still in work | **A** |
+| S2 | Down 40 min; was in work with 5 min left | Work already “ended” while down → open in **decision** (or auto-extended if decision window also elapsed while down) | Still show 5 min left | Jump to decision immediately | **A** |
+| S3 | Down through entire short rest | Short rest completed while down → auto-start next work at “rest ended” anchor, possibly already partially into next work | Still in short rest with original remaining | Enter next work at full planned duration (skip leftover rest) | **A** |
+| S4 | Down through decision window | Per FR-FLOW-4: decision elapsed → **extended work** started at decision expiry; overtime includes downtime | Still in decision with remaining window | Enter extended work now with overtime = 0 | **A** |
+| S5 | Down through most of long rest | Long rest completed → **IDLE**, session complete | Still in long rest | IDLE | **A** |
+| S6 | Down during extended work | Extended work continued (overtime includes downtime) until user Start rest | Extended frozen | Keep extended; overtime only while app up | **A** |
+| S7 | Down during soft pause | Soft-pause accumulator **includes** downtime (soft pause ends only via manual resume; user will notice the service was down) | Soft pause frozen | — | **A** (include downtime) |
 
-**Note:** Product decisions on this table are **deferred** (next PRD revision). Do not treat rows as accepted yet.
+**Why Option A:** Matches real-world elapsed time. Multi-phase catch-up is allowed when wall clock requires it; closed-over segments are marked `"recovery"`.
 
 ---
 
@@ -651,4 +652,5 @@ When the **service/container** was down and wall time advanced, what should happ
 | Version | Date | Notes |
 | --- | --- | --- |
 | 1.0 | 2026-07-11 | Initial PRD from product brief |
-| 1.1 | 2026-07-12 | Flow/decision/alerts/pause modules/auth/sounds; clarifications: soft vs hard end-time semantics; planned-work lock ≠ extended; overrides at start; single pause setting; separate planned/extended shapes; open-questions Decision column; technique summary trimmed. Recovery scenario **decisions deferred** |
+| 1.1 | 2026-07-12 | Flow/decision/alerts/pause modules/auth/sounds; clarifications: soft vs hard end-time semantics; planned-work lock ≠ extended; overrides at start; single pause setting; separate planned/extended shapes; open-questions Decision column; technique summary trimmed |
+| 1.2 | 2026-07-12 | Q9 recovery: Option A strict wall-clock catch-up for S1–S7; soft-pause downtime included; edge cases / acceptance updated |

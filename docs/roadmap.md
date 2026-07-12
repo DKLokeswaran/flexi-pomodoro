@@ -4,9 +4,9 @@
 | --- | --- |
 | **Product** | Flexi Pomodoro |
 | **Document type** | Product roadmap |
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Status** | Active |
-| **Last updated** | 2026-07-12 |
+| **Last updated** | 2026-07-12 (test coverage added to beta → 1.0) |
 | **Related** | [PRD](./PRD.md) (alpha scope) |
 
 ---
@@ -62,6 +62,30 @@ Beta is primarily quality and readiness. The items in this section are in scope 
 - Audio trust: unique transition sounds ship; mute; browser autoplay path documented
 - Hard-pause decision: keep clearly experimental, or remove if beta shows it is not worth keeping
 
+### Test coverage (beta gate for 1.0)
+
+Alpha milestones ship with focused engine unit tests; beta expands to **good unit test coverage** across the server core before Stable (1.0). Coverage is a release requirement, not a polish item.
+
+**Target areas:**
+
+| Area | What to cover |
+| --- | --- |
+| **Session engine** | Full state machine (PRD §5): decision ack/timeout/continue, extended work, soft-pause-at-planned-end, cycle chaining, long-rest early end, forbidden transitions |
+| **Pause modules** | Soft and hard strategies in isolation; `WorkPauseStrategy` contract; planned-end shift vs unchanged semantics |
+| **Recovery** | Strict wall-clock catch-up (PRD Q9 S1–S7): downtime through work, decision, rest, extended work, soft pause |
+| **Settings & overrides** | Defaults persistence, session-only overrides, param lock after start, validation bounds |
+| **Alerts** | Correct `pendingAlerts` per system boundary; no alarm on manual extended end or early long rest |
+| **API routes** | Fastify handlers: happy paths, invalid phase actions, error responses |
+| **Analytics** | Aggregation helpers: extended duration/count, soft-paused time, session completion stats |
+| **Migrations** | Schema upgrade paths apply cleanly on a fixture DB |
+
+**Stable (1.0) test bar:**
+
+- Critical paths (engine, pause, recovery, alerts) have unit tests with no intentional gaps on P0 PRD rules
+- New P0 behavior ships with tests in the same change (no regressions on timer correctness or data integrity)
+- CI runs the full unit suite on every merge; failures block release
+- UI and Docker remain primarily manual / smoke-tested; beta does not require full E2E automation for 1.0
+
 ### v1 features for Stable
 
 | Feature | Intent |
@@ -76,6 +100,7 @@ Beta is primarily quality and readiness. The items in this section are in scope 
 - Tags, CSV import/export, and backup are available
 - Data survives restarts and upgrades without manual repair
 - Deploy story is clear for homelab / VPS behind a reverse proxy
+- Good unit test coverage on server core (engine, pause, recovery, alerts, API, analytics helpers) with CI enforcement
 - No known P0 data-loss or incorrect-timer bugs; remaining issues are documented and non-blocking
 
 Work in later sections is **not** required to ship 1.0.
@@ -116,7 +141,7 @@ PRD (alpha)
     │
     ▼
 Beta → Stable 1.0
-  (hardening + tags + CSV import/export + backup)
+  (hardening + unit test coverage + tags + CSV import/export + backup)
     │
     ├── Post-v1 (likely): integrations · webhook/API · sync later
     │
@@ -132,3 +157,4 @@ Beta → Stable 1.0
 | Version | Date | Notes |
 | --- | --- | --- |
 | 1.0 | 2026-07-12 | Alpha = PRD; beta → stable with tags, CSV, backup; post-v1 likely vs considered |
+| 1.1 | 2026-07-12 | Beta → 1.0: good unit test coverage as release gate (engine, pause, recovery, API, analytics) |

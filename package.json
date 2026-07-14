@@ -1,0 +1,21 @@
+{
+  "name": "flexi-pomodoro",
+  "version": "0.0.1-alpha.1",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @flexi-pomodoro/shared && npm run dev:server & npm run dev:web; wait",
+    "dev:server": "PORT=3847 npm run dev -w @flexi-pomodoro/server",
+    "dev:web": "npm run dev -w @flexi-pomodoro/web",
+    "build": "npm run build -w @flexi-pomodoro/shared && npm run build -w @flexi-pomodoro/web && npm run build -w @flexi-pomodoro/server",
+    "start": "PORT=3847 WEB_DIST=$PWD/apps/web/dist npm run start -w @flexi-pomodoro/server",
+    "test": "npm run test -w @flexi-pomodoro/server",
+    "typecheck": "npm run typecheck -w @flexi-pomodoro/shared && npm run typecheck -w @flexi-pomodoro/server && npm run typecheck -w @flexi-pomodoro/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -4,19 +4,19 @@ overview: "Greenfield M1 build of Flexi Pomodoro: Vite + React UI, Fastify sessi
 todos:
   - id: scaffold
     content: "Scaffold npm workspaces: packages/shared, apps/server (Fastify), apps/web (Vite React), Dockerfile + compose"
-    status: pending
+    status: completed
   - id: engine
     content: Implement session engine with distinct phase types, soft pause, decision/extended/rest rules + unit tests
-    status: pending
+    status: completed
   - id: api
     content: Expose settings + session action/snapshot + SSE events; tick from wall clock; pendingAlerts; 5-minute poll fallback on client
-    status: pending
+    status: completed
   - id: ui
     content: "Build timer + defaults/overrides UI: phases, soft pause, decision, extended, long-rest early end; no stop"
-    status: pending
+    status: completed
   - id: alerts-docker
     content: Add 6 LLM-generated placeholder alert tones + client playback; Docker image smoke test
-    status: pending
+    status: completed
 isProject: true
 ---
 

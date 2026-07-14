@@ -1,0 +1,15 @@
+services:
+  flexi-pomodoro:
+    build: .
+    ports:
+      - "3847:3847"
+    environment:
+      TZ: Asia/Kolkata
+      PORT: "3847"
+    volumes:
+      # Stub for M3 SQLite persistence; unused in M1.
+      - flexi-pomodoro-data:/data
+    restart: unless-stopped
+
+volumes:
+  flexi-pomodoro-data:

@@ -2,12 +2,14 @@ export function NumberField({
   label,
   value,
   onChange,
-  step = 0.5,
+  step = 1,
+  min,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   step?: number;
+  min?: number;
 }) {
   return (
     <div className="field">
@@ -16,7 +18,7 @@ export function NumberField({
         <input
           type="number"
           step={step}
-          min={step}
+          min={min ?? step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
         />

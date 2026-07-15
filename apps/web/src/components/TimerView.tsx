@@ -1,4 +1,4 @@
-import type { SessionOverrides, SessionSnapshot } from "@flexi-pomodoro/shared";
+import type { SessionSnapshot, StartSessionBody } from "@flexi-pomodoro/shared";
 import { useNow } from "../hooks/useNow";
 import { ActiveTimer } from "./ActiveTimer";
 import {
@@ -13,7 +13,7 @@ export function TimerView({
   defaults,
 }: {
   snapshot: SessionSnapshot | null;
-  onAction: (path: string, body?: SessionOverrides) => void;
+  onAction: (path: string, body?: StartSessionBody) => void;
   actionError: string | null;
   defaults: SessionTimingDefaults;
 }) {

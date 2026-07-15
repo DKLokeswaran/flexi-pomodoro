@@ -1,8 +1,8 @@
-type Tab = "timer" | "defaults" | "analytics" | "about";
+type Tab = "timer" | "settings" | "analytics" | "about";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "timer", label: "Timer" },
-  { id: "defaults", label: "Defaults" },
+  { id: "settings", label: "Settings" },
   { id: "analytics", label: "Analytics" },
   { id: "about", label: "About" },
 ];

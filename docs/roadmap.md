@@ -4,9 +4,9 @@
 | --- | --- |
 | **Product** | Flexi Pomodoro |
 | **Document type** | Product roadmap |
-| **Version** | 1.1 |
+| **Version** | 1.3 |
 | **Status** | Active |
-| **Last updated** | 2026-07-12 (test coverage added to beta → 1.0) |
+| **Last updated** | 2026-07-16 (Settings tab vs Defaults values; session overrides include decision window) |
 | **Related** | [PRD](./PRD.md) (alpha scope) |
 
 ---
@@ -34,7 +34,7 @@ Clients (web UI and any later mobile UI) treat the backend as the source of trut
 
 | Milestone | Focus |
 | --- | --- |
-| **M1 – Timer core** | Work/rest shapes, defaults & overrides, session lock, decision window, extended work, soft pause, unique alerts, Docker |
+| **M1 – Timer core** | Work/rest shapes, defaults (Settings tab) & overrides (incl. decision window), session lock, decision window, extended work, soft pause, unique alerts, Docker |
 | **M2 – Pause modules** | Soft default + hard behind flag; encapsulated, deletable strategies with tests |
 | **M3 – Persistence & resume** | SQLite on volume; labeled extended segments; strict wall-clock recovery |
 | **M4 – Analytics** | Extended/pause stats and dashboard surfaces |
@@ -55,7 +55,7 @@ Beta is primarily quality and readiness. The items in this section are in scope 
 ### Readiness and quality
 
 - Bug fixes and edge-case hardening (recovery, multi-tab, audio unlock, soft-pause-at-planned-end)
-- UX clarity (defaults vs session overrides, extended-work labeling, alert feedback)
+- UX clarity (Defaults on Settings tab vs This session overrides, extended-work labeling, alert feedback)
 - Ops maturity (health checks, upgrade/migration paths, documented deploy recipes, reverse-proxy / network-isolation notes)
 - Real-world soak: multi-day sessions, container restarts, browser refresh mid-session
 - Data durability: migrations on upgrade without silent history loss
@@ -73,7 +73,7 @@ Alpha milestones ship with focused engine unit tests; beta expands to **good uni
 | **Session engine** | Full state machine (PRD §5): decision ack/timeout/continue, extended work, soft-pause-at-planned-end, cycle chaining, long-rest early end, forbidden transitions |
 | **Pause modules** | Soft and hard strategies in isolation; `WorkPauseStrategy` contract; planned-end shift vs unchanged semantics |
 | **Recovery** | Strict wall-clock catch-up (PRD Q9 S1–S7): downtime through work, decision, rest, extended work, soft pause |
-| **Settings & overrides** | Defaults persistence, session-only overrides, param lock after start, validation bounds |
+| **Settings & overrides** | Defaults persistence (edited on Settings tab), session-only overrides (incl. decision window), param lock after start, validation bounds |
 | **Alerts** | Correct `pendingAlerts` per system boundary; no alarm on manual extended end or early long rest |
 | **API routes** | Fastify handlers: happy paths, invalid phase actions, error responses |
 | **Analytics** | Aggregation helpers: extended duration/count, soft-paused time, session completion stats |
@@ -93,11 +93,12 @@ Alpha milestones ship with focused engine unit tests; beta expands to **good uni
 | **Tags** | Attach tags (e.g. task / project labels) to sessions or work so analytics can be filtered and reviewed by focus area |
 | **CSV import / export** | Export history and settings-friendly data to CSV; import CSV to restore or migrate data between instances |
 | **Backup** | Proper backup covering both in-place and online approaches |
+| **Debug mode** | Expand alpha’s per-feature debug flags (e.g. short durations for QA) into fuller tooling for Stable: engine inspection, force transitions, and a clearer debug UI — each capability independently toggleable |
 
 **Stable (1.0) means:**
 
 - PRD core technique and analytics are complete and trustworthy
-- Tags, CSV import/export, and backup are available
+- Tags, CSV import/export, backup, and debug mode are available
 - Data survives restarts and upgrades without manual repair
 - Deploy story is clear for homelab / VPS behind a reverse proxy
 - Good unit test coverage on server core (engine, pause, recovery, alerts, API, analytics helpers) with CI enforcement
@@ -141,7 +142,7 @@ PRD (alpha)
     │
     ▼
 Beta → Stable 1.0
-  (hardening + unit test coverage + tags + CSV import/export + backup)
+  (hardening + unit test coverage + tags + CSV import/export + backup + debug mode)
     │
     ├── Post-v1 (likely): integrations · webhook/API · sync later
     │
@@ -158,3 +159,5 @@ Beta → Stable 1.0
 | --- | --- | --- |
 | 1.0 | 2026-07-12 | Alpha = PRD; beta → stable with tags, CSV, backup; post-v1 likely vs considered |
 | 1.1 | 2026-07-12 | Beta → 1.0: good unit test coverage as release gate (engine, pause, recovery, API, analytics) |
+| 1.2 | 2026-07-15 | Beta → 1.0 v1 features: Debug mode (builds on alpha per-feature flags / short durations) |
+| 1.3 | 2026-07-16 | Align with PRD: Settings tab hosts Defaults; session overrides include decision window |

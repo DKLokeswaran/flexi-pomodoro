@@ -1,4 +1,23 @@
 import { z } from "zod";
+import { SETTINGS_BOUNDS, type SettingsBounds } from "./bounds.js";
+import { DebugFlagsSchema, type DebugFlags } from "./debug/catalog.js";
+import { getSettingsBounds } from "./debug/getSettingsBounds.js";
+
+export { SETTINGS_BOUNDS, type SettingsBounds } from "./bounds.js";
+export {
+  DEBUG_FEATURES,
+  DEBUG_FEATURE_IDS,
+  DEBUG_FEATURE_META,
+  DebugFlagsSchema,
+  getDebugFeature,
+  isDebugFeatureEnabled,
+  type DebugFeatureDef,
+  type DebugFeatureId,
+  type DebugFeatureMeta,
+  type DebugFlags,
+} from "./debug/catalog.js";
+export { getSettingsBounds } from "./debug/getSettingsBounds.js";
+export { SHORT_DURATIONS_MIN_OVERLAY } from "./debug/features/shortDurations/index.js";
 
 export const AlertIdSchema = z.enum([
   "work_planned_end",
@@ -15,14 +34,6 @@ export type AlertId = z.infer<typeof AlertIdSchema>;
 export const WorkPauseStrategySchema = z.literal("soft");
 export type WorkPauseStrategy = z.infer<typeof WorkPauseStrategySchema>;
 
-export const SETTINGS_BOUNDS = {
-  workDurationSec: { min: 60, max: 180 * 60 },
-  shortRestDurationSec: { min: 60, max: 60 * 60 },
-  cyclesBeforeLongRest: { min: 1, max: 12 },
-  longRestDurationSec: { min: 60, max: 120 * 60 },
-  decisionWindowSec: { min: 10, max: 20 },
-} as const;
-
 function boundedInt(name: string, bounds: { min: number; max: number }) {
   return z
     .number({ error: `${name} must be a number` })
@@ -31,33 +42,30 @@ function boundedInt(name: string, bounds: { min: number; max: number }) {
     .max(bounds.max, { error: `${name} must be <= ${bounds.max}` });
 }
 
-function boundedNumber(name: string, bounds: { min: number; max: number }) {
-  return z
-    .number({ error: `${name} must be a number` })
-    .finite({ error: `${name} must be finite` })
-    .min(bounds.min, { error: `${name} must be >= ${bounds.min}` })
-    .max(bounds.max, { error: `${name} must be <= ${bounds.max}` });
+function sessionParamsSchemaForBounds(bounds: SettingsBounds) {
+  return z.object({
+    workDurationSec: boundedInt("workDurationSec", bounds.workDurationSec),
+    shortRestDurationSec: boundedInt(
+      "shortRestDurationSec",
+      bounds.shortRestDurationSec,
+    ),
+    cyclesBeforeLongRest: boundedInt(
+      "cyclesBeforeLongRest",
+      bounds.cyclesBeforeLongRest,
+    ),
+    longRestDurationSec: boundedInt(
+      "longRestDurationSec",
+      bounds.longRestDurationSec,
+    ),
+    decisionWindowSec: boundedInt(
+      "decisionWindowSec",
+      bounds.decisionWindowSec,
+    ),
+  });
 }
 
-export const SessionParamsSchema = z.object({
-  workDurationSec: boundedNumber("workDurationSec", SETTINGS_BOUNDS.workDurationSec),
-  shortRestDurationSec: boundedNumber(
-    "shortRestDurationSec",
-    SETTINGS_BOUNDS.shortRestDurationSec,
-  ),
-  cyclesBeforeLongRest: boundedInt(
-    "cyclesBeforeLongRest",
-    SETTINGS_BOUNDS.cyclesBeforeLongRest,
-  ),
-  longRestDurationSec: boundedNumber(
-    "longRestDurationSec",
-    SETTINGS_BOUNDS.longRestDurationSec,
-  ),
-  decisionWindowSec: boundedInt(
-    "decisionWindowSec",
-    SETTINGS_BOUNDS.decisionWindowSec,
-  ),
-});
+/** Production session params (settings + default start validation). */
+export const SessionParamsSchema = sessionParamsSchemaForBounds(SETTINGS_BOUNDS);
 export type SessionParams = z.infer<typeof SessionParamsSchema>;
 
 export const SessionOverridesSchema = SessionParamsSchema.partial();
@@ -72,6 +80,9 @@ export type Settings = z.infer<typeof SettingsSchema>;
 export const SettingsPatchSchema = SettingsSchema.partial();
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;
 
+/** Body for POST /api/session/start — overrides plus optional per-feature debug flags. */
+export type StartSessionBody = SessionOverrides & { debug?: DebugFlags };
+
 export const DEFAULT_SETTINGS: Settings = {
   workDurationSec: 25 * 60,
   shortRestDurationSec: 5 * 60,
@@ -85,8 +96,10 @@ export const DEFAULT_SETTINGS: Settings = {
 export function mergeSessionParams(
   settings: Settings,
   overrides?: SessionOverrides,
+  opts?: { debug?: DebugFlags },
 ): SessionParams {
-  return SessionParamsSchema.parse({
+  const schema = sessionParamsSchemaForBounds(getSettingsBounds(opts?.debug));
+  return schema.parse({
     workDurationSec: overrides?.workDurationSec ?? settings.workDurationSec,
     shortRestDurationSec:
       overrides?.shortRestDurationSec ?? settings.shortRestDurationSec,
@@ -97,6 +110,27 @@ export function mergeSessionParams(
     decisionWindowSec:
       overrides?.decisionWindowSec ?? settings.decisionWindowSec,
   });
+}
+
+/**
+ * Parse start-session body: extract `debug` (strict), then validate overrides
+ * against bounds from enabled debug flags.
+ */
+export function parseStartSessionBody(body: unknown): {
+  debug: DebugFlags | undefined;
+  overrides: SessionOverrides;
+} {
+  const raw = z.object({}).passthrough().parse(body ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const { debug: debugRaw, ...overrideRaw } = raw;
+  const debug =
+    debugRaw === undefined ? undefined : DebugFlagsSchema.parse(debugRaw);
+  const overrides = sessionParamsSchemaForBounds(getSettingsBounds(debug))
+    .partial()
+    .parse(overrideRaw);
+  return { debug, overrides };
 }
 
 export function parseSettingsPatch(

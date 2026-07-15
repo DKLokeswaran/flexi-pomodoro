@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import {
-  type SessionOverrides,
   type SettingsPatch,
-  SessionOverridesSchema,
+  type StartSessionBody,
   SettingsPatchSchema,
+  parseStartSessionBody,
 } from "@flexi-pomodoro/shared";
 import { ZodError } from "zod";
 import { SessionEngine, SessionError, toSessionError } from "../session/engine.js";
@@ -96,10 +96,10 @@ export async function registerApiRoutes(
     },
   );
 
-  app.post<{ Body: SessionOverrides }>("/api/session/start", async (req, reply) => {
+  app.post<{ Body: StartSessionBody }>("/api/session/start", async (req, reply) => {
     try {
-      const overrides = SessionOverridesSchema.parse(req.body ?? {});
-      return engine.start(overrides);
+      const { debug, overrides } = parseStartSessionBody(req.body ?? {});
+      return engine.start(overrides, Date.now(), { debug });
     } catch (err) {
       const { statusCode, body } = errorReply(err);
       return reply.code(statusCode).send(body);

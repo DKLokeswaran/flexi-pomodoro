@@ -19,5 +19,5 @@ export function minutesToSec(minutes: number): number {
 }
 
 export function secToMinutes(sec: number): number {
-  return Math.round((sec / 60) * 100) / 100;
+  return Math.round(sec / 60);
 }

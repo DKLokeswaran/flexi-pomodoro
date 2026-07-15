@@ -232,6 +232,39 @@ input {
   grid-column: 1 / -1;
 }
 
+.debug-flags {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+  text-align: left;
+}
+
+.debug-flag {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.debug-flag input {
+  margin-top: 0.2rem;
+  accent-color: var(--accent);
+}
+
+.debug-flag-desc {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.debug-flag-nested {
+  margin-left: 1.25rem;
+}
+
 .error {
   color: var(--extended);
   margin: 0;

@@ -4,9 +4,9 @@
 | --- | --- |
 | **Product name** | Flexi Pomodoro (working title — see §14 Q10) |
 | **Document type** | Product Requirements Document (PRD) |
-| **Version** | 1.3 |
+| **Version** | 1.4 |
 | **Status** | Draft |
-| **Last updated** | 2026-07-12 |
+| **Last updated** | 2026-07-16 |
 | **Audience** | Solo builders / self-hosters implementing the app |
 
 ---
@@ -88,8 +88,9 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 | **Session runtime** (session) | A committed run of **N cycles**. Starts only on explicit user action |
 | **Soft pause** (default) | Planned work **end time does not change**. The work countdown keeps running toward the original planned end; a separate accumulator tracks how long the user was soft-paused (not focusing). That interruption time is for analytics only—it does **not** buy more planned work. Soft pause ends on **manual resume**, or **automatically at planned end** (see FR-PAUSE-S7: auto-rest, skip decision) |
 | **Hard pause** (experimental) | Work timer **stops**. On resume, remaining time continues and the **planned end time is shifted** by the paused duration. Behind experimental feature flag |
-| **Defaults** | Persistent user settings used when starting a session without overrides |
-| **Session override** | One-time values applied only to the session about to start |
+| **Defaults** | Persistent timing values (work, rest, `N`, decision window, etc.) used when starting a session without overrides |
+| **Settings** | App UI tab/panel that hosts defaults (and related preferences) |
+| **Session override** | One-time values applied only to the session about to start (shown as “This session” on the timer) |
 | **System period boundary** | Instant when a **timer-driven** phase reaches its end (planned work, short rest, long rest). Triggers unique alert. Manual UI actions (e.g. End extended work, End long rest early) do **not** fire “end” alarms |
 
 ---
@@ -114,7 +115,9 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 
 ---
 
-### 4.2 Settings: defaults & session overrides (FR-SET)
+### 4.2 Defaults & session overrides (FR-SET)
+
+Defaults are edited on the **Settings** tab. Session overrides appear on the timer as **This session**.
 
 #### 4.2.1 Configurable defaults
 
@@ -135,12 +138,12 @@ Optional v1 niceties (P2): sound pack selection (from shipped curated assets), a
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| FR-SET-1 | Before starting a session, user may override any of: work, short rest, `N`, long rest | P0 |
-| FR-SET-2 | Overrides apply only to that session; defaults remain unchanged unless user saves defaults separately | P0 |
+| FR-SET-1 | Before starting a session, user may override any of: work, short rest, `N`, long rest, decision window | P0 |
+| FR-SET-2 | Overrides apply only to that session; defaults remain unchanged unless the user saves defaults separately (from Settings) | P0 |
 | FR-SET-3 | After session **start**, session params are locked except: early end of **long rest** only | P0 |
 | FR-SET-4 | **Neither short rest nor long rest duration may be increased** after session start | P0 |
 | FR-SET-5 | The session’s **planned work duration** (default or override captured at start) cannot be increased after session start. This does **not** constrain extended work, which has no fixed planned end | P0 |
-| FR-SET-6 | UI clearly distinguishes “Defaults” vs “This session” | P0 |
+| FR-SET-6 | UI clearly distinguishes **Defaults** (persistent values on the Settings tab) vs **This session** (overrides before start) | P0 |
 
 ---
 
@@ -285,7 +288,7 @@ WorkPauseStrategy {
 | ID | Requirement | Priority |
 | --- | --- | --- |
 | FR-SESS-1 | A session runtime starts **only** when the user explicitly starts it | P0 |
-| FR-SESS-2 | At start, the user may apply **session overrides** (work, short rest, `N`, long rest, etc.). The **effective** params for that runtime are then locked for the rest of the session—overrides are allowed at start, not mid-runtime | P0 |
+| FR-SESS-2 | At start, the user may apply **session overrides** (work, short rest, `N`, long rest, decision window). The **effective** params for that runtime are then locked for the rest of the session—overrides are allowed at start, not mid-runtime | P0 |
 | FR-SESS-3 | On start, cycle 1 work begins immediately | P0 |
 
 #### 4.7.2 During a session
@@ -397,8 +400,8 @@ REST_LONG    // not pausable; early-endable
 
 ### 6.1 Primary surfaces
 
-1. **Timer / session** — phase, countdown/count-up, cycle `k / N`, primary actions  
-2. **Defaults** — persistent settings + experimental flags  
+1. **Timer / session** — phase, countdown/count-up, cycle `k / N`, primary actions; idle “This session” overrides before start  
+2. **Settings** — tab for defaults and related preferences (e.g. experimental flags)  
 3. **Analytics** — stats and charts (extended work first-class)  
 4. **About / self-host help** — run instructions; credit sound licenses  
 
@@ -557,7 +560,7 @@ docker run -d \
 | Container restart mid-session | **Strict wall-clock catch-up (Option A)** — see §14 Q9. Recompute phase from stored anchors as if the kitchen timer never stopped; close skipped segments with `endedReason: "recovery"` where needed |
 | Multiple tabs | One logical session; sync or “active elsewhere” |
 | Audio blocked | Visual + enable-sound prompt |
-| Defaults edited mid-session | Affect future sessions only |
+| Defaults edited mid-session (via Settings) | Affect future sessions only |
 | `N = 1` | Work → decision → (optional extended) → long rest only |
 | Decision window spans tab blur | Wall clock still counts server-side; timeout → extended work |
 | Soft pause across refresh / downtime | Restore soft-pause active flag; **planned end unchanged**; downtime while soft-paused **counts toward** `softPausedSec` until manual resume **or** planned-end auto-rest (FR-PAUSE-S7) |
@@ -569,7 +572,7 @@ docker run -d \
 
 | Milestone | Scope |
 | --- | --- |
-| **M1 – Timer core** | Separate work/rest shapes, defaults, session lock, decision window, extended work, soft pause, unique alerts (placeholders OK), Docker |
+| **M1 – Timer core** | Separate work/rest shapes, defaults (Settings tab) + session overrides, session lock, decision window, extended work, soft pause, unique alerts (placeholders OK), Docker |
 | **M2 – Pause modules** | Soft strategy default + hard strategy behind flag; encapsulation + tests for delete-ability |
 | **M3 – Persistence & resume** | SQLite, labeled extended segments, strict wall-clock recovery (Q9 Option A) |
 | **M4 – Analytics** | Extended/pause stats + charts |
@@ -580,7 +583,7 @@ docker run -d \
 ## 13. Acceptance criteria (product-level)
 
 1. Docker + persistent volume; no managed external DB.  
-2. Defaults + per-session overrides; **no rest (or work) duration increase** after start.  
+2. Defaults (Settings tab) + per-session overrides (including decision window); **no rest (or work) duration increase** after start.  
 3. Unique alerts on system timer boundaries; **no** alarm on manual end of extended work.  
 4. Decision window 10–20s; ack → rest; timeout → extended work; extended labeled in DB.  
 5. Extended work never lengthens rest or grants long rest early.  
@@ -666,3 +669,4 @@ When the **service/container** was down and wall time advanced, what should happ
 | 1.1 | 2026-07-12 | Flow/decision/alerts/pause modules/auth/sounds; clarifications: soft vs hard end-time semantics; planned-work lock ≠ extended; overrides at start; single pause setting; separate planned/extended shapes; open-questions Decision column; technique summary trimmed |
 | 1.2 | 2026-07-12 | Q9 recovery: Option A strict wall-clock catch-up for S1–S7; soft-pause downtime included; edge cases / acceptance updated |
 | 1.3 | 2026-07-12 | Soft pause through planned end: auto-close pause, skip decision, auto-transition to rest |
+| 1.4 | 2026-07-16 | Settings is the tab name; Defaults vs This session labeling; session overrides include decision window |

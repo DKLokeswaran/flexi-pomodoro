@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DEFAULT_SETTINGS } from "@flexi-pomodoro/shared";
 import { AboutStub, AnalyticsStub } from "./components/Stubs";
-import { DefaultsPanel } from "./components/DefaultsPanel";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { Nav, type Tab } from "./components/Nav";
 import { TimerView } from "./components/TimerView";
 import {
@@ -59,8 +59,8 @@ export function App() {
         />
       ) : null}
 
-      {tab === "defaults" ? (
-        <DefaultsPanel
+      {tab === "settings" ? (
+        <SettingsPanel
           settings={settings}
           locked={Boolean(active)}
           saving={saveSettings.isPending}

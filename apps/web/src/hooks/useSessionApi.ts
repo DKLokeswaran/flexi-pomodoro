@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { SessionOverrides, SettingsPatch } from "@flexi-pomodoro/shared";
+import type {
+  SessionSnapshot,
+  SettingsPatch,
+  StartSessionBody,
+} from "@flexi-pomodoro/shared";
 import {
   alertsFromSnapshot,
   fetchSettings,
@@ -7,7 +11,6 @@ import {
   postAction,
   saveSettings,
 } from "../api";
-import type { SessionSnapshot } from "@flexi-pomodoro/shared";
 
 export const settingsQueryKey = ["settings"] as const;
 
@@ -37,7 +40,7 @@ export function useSessionActionMutation(
       body,
     }: {
       path: string;
-      body?: SessionOverrides;
+      body?: StartSessionBody;
     }) => postAction(path, body),
     onSuccess: (snap) => {
       onSnapshot(snap);

@@ -1,10 +1,10 @@
 import type {
   AlertEvent,
   AlertId,
-  SessionOverrides,
   SessionSnapshot,
   Settings,
   SettingsPatch,
+  StartSessionBody,
 } from "@flexi-pomodoro/shared";
 
 const ALERT_SEQ_KEY = "flexi-pomodoro:lastPlayedAlertSeq";
@@ -69,7 +69,7 @@ export async function fetchSession(): Promise<SessionSnapshot> {
 
 export async function postAction(
   path: string,
-  body?: SessionOverrides | undefined,
+  body?: StartSessionBody | undefined,
 ): Promise<SessionSnapshot> {
   return parseJson(
     await fetch(path, {

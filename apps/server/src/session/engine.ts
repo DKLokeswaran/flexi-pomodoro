@@ -7,6 +7,7 @@ import {
   type PlannedWorkPhase,
   type RestKind,
   type RestPhase,
+  type DebugFlags,
   type SessionOverrides,
   type SessionParams,
   type SessionSnapshot,
@@ -188,14 +189,20 @@ export class SessionEngine {
     return this.buildSnapshot(nowMs, sinceSeq);
   }
 
-  start(overrides?: SessionOverrides, nowMs: number = Date.now()): SessionSnapshot {
+  start(
+    overrides?: SessionOverrides,
+    nowMs: number = Date.now(),
+    opts?: { debug?: DebugFlags },
+  ): SessionSnapshot {
     if (this.session) {
       throw new SessionError("A session is already active", "SESSION_ACTIVE");
     }
     const seqAtStart = this.alertSeq;
     let params: SessionParams;
     try {
-      params = mergeSessionParams(this.settings, overrides);
+      params = mergeSessionParams(this.settings, overrides, {
+        debug: opts?.debug,
+      });
     } catch (err) {
       throw toSessionError(err);
     }

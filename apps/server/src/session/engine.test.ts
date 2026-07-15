@@ -206,4 +206,56 @@ describe("SessionEngine", () => {
     const phase = activePhase(engine, T0 + 60_000 + 15_000);
     assert.equal(phase.kind, "extended_work");
   });
+
+  it("starts with 1s durations when debug.shortDurations is enabled", () => {
+    const engine = new SessionEngine();
+    const snap = engine.start(
+      {
+        workDurationSec: 1,
+        shortRestDurationSec: 1,
+        longRestDurationSec: 1,
+        decisionWindowSec: 1,
+        cyclesBeforeLongRest: 1,
+      },
+      T0,
+      { debug: { shortDurations: true } },
+    );
+    assert.equal(snap.status, "active");
+    if (snap.status !== "active") throw new Error("expected active");
+    assert.equal(snap.session.params.workDurationSec, 1);
+    assert.equal(snap.session.params.decisionWindowSec, 1);
+  });
+
+  it("rejects 1s durations without shortDurations flag", () => {
+    const engine = new SessionEngine();
+    assert.throws(
+      () =>
+        engine.start(
+          {
+            workDurationSec: 1,
+            shortRestDurationSec: 1,
+            longRestDurationSec: 1,
+            decisionWindowSec: 1,
+          },
+          T0,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof SessionError);
+        assert.equal(err.code, "INVALID_SETTINGS");
+        return true;
+      },
+    );
+  });
+
+  it("rejects sub-minute work in settings even when short timers are desired", () => {
+    const engine = new SessionEngine();
+    assert.throws(
+      () => engine.updateSettings({ workDurationSec: 1 }),
+      (err: unknown) => {
+        assert.ok(err instanceof SessionError);
+        assert.equal(err.code, "INVALID_SETTINGS");
+        return true;
+      },
+    );
+  });
 });

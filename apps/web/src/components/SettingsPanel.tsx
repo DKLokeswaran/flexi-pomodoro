@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import type { Settings } from "@flexi-pomodoro/shared";
+import {
+  DEBUG_FEATURE_IDS,
+  DEBUG_FEATURE_META,
+  type Settings,
+} from "@flexi-pomodoro/shared";
+import { useDebugFlags } from "../debug/DebugFlagsProvider";
 import { minutesToSec, secToMinutes } from "../time";
 import { NumberField } from "./NumberField";
 
-export function DefaultsPanel({
+export function SettingsPanel({
   settings,
   onSave,
   locked,
@@ -16,6 +21,7 @@ export function DefaultsPanel({
   saving?: boolean;
   error?: string | null;
 }) {
+  const { debugMode, setDebugMode, flags, setFlag } = useDebugFlags();
   const [draft, setDraft] = useState({
     workMin: secToMinutes(settings.workDurationSec),
     shortRestMin: secToMinutes(settings.shortRestDurationSec),
@@ -36,9 +42,9 @@ export function DefaultsPanel({
 
   return (
     <section className="panel">
-      <h2>Defaults</h2>
+      <h2>Settings</h2>
       <p className="lead">
-        Persistent settings used when starting without overrides. Edits apply to
+        Persistent defaults used when starting without overrides. Edits apply to
         future sessions only.
       </p>
       {locked ? (
@@ -51,12 +57,18 @@ export function DefaultsPanel({
         <NumberField
           label="Work (min)"
           value={draft.workMin}
-          onChange={(v) => setDraft((d) => ({ ...d, workMin: v }))}
+          step={1}
+          onChange={(v) =>
+            setDraft((d) => ({ ...d, workMin: Math.round(v) }))
+          }
         />
         <NumberField
           label="Short rest (min)"
           value={draft.shortRestMin}
-          onChange={(v) => setDraft((d) => ({ ...d, shortRestMin: v }))}
+          step={1}
+          onChange={(v) =>
+            setDraft((d) => ({ ...d, shortRestMin: Math.round(v) }))
+          }
         />
         <NumberField
           label="Cycles (N)"
@@ -67,12 +79,16 @@ export function DefaultsPanel({
         <NumberField
           label="Long rest (min)"
           value={draft.longRestMin}
-          onChange={(v) => setDraft((d) => ({ ...d, longRestMin: v }))}
+          step={1}
+          onChange={(v) =>
+            setDraft((d) => ({ ...d, longRestMin: Math.round(v) }))
+          }
         />
         <NumberField
           label="Decision window (sec)"
           value={draft.decisionSec}
           step={1}
+          min={10}
           onChange={(v) =>
             setDraft((d) => ({ ...d, decisionSec: Math.round(v) }))
           }
@@ -96,6 +112,44 @@ export function DefaultsPanel({
         >
           Save defaults
         </button>
+      </div>
+
+      <p className="section-title">Debug</p>
+      <div className="debug-flags">
+        <label className="debug-flag">
+          <input
+            type="checkbox"
+            checked={debugMode}
+            onChange={(e) => setDebugMode(e.target.checked)}
+          />
+          <span>
+            Enable debug mode
+            <span className="debug-flag-desc">
+              Unlocks per-feature debug options for this browser session. Not
+              saved with defaults.
+            </span>
+          </span>
+        </label>
+        {debugMode
+          ? DEBUG_FEATURE_IDS.map((id) => {
+              const meta = DEBUG_FEATURE_META[id];
+              return (
+                <label key={id} className="debug-flag debug-flag-nested">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(flags[id])}
+                    onChange={(e) => setFlag(id, e.target.checked)}
+                  />
+                  <span>
+                    {meta.label}
+                    {meta.description ? (
+                      <span className="debug-flag-desc">{meta.description}</span>
+                    ) : null}
+                  </span>
+                </label>
+              );
+            })
+          : null}
       </div>
     </section>
   );

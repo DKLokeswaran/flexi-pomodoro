@@ -30,6 +30,22 @@ export const AlertIdSchema = z.enum([
 ]);
 export type AlertId = z.infer<typeof AlertIdSchema>;
 
+/** Shared session HTTP paths (server routes + client callers). */
+export const SESSION_API = {
+  health: "/api/health",
+  settings: "/api/settings",
+  session: "/api/session",
+  alertSeq: "/api/session/alert-seq",
+  events: "/api/session/events",
+  start: "/api/session/start",
+  ackRest: "/api/session/ack-rest",
+  continue: "/api/session/continue",
+  startRest: "/api/session/start-rest",
+  softPause: "/api/session/soft-pause",
+  softResume: "/api/session/soft-resume",
+  endLongRest: "/api/session/end-long-rest",
+} as const;
+
 /** M1: only soft is accepted. Hard arrives in M2. */
 export const WorkPauseStrategySchema = z.literal("soft");
 export type WorkPauseStrategy = z.infer<typeof WorkPauseStrategySchema>;

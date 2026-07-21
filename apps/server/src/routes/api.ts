@@ -1,7 +1,9 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+  type SessionSnapshot,
   type SettingsPatch,
   type StartSessionBody,
+  SESSION_API,
   SettingsPatchSchema,
   parseStartSessionBody,
 } from "@flexi-pomodoro/shared";
@@ -42,11 +44,11 @@ export async function registerApiRoutes(
   app: FastifyInstance,
   engine: SessionEngine,
 ): Promise<void> {
-  app.get("/api/health", async () => ({ ok: true }));
+  app.get(SESSION_API.health, async () => ({ ok: true }));
 
-  app.get("/api/settings", async () => engine.getSettings());
+  app.get(SESSION_API.settings, async () => engine.getSettings());
 
-  app.put<{ Body: SettingsPatch }>("/api/settings", async (req, reply) => {
+  app.put<{ Body: SettingsPatch }>(SESSION_API.settings, async (req, reply) => {
     try {
       const patch = SettingsPatchSchema.parse(req.body ?? {});
       return engine.updateSettings(patch);
@@ -56,12 +58,12 @@ export async function registerApiRoutes(
     }
   });
 
-  app.get("/api/session/alert-seq", async () => ({
+  app.get(SESSION_API.alertSeq, async () => ({
     alertSeq: engine.getAlertSeq(),
   }));
 
   app.get<{ Querystring: { sinceSeq?: string } }>(
-    "/api/session",
+    SESSION_API.session,
     async (req) => {
       const sinceSeq = resolveSinceSeq(req.query.sinceSeq, engine);
       return engine.getSnapshot(Date.now(), sinceSeq);
@@ -69,7 +71,7 @@ export async function registerApiRoutes(
   );
 
   app.get<{ Querystring: { sinceSeq?: string } }>(
-    "/api/session/events",
+    SESSION_API.events,
     async (req, reply) => {
       reply.hijack();
       reply.raw.writeHead(200, {
@@ -78,7 +80,7 @@ export async function registerApiRoutes(
         Connection: "keep-alive",
       });
 
-      const send = (data: unknown) => {
+      const send = (data: SessionSnapshot) => {
         reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
       };
 
@@ -100,7 +102,7 @@ export async function registerApiRoutes(
     },
   );
 
-  app.post<{ Body: StartSessionBody }>("/api/session/start", async (req, reply) => {
+  app.post<{ Body: StartSessionBody }>(SESSION_API.start, async (req, reply) => {
     try {
       const { debug, overrides } = parseStartSessionBody(req.body ?? {});
       return engine.start(overrides, Date.now(), { debug });
@@ -111,11 +113,8 @@ export async function registerApiRoutes(
   });
 
   const action =
-    (fn: () => ReturnType<SessionEngine["getSnapshot"]>) =>
-    async (
-      _req: unknown,
-      reply: { code: (n: number) => { send: (b: object) => unknown } },
-    ) => {
+    (fn: () => SessionSnapshot) =>
+    async (_req: FastifyRequest, reply: FastifyReply) => {
       try {
         return fn();
       } catch (err) {
@@ -124,10 +123,10 @@ export async function registerApiRoutes(
       }
     };
 
-  app.post("/api/session/ack-rest", action(() => engine.ackRest()));
-  app.post("/api/session/continue", action(() => engine.continueExtended()));
-  app.post("/api/session/start-rest", action(() => engine.startRest()));
-  app.post("/api/session/soft-pause", action(() => engine.softPause()));
-  app.post("/api/session/soft-resume", action(() => engine.softResume()));
-  app.post("/api/session/end-long-rest", action(() => engine.endLongRest()));
+  app.post(SESSION_API.ackRest, action(() => engine.ackRest()));
+  app.post(SESSION_API.continue, action(() => engine.continueExtended()));
+  app.post(SESSION_API.startRest, action(() => engine.startRest()));
+  app.post(SESSION_API.softPause, action(() => engine.softPause()));
+  app.post(SESSION_API.softResume, action(() => engine.softResume()));
+  app.post(SESSION_API.endLongRest, action(() => engine.endLongRest()));
 }

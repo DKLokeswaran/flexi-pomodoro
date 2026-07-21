@@ -12,6 +12,7 @@ import {
   type SessionParams,
   type SessionSnapshot,
   type Settings,
+  type SettingsPatch,
   DEFAULT_SETTINGS,
   mergeSessionParams,
   parseSettingsPatch,
@@ -114,7 +115,7 @@ export class SessionEngine {
     return { ...this.settings };
   }
 
-  updateSettings(partial: unknown): Settings {
+  updateSettings(partial: SettingsPatch): Settings {
     try {
       this.settings = parseSettingsPatch(this.settings, partial);
     } catch (err) {
@@ -289,6 +290,8 @@ export class SessionEngine {
       throw new SessionError("Continue is only valid in decision", "INVALID_PHASE");
     }
     const decision = session.phase as DecisionPhase;
+    // Explicit continue: decision elapsed is neither work nor rest (M3 DecisionSegment).
+    // Extended starts at the click, not at decision.startedAt.
     session.phase = {
       kind: "extended_work",
       cycleIndex: decision.cycleIndex,
@@ -399,10 +402,11 @@ export class SessionEngine {
       if (nowMs < parseIso(phase.decisionEndsAt)) {
         return false;
       }
+      // Timeout: decision window counts as extended work (backdate to decision start).
       session.phase = {
         kind: "extended_work",
         cycleIndex: phase.cycleIndex,
-        startedAt: phase.decisionEndsAt,
+        startedAt: phase.startedAt,
       };
       this.emitAlerts("extended_work_auto_start");
       return true;

@@ -124,6 +124,8 @@ describe("SessionEngine", () => {
     const afterDecision = afterWork + 15_000;
     phase = activePhase(engine, afterDecision);
     assert.equal(phase.kind, "extended_work");
+    // Timeout: decision window is part of extended (startedAt = decision start).
+    assert.equal(phase.startedAt, new Date(afterWork).toISOString());
     assert.ok(
       alertsSince(engine, afterDecision, seqBeforeDecisionEnd).includes(
         "extended_work_auto_start",
@@ -145,6 +147,18 @@ describe("SessionEngine", () => {
         (a) => a.id === "long_rest_start",
       ),
     );
+  });
+
+  it("continue from decision starts extended at click (decision time excluded)", () => {
+    const engine = engineWithShortTimers(1);
+    engine.start(undefined, T0);
+    const afterWork = T0 + 60_000;
+    activePhase(engine, afterWork);
+    const clickAt = afterWork + 5_000;
+    engine.continueExtended(clickAt);
+    const phase = activePhase(engine, clickAt);
+    assert.equal(phase.kind, "extended_work");
+    assert.equal(phase.startedAt, new Date(clickAt).toISOString());
   });
 
   it("soft pause mid-work keeps planned end unchanged", () => {

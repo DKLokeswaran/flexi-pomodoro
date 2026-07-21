@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { StartSessionBody } from "@flexi-pomodoro/shared";
 import { useDebugFlags } from "../debug/DebugFlagsProvider";
+import { DECISION_WINDOW_LABEL } from "../labels";
 import { minutesToSec, secToMinutes } from "../time";
 import { NumberField } from "./NumberField";
 
@@ -89,7 +90,7 @@ export function IdleStartForm({
     { key: "shortRest", label: `Short rest (${durationUnit})` },
     { key: "cycles", label: "Cycles (N)" },
     { key: "longRest", label: `Long rest (${durationUnit})` },
-    { key: "decision", label: "Decision window (sec)" },
+    { key: "decision", label: DECISION_WINDOW_LABEL },
   ];
 
   return (

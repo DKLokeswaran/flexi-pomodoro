@@ -1,4 +1,5 @@
 import type { SessionSnapshot, StartSessionBody } from "@flexi-pomodoro/shared";
+import { SESSION_API } from "@flexi-pomodoro/shared";
 import { useNow } from "../hooks/useNow";
 import { ActiveTimer } from "./ActiveTimer";
 import {
@@ -9,12 +10,10 @@ import {
 export function TimerView({
   snapshot,
   onAction,
-  actionError,
   defaults,
 }: {
   snapshot: SessionSnapshot | null;
   onAction: (path: string, body?: StartSessionBody) => void;
-  actionError: string | null;
   defaults: SessionTimingDefaults;
 }) {
   const active = snapshot?.status === "active";
@@ -25,11 +24,10 @@ export function TimerView({
 
   return (
     <section className="timer-shell" aria-live="polite">
-      {actionError ? <p className="error">{actionError}</p> : null}
       {!active || !phase || !params || !snapshot ? (
         <IdleStartForm
           defaults={defaults}
-          onStart={(body) => onAction("/api/session/start", body)}
+          onStart={(body) => onAction(SESSION_API.start, body)}
         />
       ) : (
         <ActiveTimer

@@ -6,25 +6,27 @@ import type {
   SettingsPatch,
   StartSessionBody,
 } from "@flexi-pomodoro/shared";
+import { SESSION_API } from "@flexi-pomodoro/shared";
 import { alertSeqStore } from "./alertSeqStore";
+import { REQUEST_FAILED } from "./labels";
 
 async function parseJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(
-      (body as { error?: string }).error ?? `Request failed (${res.status})`,
+      (body as { error?: string }).error ?? `${REQUEST_FAILED} (${res.status})`,
     );
   }
   return res.json() as Promise<T>;
 }
 
 export async function fetchSettings(): Promise<Settings> {
-  return parseJson(await fetch("/api/settings"));
+  return parseJson(await fetch(SESSION_API.settings));
 }
 
 export async function saveSettings(partial: SettingsPatch): Promise<Settings> {
   return parseJson(
-    await fetch("/api/settings", {
+    await fetch(SESSION_API.settings, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(partial),
@@ -34,7 +36,7 @@ export async function saveSettings(partial: SettingsPatch): Promise<Settings> {
 
 export async function fetchAlertSeq(): Promise<number> {
   const body = await parseJson<{ alertSeq: number }>(
-    await fetch("/api/session/alert-seq"),
+    await fetch(SESSION_API.alertSeq),
   );
   return body.alertSeq;
 }
@@ -49,7 +51,7 @@ export async function syncAlertSeq(): Promise<number> {
 export async function fetchSession(): Promise<SessionSnapshot> {
   const sinceSeq = alertSeqStore.get();
   const q = sinceSeq > 0 ? `?sinceSeq=${sinceSeq}` : "";
-  return parseJson(await fetch(`/api/session${q}`));
+  return parseJson(await fetch(`${SESSION_API.session}${q}`));
 }
 
 export async function postAction(
@@ -94,7 +96,7 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
     if (closed) return;
     const sinceSeq = alertSeqStore.get();
     const q = sinceSeq > 0 ? `?sinceSeq=${sinceSeq}` : "";
-    es = new EventSource(`/api/session/events${q}`);
+    es = new EventSource(`${SESSION_API.events}${q}`);
     es.onmessage = (ev) => {
       try {
         onSnapshot(JSON.parse(ev.data) as SessionSnapshot);
@@ -103,9 +105,11 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
       }
     };
     es.onerror = () => {
-      es?.close();
+      // CONNECTING = browser auto-retry; only handle a fully closed stream.
+      if (es?.readyState !== EventSource.CLOSED) return;
       es = null;
-      if (!closed) setTimeout(() => void openSse(), 2_000);
+      if (closed) return;
+      void openSse();
     };
   };
 
@@ -140,7 +144,7 @@ const ALERT_FILES: Record<AlertId, string> = {
 };
 
 /**
- * Play new alert deltas. Autoplay may still fail without a recent user gesture;
+ * Play new alert deltas. Autoplay may fail without a recent user gesture;
  * failures are ignored — visual state remains correct.
  */
 export function playAlerts(events: AlertEvent[]): void {

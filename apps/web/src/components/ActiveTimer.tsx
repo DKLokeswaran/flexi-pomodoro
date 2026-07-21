@@ -1,4 +1,5 @@
 import type { Phase, SessionParams, SessionSnapshot } from "@flexi-pomodoro/shared";
+import { SESSION_API } from "@flexi-pomodoro/shared";
 import {
   elapsedFromIso,
   formatMmSs,
@@ -22,11 +23,17 @@ function phaseTitle(kind: string): string {
   }
 }
 
-function displayClock(snapshot: SessionSnapshot, nowMs: number): string {
+function displayClock(
+  snapshot: SessionSnapshot,
+  params: SessionParams,
+  nowMs: number,
+): string {
   if (snapshot.status !== "active") return "00:00";
   const { phase } = snapshot.session;
   if (phase.kind === "extended_work") {
-    return formatMmSs(elapsedFromIso(phase.startedAt, nowMs));
+    const planned = formatMmSs(params.workDurationSec);
+    const extended = formatMmSs(elapsedFromIso(phase.startedAt, nowMs));
+    return `${planned} + ${extended}`;
   }
   if (phase.kind === "decision") {
     return formatMmSs(Math.max(0, secFromIso(phase.decisionEndsAt, nowMs)));
@@ -50,26 +57,26 @@ type PhaseAction = {
 function actionsForPhase(phase: Phase): PhaseAction[] {
   if (phase.kind === "planned_work") {
     return phase.softPaused
-      ? [{ label: "Resume", path: "/api/session/soft-resume", primary: true }]
-      : [{ label: "Soft pause", path: "/api/session/soft-pause" }];
+      ? [{ label: "Resume", path: SESSION_API.softResume, primary: true }]
+      : [{ label: "Soft pause", path: SESSION_API.softPause }];
   }
   if (phase.kind === "decision") {
     return [
       {
-        label: "Acknowledge rest",
-        path: "/api/session/ack-rest",
+        label: "Continue working",
+        path: SESSION_API.continue,
         primary: true,
       },
-      { label: "Continue", path: "/api/session/continue" },
+      { label: "Acknowledge rest", path: SESSION_API.ackRest },
     ];
   }
   if (phase.kind === "extended_work") {
     return [
-      { label: "Start rest", path: "/api/session/start-rest", primary: true },
+      { label: "Start rest", path: SESSION_API.startRest, primary: true },
     ];
   }
   if (phase.kind === "long_rest") {
-    return [{ label: "End long rest early", path: "/api/session/end-long-rest" }];
+    return [{ label: "End long rest early", path: SESSION_API.endLongRest }];
   }
   return [];
 }
@@ -97,15 +104,14 @@ export function ActiveTimer({
           ? " · soft-paused"
           : ""}
       </p>
-      <div className="clock">{displayClock(snapshot, now)}</div>
+      <div className="clock">{displayClock(snapshot, params, now)}</div>
       <p className="cycle">
         Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
       </p>
       {phase.kind === "decision" ? (
         <p className="decision-hint">
-          Rest in{" "}
-          {formatMmSs(Math.max(0, secFromIso(phase.decisionEndsAt, now)))} — or
-          keep working
+          Keep working — or rest in{" "}
+          {formatMmSs(Math.max(0, secFromIso(phase.decisionEndsAt, now)))}
         </p>
       ) : null}
       {phase.kind === "extended_work" ? (

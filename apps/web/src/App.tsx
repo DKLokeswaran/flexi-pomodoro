@@ -21,20 +21,6 @@ export function App() {
   const settings = settingsQuery.data ?? DEFAULT_SETTINGS;
   const active = snapshot?.status === "active";
 
-  const actionError =
-    sessionAction.error instanceof Error
-      ? sessionAction.error.message
-      : sessionAction.error
-        ? "Request failed"
-        : null;
-
-  const saveError =
-    saveSettings.error instanceof Error
-      ? saveSettings.error.message
-      : saveSettings.error
-        ? "Save failed"
-        : null;
-
   return (
     <div className="app">
       <h1 className="brand">Flexi Pomodoro</h1>
@@ -51,11 +37,8 @@ export function App() {
       {tab === "timer" ? (
         <TimerView
           snapshot={snapshot}
-          actionError={actionError}
           defaults={settings}
-          onAction={(path, body) =>
-            sessionAction.mutate({ path, body })
-          }
+          onAction={(path, body) => sessionAction.mutate({ path, body })}
         />
       ) : null}
 
@@ -64,7 +47,6 @@ export function App() {
           settings={settings}
           locked={Boolean(active)}
           saving={saveSettings.isPending}
-          error={saveError}
           onSave={(next) => saveSettings.mutate(next)}
         />
       ) : null}

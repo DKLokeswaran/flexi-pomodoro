@@ -5,6 +5,7 @@ import {
   type Settings,
 } from "@flexi-pomodoro/shared";
 import { useDebugFlags } from "../debug/DebugFlagsProvider";
+import { DECISION_WINDOW_LABEL } from "../labels";
 import { minutesToSec, secToMinutes } from "../time";
 import { NumberField } from "./NumberField";
 
@@ -13,13 +14,11 @@ export function SettingsPanel({
   onSave,
   locked,
   saving,
-  error,
 }: {
   settings: Settings;
   onSave: (s: Settings) => void;
   locked: boolean;
   saving?: boolean;
-  error?: string | null;
 }) {
   const { debugMode, setDebugMode, flags, setFlag } = useDebugFlags();
   const [draft, setDraft] = useState({
@@ -52,7 +51,6 @@ export function SettingsPanel({
           A session is active — defaults stay locked until idle.
         </p>
       ) : null}
-      {error ? <p className="error">{error}</p> : null}
       <div className="form-grid">
         <NumberField
           label="Work (min)"
@@ -85,7 +83,7 @@ export function SettingsPanel({
           }
         />
         <NumberField
-          label="Decision window (sec)"
+          label={DECISION_WINDOW_LABEL}
           value={draft.decisionSec}
           step={1}
           min={10}

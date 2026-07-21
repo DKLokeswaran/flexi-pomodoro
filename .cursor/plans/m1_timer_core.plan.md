@@ -97,6 +97,7 @@ workPauseStrategy: "soft" // hard ignored/hidden until M2
 | GET | `/api/health` | Docker/orchestration smoke |
 | GET/PUT | `/api/settings` | Defaults |
 | GET | `/api/session` | Current session snapshot or idle (also used for 5-minute poll fallback) |
+| GET | `/api/session/alert-seq` | Current `alertSeq` high-water (no history; client sync on startup / reconnect / idle) |
 | GET | `/api/session/events` | SSE stream of phase transitions + pendingAlerts |
 | POST | `/api/session/start` | Body: optional overrides; lock params; start cycle 1 work |
 | POST | `/api/session/ack-rest` | Decision → rest |
@@ -119,7 +120,7 @@ workPauseStrategy: "soft" // hard ignored/hidden until M2
 
 **Tick:** Fastify `setInterval` (~250ms) advances phases from wall clock; responses include `serverNow` so the UI can render without drift.
 
-**Alert events:** session snapshot includes `pendingAlerts: AlertId[]` (or last-emitted id + seq). Client plays placeholder audio once per event. Alert ids: `work_planned_end`, `rest_ack` / short|long rest start, `short_rest_end`, `long_rest_end`, `extended_work_auto_start`. Manual extended end and early long-rest end emit **no** end alarm.
+**Alert events:** session snapshot includes `pendingAlerts: AlertEvent[]` (`{ seq, id }` deltas since client watermark) plus `alertSeq` high-water. Client plays placeholder audio once per event. Alert ids: `work_planned_end`, `rest_ack` / short|long rest start, `short_rest_end`, `long_rest_end`, `extended_work_auto_start`. Manual extended end and early long-rest end emit **no** end alarm.
 
 ## Web UI
 

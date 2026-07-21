@@ -6,36 +6,7 @@ import type {
   SettingsPatch,
   StartSessionBody,
 } from "@flexi-pomodoro/shared";
-
-const ALERT_SEQ_KEY = "flexi-pomodoro:lastPlayedAlertSeq";
-
-/** In-memory watermark — always authoritative for this tab session. */
-let memorySeq = 0;
-
-function readStoredSeq(): number {
-  try {
-    const raw = localStorage.getItem(ALERT_SEQ_KEY);
-    const n = raw ? Number(raw) : 0;
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-  } catch {
-    return 0;
-  }
-}
-
-export function getLastPlayedSeq(): number {
-  const fromLs = readStoredSeq();
-  memorySeq = Math.max(memorySeq, fromLs);
-  return memorySeq;
-}
-
-export function setLastPlayedSeq(seq: number): void {
-  memorySeq = Math.max(memorySeq, seq);
-  try {
-    localStorage.setItem(ALERT_SEQ_KEY, String(memorySeq));
-  } catch {
-    // Quota / private mode: memorySeq still drives sinceSeq for this tab.
-  }
-}
+import { alertSeqStore } from "./alertSeqStore";
 
 async function parseJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -61,8 +32,22 @@ export async function saveSettings(partial: SettingsPatch): Promise<Settings> {
   );
 }
 
+export async function fetchAlertSeq(): Promise<number> {
+  const body = await parseJson<{ alertSeq: number }>(
+    await fetch("/api/session/alert-seq"),
+  );
+  return body.alertSeq;
+}
+
+/** Align client watermark with server high-water (no history replay). */
+export async function syncAlertSeq(): Promise<number> {
+  const seq = await fetchAlertSeq();
+  alertSeqStore.set(seq);
+  return seq;
+}
+
 export async function fetchSession(): Promise<SessionSnapshot> {
-  const sinceSeq = getLastPlayedSeq();
+  const sinceSeq = alertSeqStore.get();
   const q = sinceSeq > 0 ? `?sinceSeq=${sinceSeq}` : "";
   return parseJson(await fetch(`/api/session${q}`));
 }
@@ -99,9 +84,15 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
     }
   };
 
-  const openSse = () => {
+  const openSse = async () => {
     if (closed) return;
-    const sinceSeq = getLastPlayedSeq();
+    try {
+      await syncAlertSeq();
+    } catch {
+      // ignore transient errors; reconnect will retry
+    }
+    if (closed) return;
+    const sinceSeq = alertSeqStore.get();
     const q = sinceSeq > 0 ? `?sinceSeq=${sinceSeq}` : "";
     es = new EventSource(`/api/session/events${q}`);
     es.onmessage = (ev) => {
@@ -114,11 +105,11 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
     es.onerror = () => {
       es?.close();
       es = null;
-      if (!closed) setTimeout(openSse, 2_000);
+      if (!closed) setTimeout(() => void openSse(), 2_000);
     };
   };
 
-  openSse();
+  void openSse();
   void poll();
   pollTimer = setInterval(poll, 5 * 60_000);
 
@@ -154,10 +145,10 @@ const ALERT_FILES: Record<AlertId, string> = {
  */
 export function playAlerts(events: AlertEvent[]): void {
   if (events.length === 0) return;
-  const last = getLastPlayedSeq();
+  const last = alertSeqStore.get();
   const fresh = events.filter((e) => e.seq > last);
   if (fresh.length === 0) return;
-  setLastPlayedSeq(Math.max(...fresh.map((e) => e.seq)));
+  alertSeqStore.advance(Math.max(...fresh.map((e) => e.seq)));
   for (const event of fresh) {
     const src = ALERT_FILES[event.id];
     if (!src) continue;

@@ -87,10 +87,28 @@ describe("SessionEngine", () => {
     const afterLong = afterWork2 + 500 + 120_000;
     const snap = engine.getSnapshot(afterLong, seqBeforeLongEnd);
     assert.equal(snap.status, "idle");
+    assert.ok(snap.pendingAlerts.some((a) => a.id === "long_rest_end"));
+    assert.equal(engine.getAlertSeq(), 0);
+  });
+
+  it("resets alertSeq after session end; new session alerts start at 1", () => {
+    const engine = engineWithShortTimers(1);
+    engine.start(undefined, T0);
+    engine.getSnapshot(T0 + 60_000, 0);
+    engine.ackRest(T0 + 60_500);
+    engine.getSnapshot(T0 + 60_500 + 120_000, 0);
+    assert.equal(engine.getAlertSeq(), 0);
+
+    engine.start(undefined, T0 + 200_000);
+    const seqBefore = engine.getAlertSeq();
+    engine.getSnapshot(T0 + 200_000 + 60_000, seqBefore);
+    assert.equal(engine.getAlertSeq(), 1);
+    const snap = engine.getSnapshot(T0 + 200_000 + 60_000, seqBefore);
     assert.ok(
-      alertsSince(engine, afterLong, seqBeforeLongEnd).includes(
-        "long_rest_end",
-      ),
+      (snap.status === "active"
+        ? snap.session.pendingAlerts
+        : snap.pendingAlerts
+      ).some((a) => a.id === "work_planned_end" && a.seq === 1),
     );
   });
 

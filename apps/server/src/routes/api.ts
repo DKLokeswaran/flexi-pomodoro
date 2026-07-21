@@ -56,6 +56,10 @@ export async function registerApiRoutes(
     }
   });
 
+  app.get("/api/session/alert-seq", async () => ({
+    alertSeq: engine.getAlertSeq(),
+  }));
+
   app.get<{ Querystring: { sinceSeq?: string } }>(
     "/api/session",
     async (req) => {

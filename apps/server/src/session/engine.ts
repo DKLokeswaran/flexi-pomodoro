@@ -186,7 +186,11 @@ export class SessionEngine {
 
   getSnapshot(nowMs: number = Date.now(), sinceSeq = 0): SessionSnapshot {
     this.tick(nowMs, false);
-    return this.buildSnapshot(nowMs, sinceSeq);
+    const snap = this.buildSnapshot(nowMs, sinceSeq);
+    if (!this.session) {
+      this.resetAlertState();
+    }
+    return snap;
   }
 
   start(
@@ -320,8 +324,10 @@ export class SessionEngine {
       );
     }
     this.completeSession();
+    const snap = this.buildSnapshot(nowMs, seqAtStart);
     this.notify();
-    return this.buildSnapshot(nowMs, seqAtStart);
+    this.resetAlertState();
+    return snap;
   }
 
   /**
@@ -343,6 +349,9 @@ export class SessionEngine {
 
     if (changed && notify) {
       this.notify();
+      if (!this.session) {
+        this.resetAlertState();
+      }
     }
   }
 
@@ -427,6 +436,15 @@ export class SessionEngine {
 
   private completeSession(): void {
     this.session = null;
+  }
+
+  /** Clears alert history and resets seq after delivery (session ended). */
+  private resetAlertState(): void {
+    this.alertLog = [];
+    this.alertSeq = 0;
+    for (const listener of this.listeners) {
+      this.listenerCursors.set(listener, 0);
+    }
   }
 
   private requireActive(): ActiveSession {

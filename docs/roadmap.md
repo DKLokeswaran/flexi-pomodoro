@@ -4,9 +4,9 @@
 | --- | --- |
 | **Product** | Flexi Pomodoro |
 | **Document type** | Product roadmap |
-| **Version** | 1.3 |
+| **Version** | 1.4 |
 | **Status** | Active |
-| **Last updated** | 2026-07-16 (Settings tab vs Defaults values; session overrides include decision window) |
+| **Last updated** | 2026-07-22 (decision-window persistence attribution for M3; aligns with PRD 1.5) |
 | **Related** | [PRD](./PRD.md) (alpha scope) |
 
 ---
@@ -36,7 +36,7 @@ Clients (web UI and any later mobile UI) treat the backend as the source of trut
 | --- | --- |
 | **M1 – Timer core** | Work/rest shapes, defaults (Settings tab) & overrides (incl. decision window), session lock, decision window, extended work, soft pause, unique alerts, Docker |
 | **M2 – Pause modules** | Soft default + hard behind flag; encapsulated, deletable strategies with tests |
-| **M3 – Persistence & resume** | SQLite on volume; labeled extended segments; strict wall-clock recovery |
+| **M3 – Persistence & resume** | SQLite on volume; labeled extended segments; decision-window attribution (`DecisionSegment` vs fold-into-extended); strict wall-clock recovery |
 | **M4 – Analytics** | Extended/pause stats and dashboard surfaces |
 | **M5 – Polish** | Curated sound pack, mute, reverse-proxy notes |
 
@@ -76,7 +76,7 @@ Alpha milestones ship with focused engine unit tests; beta expands to **good uni
 | **Settings & overrides** | Defaults persistence (edited on Settings tab), session-only overrides (incl. decision window), param lock after start, validation bounds |
 | **Alerts** | Correct `pendingAlerts` per system boundary; no alarm on manual extended end or early long rest |
 | **API routes** | Fastify handlers: happy paths, invalid phase actions, error responses |
-| **Analytics** | Aggregation helpers: extended duration/count, soft-paused time, session completion stats |
+| **Analytics** | Aggregation helpers: extended duration/count (timeout includes decision window), `DecisionSegment` excluded from focus/rest/extended, soft-paused time, session completion stats |
 | **Migrations** | Schema upgrade paths apply cleanly on a fixture DB |
 
 **Stable (1.0) test bar:**
@@ -161,3 +161,4 @@ Beta → Stable 1.0
 | 1.1 | 2026-07-12 | Beta → 1.0: good unit test coverage as release gate (engine, pause, recovery, API, analytics) |
 | 1.2 | 2026-07-15 | Beta → 1.0 v1 features: Debug mode (builds on alpha per-feature flags / short durations) |
 | 1.3 | 2026-07-16 | Align with PRD: Settings tab hosts Defaults; session overrides include decision window |
+| 1.4 | 2026-07-22 | M3 / analytics: decision-window attribution per PRD FR-FLOW-11 |

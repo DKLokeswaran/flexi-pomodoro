@@ -4,9 +4,9 @@
 | --- | --- |
 | **Product name** | Flexi Pomodoro (working title — see §14 Q10) |
 | **Document type** | Product Requirements Document (PRD) |
-| **Version** | 1.4 |
+| **Version** | 1.5 |
 | **Status** | Draft |
-| **Last updated** | 2026-07-16 |
+| **Last updated** | 2026-07-22 |
 | **Audience** | Solo builders / self-hosters implementing the app |
 
 ---
@@ -84,7 +84,7 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 | **Long rest** | Break after the Nth cycle. **Not** pausable; **may** be ended early; duration **not** increasable mid-session |
 | **Cycle** | One work period + its following rest (short or long). Cycle count increments when work is left for rest (after planned work and any extended work) |
 | **Extended work** | Continuation of work after planned duration + decision window resolves to “stay in flow” (explicit Continue **or** decision timeout). Tracked separately in persistence for analytics |
-| **Decision state** | Brief window (default **15s**, configurable **10–20s**) after planned work ends: user may acknowledge → start applicable rest; if they do not, system enters extended work |
+| **Decision state** | Brief window (default **15s**, configurable **10–20s**) after planned work ends: user may acknowledge → start applicable rest; if they do not, system enters extended work. Persistence attribution of decision elapsed time depends on exit path (see FR-FLOW-11) |
 | **Session runtime** (session) | A committed run of **N cycles**. Starts only on explicit user action |
 | **Soft pause** (default) | Planned work **end time does not change**. The work countdown keeps running toward the original planned end; a separate accumulator tracks how long the user was soft-paused (not focusing). That interruption time is for analytics only—it does **not** buy more planned work. Soft pause ends on **manual resume**, or **automatically at planned end** (see FR-PAUSE-S7: auto-rest, skip decision) |
 | **Hard pause** (experimental) | Work timer **stops**. On resume, remaining time continues and the **planned end time is shifted** by the paused duration. Behind experimental feature flag |
@@ -210,13 +210,14 @@ Alerts exist to notify the user of **system-maintained timer events**, not of th
 | FR-FLOW-1 | When planned work reaches its planned end **and the user is not soft-paused**: alert `work_planned_end` and enter **decision state**. If the user **is soft-paused** at that instant, see FR-PAUSE-S7 (skip decision; auto-rest) instead | P0 |
 | FR-FLOW-2 | Decision state lasts a short configurable window (**10–20s**, default **15s**) | P0 |
 | FR-FLOW-3 | If user **acknowledges** → transition to applicable rest (short or long); play rest-entry alert | P0 |
-| FR-FLOW-4 | If user **does not** acknowledge within the window → treat as wishing to keep flow: enter **extended work** automatically; play `extended_work_auto_start`; persist extended segment as first-class data | P0 |
-| FR-FLOW-5 | User may also explicitly choose Continue / Extended work during the window (same outcome as timeout, without waiting) | P0 |
-| FR-FLOW-6 | During extended work, timer continues as work; UI labels overtime clearly | P0 |
+| FR-FLOW-4 | If user **does not** acknowledge within the window → treat as wishing to keep flow: enter **extended work** automatically; play `extended_work_auto_start`; persist extended segment as first-class data. The full decision window is included in that extended segment (`startedAt` = decision start) | P0 |
+| FR-FLOW-5 | User may also explicitly choose Continue / Extended work during the window. Runtime outcome is extended work, but decision elapsed time until the click is **not** extended work (see FR-FLOW-11); extended segment starts at the click | P0 |
+| FR-FLOW-6 | During extended work, timer continues as work; UI labels overtime clearly (planned duration + extended elapsed) | P0 |
 | FR-FLOW-7 | User ends extended work manually → start applicable rest **without** an end-of-extended alarm | P0 |
 | FR-FLOW-8 | Rest duration after extended work equals configured short/long rest—**not** scaled by overtime | P0 |
 | FR-FLOW-9 | Extended work does **not** grant long rest early; long rest only after `N` cycles | P0 |
 | FR-FLOW-10 | Persistence must mark extended work distinctly (`isExtended` / `extendedWorkSec` / separate segment rows) so analytics can answer duration and frequency questions | P0 |
+| FR-FLOW-11 | **Decision elapsed-time attribution (normative, M3):** (1) **Timeout** (no click) → decision window duration is part of **extended work** (include in `ExtendedWorkSegment`). (2) **Explicit Acknowledge rest** or **Continue** → persist a separate **`DecisionSegment`** for `decision.startedAt` → click time; that interval is **neither** focus/planned work, **nor** rest, **nor** extended work. Soft-pause auto-rest (FR-PAUSE-S7) skips decision entirely—no `DecisionSegment` | P0 |
 
 **Cycle counting rule (normative):**
 
@@ -338,10 +339,10 @@ User must Start again for a new session runtime
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| FR-AN-1 | Persist every work period, rest period, **extended-work segment**, soft/hard pause slices, and session | P0 |
+| FR-AN-1 | Persist every work period, rest period, **extended-work segment**, **decision segment** (when an explicit decision action was taken), soft/hard pause slices, and session | P0 |
 | FR-AN-2 | Extended work must be **explicitly labeled** in DB / volume data (not merely inferred from actual > planned) | P0 |
-| FR-AN-3 | Record timestamps, durations, session id, cycle index, phase type, planned vs actual, extended flag/seconds, pause strategy used | P0 |
-| FR-AN-4 | Dashboard: total focus time, **extended duration**, **extended occurrence count / rate**, total rest, soft-paused time, sessions completed, avg cycles/session | P0 |
+| FR-AN-3 | Record timestamps, durations, session id, cycle index, phase type, planned vs actual, extended flag/seconds, pause strategy used; decision rows include outcome (`ack_rest` \| `continue`) | P0 |
+| FR-AN-4 | Dashboard: total focus time, **extended duration**, **extended occurrence count / rate**, total rest, soft-paused time, sessions completed, avg cycles/session. Decision-segment time is **not** rolled into focus, rest, or extended totals | P0 |
 | FR-AN-5 | Time-range filters: today / 7 days / 30 days / all | P1 |
 | FR-AN-6 | Simple charts (focus/day, extended/day, sessions/day) | P1 |
 | FR-AN-7 | Data local to instance (export JSON/CSV P2) | P0 / P2 |
@@ -350,6 +351,7 @@ User must Start again for a new session runtime
 
 - Focus minutes (planned focus vs extended broken out)
 - Extended-work minutes, times used, % of cycles that extended
+- Decision-segment minutes (explicit ack/continue deliberation; optional detail)
 - Soft-paused minutes (interruption load)
 - Rest minutes (short vs long; long rest early-ended count)
 - Sessions completed; streak of days with ≥1 completed session
@@ -370,9 +372,9 @@ WORK_PLANNED
   └─[planned end AND not soft-paused]→ WORK_DECISION   // alert work_planned_end
 
 WORK_DECISION  // duration: decisionWindowSec (10–20)
-  ├─[user: Acknowledge rest]→ REST_SHORT or REST_LONG   // rest-entry alert
-  ├─[user: Continue / extend]→ WORK_EXTENDED            // optional explicit
-  └─[window elapsed, no ack]→ WORK_EXTENDED             // alert extended_work_auto_start
+  ├─[user: Acknowledge rest]→ REST_SHORT or REST_LONG   // rest-entry alert; persist DecisionSegment(outcome=ack_rest)
+  ├─[user: Continue / extend]→ WORK_EXTENDED            // persist DecisionSegment(outcome=continue); extended starts at click
+  └─[window elapsed, no ack]→ WORK_EXTENDED             // alert extended_work_auto_start; decision window ⊂ extended segment
 
 WORK_EXTENDED
   └─[user: Start rest]→ REST_SHORT or REST_LONG         // NO end-extended alarm
@@ -460,7 +462,9 @@ Session {
 
 **Rest:** one shared rest record shape is fine (`short_rest` | `long_rest`); early-end applies only to long.
 
-**Work:** planned and extended are **different shapes** (not one row type with a kind switch for policy):
+**Work:** planned and extended are **different shapes** (not one row type with a kind switch for policy).
+
+**Decision:** persisted only when the user takes an explicit decision action (ack or continue). Timeout does **not** create a decision row—the window is folded into extended work (FR-FLOW-11).
 
 ```
 PlannedWorkSegment {
@@ -472,11 +476,21 @@ PlannedWorkSegment {
   endedReason: "planned_complete" | "soft_paused_auto_rest" | "recovery"
 }
 
+DecisionSegment {
+  id, sessionId, cycleIndex
+  startedAt, endedAt          // decision.startedAt → explicit click time
+  durationSec
+  outcome: "ack_rest" | "continue"
+  // Not focus, not rest, not extended — deliberation only
+}
+
 ExtendedWorkSegment {
   id, sessionId, cycleIndex
   startedAt, endedAt          // no plannedDurationSec / plannedEndAt
   actualDurationSec           // unbounded until user Start rest
   endedReason: "user_start_rest" | "recovery"
+  // Timeout path: startedAt = decision start (window included in duration)
+  // Continue path: startedAt = click time (DecisionSegment covers pre-click window)
 }
 
 RestSegment {
@@ -495,7 +509,7 @@ PauseSlice {
 }
 ```
 
-Analytics contract: sum `ExtendedWorkSegment` durations/counts; soft-paused time from `PlannedWorkSegment.softPausedSec` / `PauseSlice`.
+Analytics contract: sum `ExtendedWorkSegment` durations/counts for extended metrics; soft-paused time from `PlannedWorkSegment.softPausedSec` / `PauseSlice`; sum `DecisionSegment` separately (optional) and **exclude** it from focus, rest, and extended totals.
 
 ---
 
@@ -574,7 +588,7 @@ docker run -d \
 | --- | --- |
 | **M1 – Timer core** | Separate work/rest shapes, defaults (Settings tab) + session overrides, session lock, decision window, extended work, soft pause, unique alerts (placeholders OK), Docker |
 | **M2 – Pause modules** | Soft strategy default + hard strategy behind flag; encapsulation + tests for delete-ability |
-| **M3 – Persistence & resume** | SQLite, labeled extended segments, strict wall-clock recovery (Q9 Option A) |
+| **M3 – Persistence & resume** | SQLite, labeled extended segments, **decision-window attribution** (`DecisionSegment` vs fold-into-extended per FR-FLOW-11), strict wall-clock recovery (Q9 Option A) |
 | **M4 – Analytics** | Extended/pause stats + charts |
 | **M5 – Polish** | Final sound pack (owner-picked), mute, export, proxy notes |
 
@@ -585,7 +599,7 @@ docker run -d \
 1. Docker + persistent volume; no managed external DB.  
 2. Defaults (Settings tab) + per-session overrides (including decision window); **no rest (or work) duration increase** after start.  
 3. Unique alerts on system timer boundaries; **no** alarm on manual end of extended work.  
-4. Decision window 10–20s; ack → rest; timeout → extended work; extended labeled in DB.  
+4. Decision window 10–20s; ack → rest; timeout → extended work; extended labeled in DB. Explicit ack/continue persist a `DecisionSegment` (neither focus nor rest nor extended); timeout folds the window into extended work (FR-FLOW-11).  
 5. Extended work never lengthens rest or grants long rest early.  
 6. Soft pause default; hard pause experimental; both modular/removable.  
 7. Short rest: no pause, no early end. Long rest: no pause, early end → idle (manual next session).  
@@ -606,6 +620,7 @@ Where **Decision** is filled, that is the product ruling. Where **Decision** is 
 | Q1 | Can the user **pause** planned work or short rest (not only extended work)? | Timer controls, commitment philosophy | **No pause** during planned work/short rest in v1; only end extended work | **Resolved:** planned work only. Soft pause = default (end time unchanged; track interruption). Hard pause = experimental (end time shifts). Short rest never pausable. Long rest not pausable; early-end only. Both pause strategies modular/removable |
 | Q2 | Can short rest be ended early? | Symmetry with long rest | **No** in v1—only long rest is early-endable | **Resolved:** No |
 | Q3 | Does WORK_BOUNDARY auto-timeout into rest if the user ignores the alert? | Flow vs structure | **No auto-rest**; wait indefinitely (with repeating gentle alert optional) | **Resolved:** Short decision window (10–20s, default 15s). Ack → rest; no ack → extended work |
+| Q3a | Where is decision-window elapsed time recorded for analytics? | Persistence / analytics | Fold all decision time into work or rest | **Resolved (FR-FLOW-11):** Timeout → include full window in **extended work**. Explicit Acknowledge or Continue → separate **`DecisionSegment`** (neither focus, rest, nor extended). Soft-pause auto-rest skips decision (no segment) |
 | Q4 | Should “End extended work” be framed as Pause or as Start rest? | Copy / UX | Single action: **Start rest** (ends overtime) | **Resolved:** **Start rest**; no alarm on this manual action |
 | Q5 | Auth for exposure on public VPS? | Security | Document reverse-proxy auth; no built-in auth in v1 | **Resolved:** No auth in current scope |
 | Q6 | PWA / installable / offline timer? | Scope | Not required for v1 | |
@@ -670,3 +685,4 @@ When the **service/container** was down and wall time advanced, what should happ
 | 1.2 | 2026-07-12 | Q9 recovery: Option A strict wall-clock catch-up for S1–S7; soft-pause downtime included; edge cases / acceptance updated |
 | 1.3 | 2026-07-12 | Soft pause through planned end: auto-close pause, skip decision, auto-transition to rest |
 | 1.4 | 2026-07-16 | Settings is the tab name; Defaults vs This session labeling; session overrides include decision window |
+| 1.5 | 2026-07-22 | Decision-window persistence attribution (FR-FLOW-11): timeout ⊂ extended; explicit ack/continue → DecisionSegment; M3 / analytics / data model updated |

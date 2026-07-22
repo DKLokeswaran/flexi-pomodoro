@@ -24,6 +24,10 @@ export async function fetchSettings(): Promise<Settings> {
   return parseJson(await fetch(SESSION_API.settings));
 }
 
+export async function fetchHealth(): Promise<{ ok: boolean }> {
+  return parseJson(await fetch(SESSION_API.health));
+}
+
 export async function saveSettings(partial: SettingsPatch): Promise<Settings> {
   return parseJson(
     await fetch(SESSION_API.settings, {

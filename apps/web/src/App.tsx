@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DEFAULT_SETTINGS } from "@flexi-pomodoro/shared";
-import { AboutStub, AnalyticsStub } from "./components/Stubs";
+import { AboutPage } from "./components/AboutPage";
+import { AnalyticsStub } from "./components/Stubs";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Nav, type Tab } from "./components/Nav";
 import { TimerView } from "./components/TimerView";
@@ -52,7 +53,7 @@ export function App() {
       ) : null}
 
       {tab === "analytics" ? <AnalyticsStub /> : null}
-      {tab === "about" ? <AboutStub /> : null}
+      {tab === "about" ? <AboutPage /> : null}
     </div>
   );
 }

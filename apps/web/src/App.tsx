@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { DEFAULT_SETTINGS } from "@flexi-pomodoro/shared";
-import { AboutPage } from "./components/AboutPage";
+import { AboutTab } from "./components/AboutTab";
 import { AnalyticsStub } from "./components/Stubs";
-import { SettingsPanel } from "./components/SettingsPanel";
+import { SettingsTab } from "./components/SettingsTab";
 import { Nav, type Tab } from "./components/Nav";
-import { TimerView } from "./components/TimerView";
+import { TimerTab } from "./components/TimerTab";
 import {
   useSaveSettingsMutation,
   useSessionActionMutation,
   useSettingsQuery,
-} from "./hooks/useSessionApi";
+} from "./queries/useSessionApi";
 import { useSessionStream } from "./hooks/useSessionStream";
 
 export function App() {
@@ -36,7 +36,7 @@ export function App() {
       ) : null}
 
       {tab === "timer" ? (
-        <TimerView
+        <TimerTab
           snapshot={snapshot}
           defaults={settings}
           onAction={(path, body) => sessionAction.mutate({ path, body })}
@@ -44,7 +44,7 @@ export function App() {
       ) : null}
 
       {tab === "settings" ? (
-        <SettingsPanel
+        <SettingsTab
           settings={settings}
           locked={Boolean(active)}
           saving={saveSettings.isPending}
@@ -53,7 +53,7 @@ export function App() {
       ) : null}
 
       {tab === "analytics" ? <AnalyticsStub /> : null}
-      {tab === "about" ? <AboutPage /> : null}
+      {tab === "about" ? <AboutTab /> : null}
     </div>
   );
 }

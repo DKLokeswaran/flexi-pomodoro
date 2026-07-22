@@ -7,8 +7,8 @@ import type {
   StartSessionBody,
 } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
-import { alertSeqStore } from "./alertSeqStore";
-import { REQUEST_FAILED } from "./labels";
+import { alertSeqStore } from "../utils/alertSeqStore";
+import { REQUEST_FAILED } from "../constants/labels";
 
 async function parseJson<T>(res: Response): Promise<T> {
   if (!res.ok) {

@@ -14,7 +14,7 @@ import {
   type FeatureStatus,
 } from "../constants/about";
 import { useHealthQuery } from "../queries/useHealthQuery";
-import { useToast } from "../toast/ToastProvider";
+import { useToast } from "../providers/ToastProvider";
 import { AboutAccordion } from "./about/AboutAccordion";
 import { LinkCard } from "./about/LinkCard";
 
@@ -54,7 +54,7 @@ function buildDiagnostics(healthText: string): string {
   ].join("\n");
 }
 
-export function AboutPage() {
+export function AboutTab() {
   const year = new Date().getFullYear();
   const healthQuery = useHealthQuery();
   const { pushToast } = useToast();

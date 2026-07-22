@@ -1,13 +1,13 @@
 import type { SessionSnapshot, StartSessionBody } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
 import { useNow } from "../hooks/useNow";
-import { ActiveTimer } from "./ActiveTimer";
+import { ActiveTimer } from "./timer/ActiveTimer";
 import {
   IdleStartForm,
   type SessionTimingDefaults,
-} from "./IdleStartForm";
+} from "./timer/IdleStartForm";
 
-export function TimerView({
+export function TimerTab({
   snapshot,
   onAction,
   defaults,

@@ -2,8 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
-import { DebugFlagsProvider } from "./debug/DebugFlagsProvider";
-import { ToastProvider } from "./toast/ToastProvider";
+import { DebugFlagsProvider } from "./providers/DebugFlagsProvider";
+import { ToastProvider } from "./providers/ToastProvider";
 import "./styles.css";
 
 const queryClient = new QueryClient({

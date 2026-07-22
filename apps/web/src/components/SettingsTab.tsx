@@ -4,12 +4,12 @@ import {
   DEBUG_FEATURE_META,
   type Settings,
 } from "@flexi-pomodoro/shared";
-import { useDebugFlags } from "../debug/DebugFlagsProvider";
-import { DECISION_WINDOW_LABEL } from "../labels";
-import { minutesToSec, secToMinutes } from "../time";
+import { useDebugFlags } from "../providers/DebugFlagsProvider";
+import { DECISION_WINDOW_LABEL } from "../constants/labels";
+import { minutesToSec, secToMinutes } from "../utils/time";
 import { NumberField } from "./NumberField";
 
-export function SettingsPanel({
+export function SettingsTab({
   settings,
   onSave,
   locked,

@@ -12,8 +12,8 @@ import {
   postAction,
   saveSettings,
 } from "../api";
-import { REQUEST_FAILED } from "../labels";
-import { useToast } from "../toast/ToastProvider";
+import { REQUEST_FAILED } from "../constants/labels";
+import { useToast } from "../providers/ToastProvider";
 
 export const settingsQueryKey = ["settings"] as const;
 

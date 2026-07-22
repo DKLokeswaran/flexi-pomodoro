@@ -4,7 +4,7 @@ import {
   elapsedFromIso,
   formatMmSs,
   secFromIso,
-} from "../time";
+} from "../../utils/time";
 
 function phaseTitle(kind: string): string {
   switch (kind) {

@@ -4,6 +4,7 @@ import { useDebugFlags } from "../../providers/DebugFlagsProvider";
 import { DECISION_WINDOW_LABEL } from "../../constants/labels";
 import { minutesToSec, secToMinutes } from "../../utils/time";
 import { NumberField } from "../NumberField";
+import displayStyles from "./timerDisplay.module.css";
 
 export type SessionTimingDefaults = {
   workDurationSec: number;
@@ -95,9 +96,9 @@ export function IdleStartForm({
 
   return (
     <>
-      <p className="phase-label">Ready</p>
-      <div className="clock">00:00</div>
-      <p className="cycle">Start a committed session</p>
+      <p className={displayStyles.phaseLabel}>Ready</p>
+      <div className={displayStyles.clock}>00:00</div>
+      <p className={displayStyles.cycle}>Start a committed session</p>
       <div className="panel" style={{ width: "100%" }}>
         <p className="section-title">This session</p>
         <div className="form-grid">

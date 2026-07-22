@@ -6,6 +6,7 @@ import {
   IdleStartForm,
   type SessionTimingDefaults,
 } from "./timer/IdleStartForm";
+import styles from "./TimerTab.module.css";
 
 export function TimerTab({
   snapshot,
@@ -23,7 +24,7 @@ export function TimerTab({
     snapshot?.status === "active" ? snapshot.session.params : null;
 
   return (
-    <section className="timer-shell" aria-live="polite">
+    <section className={styles.timerShell} aria-live="polite">
       {!active || !phase || !params || !snapshot ? (
         <IdleStartForm
           defaults={defaults}

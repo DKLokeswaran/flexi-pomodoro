@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import styles from "./ToastProvider.module.css";
 
 export type ToastKind = "success" | "error";
 
@@ -38,13 +39,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ pushToast }}>
       {children}
-      <div className="toast-stack" aria-live="polite" aria-relevant="additions">
+      <div className={styles.stack} aria-live="polite" aria-relevant="additions">
         {toast ? (
-          <div className={`toast toast-${toast.kind}`} role="status">
-            <span className="toast-message">{toast.message}</span>
+          <div
+            className={`${styles.toast} ${
+              toast.kind === "success" ? styles.toastSuccess : styles.toastError
+            }`}
+            role="status"
+          >
+            <span className={styles.message}>{toast.message}</span>
             <button
               type="button"
-              className="toast-close"
+              className={styles.close}
               aria-label="Dismiss"
               onClick={() => setToast(null)}
             >

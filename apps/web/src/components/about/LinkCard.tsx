@@ -1,5 +1,6 @@
 import type { LinkIcon } from "../../constants/about";
 import { AboutIcon } from "./AboutIcon";
+import styles from "./LinkCard.module.css";
 
 type LinkCardProps = {
   label: string;
@@ -21,26 +22,22 @@ export function LinkCard({
   soon = false,
 }: LinkCardProps) {
   return (
-    <article
-      className={`about-link-card${soon ? " about-link-card--soon" : ""}`}
-    >
-      <div className="about-link-card-icon" aria-hidden>
+    <article className={`${styles.card}${soon ? ` ${styles.cardSoon}` : ""}`}>
+      <div className={styles.icon} aria-hidden>
         <AboutIcon icon={icon} />
       </div>
-      <h4 className="about-link-card-title">{label}</h4>
+      <h4 className={styles.title}>{label}</h4>
       {description ? (
-        <p className="about-link-card-desc">{description}</p>
+        <p className={styles.desc}>{description}</p>
       ) : (
-        <div className="about-link-card-desc-spacer" aria-hidden />
+        <div className={styles.descSpacer} aria-hidden />
       )}
       {soon || !href ? (
-        <span className="about-link-card-cta about-link-card-cta--disabled">
-          {cta}
-        </span>
+        <span className={`${styles.cta} ${styles.ctaDisabled}`}>{cta}</span>
       ) : (
         <a
           href={href}
-          className="about-link-card-cta"
+          className={styles.cta}
           {...(external
             ? { target: "_blank", rel: "noopener noreferrer" }
             : {})}

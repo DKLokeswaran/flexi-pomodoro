@@ -8,6 +8,7 @@ import { useDebugFlags } from "../providers/DebugFlagsProvider";
 import { DECISION_WINDOW_LABEL } from "../constants/labels";
 import { minutesToSec, secToMinutes } from "../utils/time";
 import { NumberField } from "./NumberField";
+import styles from "./SettingsTab.module.css";
 
 export function SettingsTab({
   settings,
@@ -113,8 +114,8 @@ export function SettingsTab({
       </div>
 
       <p className="section-title">Debug</p>
-      <div className="debug-flags">
-        <label className="debug-flag">
+      <div className={styles.debugFlags}>
+        <label className={styles.debugFlag}>
           <input
             type="checkbox"
             checked={debugMode}
@@ -122,7 +123,7 @@ export function SettingsTab({
           />
           <span>
             Enable debug mode
-            <span className="debug-flag-desc">
+            <span className={styles.debugFlagDesc}>
               Unlocks per-feature debug options for this browser session. Not
               saved with defaults.
             </span>
@@ -132,7 +133,7 @@ export function SettingsTab({
           ? DEBUG_FEATURE_IDS.map((id) => {
               const meta = DEBUG_FEATURE_META[id];
               return (
-                <label key={id} className="debug-flag debug-flag-nested">
+                <label key={id} className={`${styles.debugFlag} ${styles.debugFlagNested}`}>
                   <input
                     type="checkbox"
                     checked={Boolean(flags[id])}
@@ -141,7 +142,7 @@ export function SettingsTab({
                   <span>
                     {meta.label}
                     {meta.description ? (
-                      <span className="debug-flag-desc">{meta.description}</span>
+                      <span className={styles.debugFlagDesc}>{meta.description}</span>
                     ) : null}
                   </span>
                 </label>

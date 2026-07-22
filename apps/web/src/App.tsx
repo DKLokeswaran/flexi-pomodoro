@@ -11,6 +11,7 @@ import {
   useSettingsQuery,
 } from "./queries/useSessionApi";
 import { useSessionStream } from "./hooks/useSessionStream";
+import styles from "./App.module.css";
 
 export function App() {
   const [tab, setTab] = useState<Tab>("timer");
@@ -23,12 +24,12 @@ export function App() {
   const active = snapshot?.status === "active";
 
   return (
-    <div className="app">
-      <h1 className="brand">Flexi Pomodoro</h1>
+    <div className={styles.app}>
+      <h1 className={styles.brand}>Flexi Pomodoro</h1>
       <Nav tab={tab} onChange={setTab} />
 
       {settingsQuery.isError ? (
-        <p className="error">
+        <p className={styles.error}>
           {settingsQuery.error instanceof Error
             ? settingsQuery.error.message
             : "Failed to load settings"}

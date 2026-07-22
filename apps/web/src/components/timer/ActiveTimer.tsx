@@ -5,6 +5,7 @@ import {
   formatMmSs,
   secFromIso,
 } from "../../utils/time";
+import displayStyles from "./timerDisplay.module.css";
 
 function phaseTitle(kind: string): string {
   switch (kind) {
@@ -98,24 +99,24 @@ export function ActiveTimer({
 
   return (
     <>
-      <p className="phase-label" data-phase={phase.kind}>
+      <p className={displayStyles.phaseLabel} data-phase={phase.kind}>
         {phaseTitle(phase.kind)}
         {phase.kind === "planned_work" && phase.softPaused
           ? " · soft-paused"
           : ""}
       </p>
-      <div className="clock">{displayClock(snapshot, params, now)}</div>
-      <p className="cycle">
+      <div className={displayStyles.clock}>{displayClock(snapshot, params, now)}</div>
+      <p className={displayStyles.cycle}>
         Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
       </p>
       {phase.kind === "decision" ? (
-        <p className="decision-hint">
+        <p className={displayStyles.decisionHint}>
           Keep working — or rest in{" "}
           {formatMmSs(Math.max(0, secFromIso(phase.decisionEndsAt, now)))}
         </p>
       ) : null}
       {phase.kind === "extended_work" ? (
-        <p className="decision-hint">Overtime — start rest when ready</p>
+        <p className={displayStyles.decisionHint}>Overtime — start rest when ready</p>
       ) : null}
       <div className="actions">
         {actions.map((a) => (

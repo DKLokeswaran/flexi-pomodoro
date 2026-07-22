@@ -1,3 +1,5 @@
+import styles from "./NumberField.module.css";
+
 export function NumberField({
   label,
   value,
@@ -12,7 +14,7 @@ export function NumberField({
   min?: number;
 }) {
   return (
-    <div className="field">
+    <div className={styles.field}>
       <label>
         {label}
         <input

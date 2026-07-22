@@ -1,0 +1,44 @@
+.phaseLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.phaseLabel[data-phase="planned_work"] {
+  color: var(--accent);
+}
+
+.phaseLabel[data-phase="decision"] {
+  color: var(--decision);
+}
+
+.phaseLabel[data-phase="extended_work"] {
+  color: var(--extended);
+}
+
+.phaseLabel[data-phase="short_rest"],
+.phaseLabel[data-phase="long_rest"] {
+  color: var(--rest);
+}
+
+.clock {
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 16vw, 6.5rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  animation: pulse-soft 4s ease-in-out infinite;
+}
+
+.cycle {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.decisionHint {
+  color: var(--decision);
+  max-width: 22rem;
+  line-height: 1.4;
+}

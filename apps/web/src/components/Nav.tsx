@@ -1,3 +1,5 @@
+import styles from "./Nav.module.css";
+
 type Tab = "timer" | "settings" | "analytics" | "about";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -15,7 +17,7 @@ export function Nav({
   onChange: (tab: Tab) => void;
 }) {
   return (
-    <nav className="nav" aria-label="Primary">
+    <nav className={styles.nav} aria-label="Primary">
       {TABS.map(({ id, label }) => (
         <button
           key={id}

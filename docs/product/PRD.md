@@ -4,9 +4,9 @@
 | --- | --- |
 | **Product name** | Flexi Pomodoro (working title — see §14 Q10) |
 | **Document type** | Product Requirements Document (PRD) |
-| **Version** | 1.5 |
+| **Version** | 1.6 |
 | **Status** | Draft |
-| **Last updated** | 2026-07-22 |
+| **Last updated** | 2026-07-24 |
 | **Audience** | Solo builders / self-hosters implementing the app |
 
 ---
@@ -26,9 +26,10 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 - Unique audible alerts at **system-maintained** period boundaries (not on manual button presses that merely confirm intent).
 - Optional **extended work** after a work period ends (stay in flow) without earning a longer break.
 - Short decision window after planned work ends; silence → assume extended work.
+- Short-rest **acknowledgement** window after each short rest; silence → next work starts immediately paused.
 - **Committed session runtime**: once started, the user cannot abandon the session until all planned cycles complete.
 - Soft-pause (default) and experimental hard-pause for **work only**, implemented as swappable modules.
-- Persistent analytics with first-class extended-work metrics.
+- Persistent analytics with first-class extended-work metrics; live session stats while active; today totals on idle.
 
 ### 1.3 Goals
 
@@ -68,8 +69,8 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 
 1. Set personal defaults once; reuse them daily.
 2. Start a committed session (optionally overriding defaults for that run).
-3. Work → alert → short decision window → rest **or** extended work → later start rest → next cycle automatically.
-4. After N cycles, take a long rest (skippable early); then manually start the next session when ready.
+3. Work → alert → short decision window → rest **or** extended work → later start rest → short-rest acknowledgement → next work (running on ack, or immediately paused if the window elapses).
+4. After N cycles, take a long rest (skippable early) → idle; then manually start the next session when ready. No short-rest-style acknowledgement after long rest.
 5. Soft-pause work when interrupted (default); optionally try experimental hard-pause.
 6. Review analytics: focus time, extended-work duration/count, rest time, sessions completed, etc.
 
@@ -85,6 +86,7 @@ A lightweight, single-user, self-hostable web app that implements a **flow-aware
 | **Cycle** | One work period + its following rest (short or long). Cycle count increments when work is left for rest (after planned work and any extended work) |
 | **Extended work** | Continuation of work after planned duration + decision window resolves to “stay in flow” (explicit Continue **or** decision timeout). Tracked separately in persistence for analytics |
 | **Decision state** | Brief window (default **15s**, configurable **10–20s**) after planned work ends: user may acknowledge → start applicable rest; if they do not, system enters extended work. Persistence attribution of decision elapsed time depends on exit path (see FR-FLOW-11) |
+| **Short-rest acknowledgement** | Brief window after **short rest** ends (same duration setting as the work decision window: **10–20s**, default **15s**). User must acknowledge to enter the next work period running. If they do not, the next work period still starts but is **immediately paused** under the active soft/hard strategy. Does **not** apply after long rest |
 | **Session runtime** (session) | A committed run of **N cycles**. Starts only on explicit user action |
 | **Soft pause** (default) | Planned work **end time does not change**. The work countdown keeps running toward the original planned end; a separate accumulator tracks how long the user was soft-paused (not focusing). That interruption time is for analytics only—it does **not** buy more planned work. Soft pause ends on **manual resume**, or **automatically at planned end** (see FR-PAUSE-S7: auto-rest, skip decision) |
 | **Hard pause** (experimental) | Work timer **stops**. On resume, remaining time continues and the **planned end time is shifted** by the paused duration. Behind experimental feature flag |
@@ -154,7 +156,7 @@ Alerts exist to notify the user of **system-maintained timer events**, not of th
 | ID | Requirement | Priority |
 | --- | --- | --- |
 | FR-ALERT-1 | At end of **planned work** → enter decision state: play unique alert `work_planned_end` | P0 |
-| FR-ALERT-2 | At end of **short rest**: play unique alert `short_rest_end` | P0 |
+| FR-ALERT-2 | At end of **short rest**: play unique alert `short_rest_end`, then enter **short-rest acknowledgement** (FR-ACK) | P0 |
 | FR-ALERT-3 | At end of **long rest** (timer completed, not early-ended): play unique alert `long_rest_end` | P0 |
 | FR-ALERT-4 | When decision window expires and system auto-enters extended work: play unique alert `extended_work_auto_start` (or reuse a distinct “still working” cue—must differ from rest-start cues) | P0 |
 | FR-ALERT-5 | **Do not** play an end-of-work / transition alarm when the user manually ends extended work (they initiated it; UI state change is enough) | P0 |
@@ -188,12 +190,12 @@ Alerts exist to notify the user of **system-maintained timer events**, not of th
 
 **Decision:** Do **not** force one shared shape across planned work, extended work, and rest. Capabilities differ enough that a single “timer phase” type invites illegal states.
 
-| Capability | Planned work | Extended work | Short rest | Long rest |
-| --- | --- | --- | --- | --- |
-| Soft / hard pause | Yes (modules) | **No** — only end → rest | **No** | **No** |
-| Fixed planned end | Yes (wall-clock end from session params; soft pause does not move it) | **No** — theoretically unbounded until user ends | Yes | Yes |
-| Early end by user | No (runs to plan → decision) | Yes → start rest | **No** | **Yes** → idle |
-| System end alert | Yes (planned end) | No (manual end) | Yes | Yes (timer complete only) |
+| Capability | Planned work | Extended work | Short rest | Long rest | Short-rest ack |
+| --- | --- | --- | --- | --- | --- |
+| Soft / hard pause | Yes (modules) | **No** — only end → rest | **No** | **No** | **No** |
+| Fixed planned end | Yes (wall-clock end from session params; soft pause does not move it) | **No** — theoretically unbounded until user ends | Yes | Yes | Yes (ack window) |
+| Early end by user | No (runs to plan → decision) | Yes → start rest | **No** | **Yes** → idle | Ack only (or timeout → paused work) |
+| System end alert | Yes (planned end) | No (manual end) | Yes → enter ack | Yes (timer complete only) | No separate end alarm required |
 
 **Shape guidance:**
 
@@ -239,7 +241,7 @@ Applies to **planned work only**. Short rest and long rest are never pausable. L
 | FR-PAUSE-S3 | **Planned end time does not change.** Soft pause only accumulates `softPausedSec` (time the user marked as not focusing) | P0 |
 | FR-PAUSE-S4 | Soft-paused time is persisted for analytics (interruption load vs focus); it does not extend planned work | P0 |
 | FR-PAUSE-S5 | Soft pause does not end the session and does not unlock mid-session cancel | P0 |
-| FR-PAUSE-S6 | Soft pause is available **only during planned work**. It is not available in decision, extended work, or rest | P0 |
+| FR-PAUSE-S6 | Soft pause is available **only during planned work**. It is not available in decision, extended work, short-rest acknowledgement, or rest | P0 |
 | FR-PAUSE-S7 | **Soft pause at planned end (normative):** If planned work reaches its end while still soft-paused: (1) auto-close the soft-pause slice (count soft-paused time through planned end); (2) **skip the decision window**; (3) **automatically start** the applicable rest (short or long)—user was not focusing, so do not offer / auto-enter extended work; (4) play the usual planned-work-end and rest-entry alerts | P0 |
 | FR-PAUSE-S8 | Otherwise, soft pause ends via **manual resume** (or equivalent). Soft pause does not clear by itself before planned end | P0 |
 
@@ -297,15 +299,29 @@ WorkPauseStrategy {
 | ID | Requirement | Priority |
 | --- | --- | --- |
 | FR-SESS-4 | Once started, the user **cannot abort / stop / cancel** the session until all `N` cycles are finished | P0 |
-| FR-SESS-5 | Inside a session, after each short rest completes, next work starts **automatically** | P0 |
+| FR-SESS-5 | Inside a session, after each short rest completes, enter **short-rest acknowledgement** (FR-ACK). Next work does **not** start running until the user acknowledges; if the acknowledgement window elapses, next work still starts but is **immediately paused** (active pause strategy) | P0 |
 | FR-SESS-6 | **No rest duration** (short or long) may be increased after start | P0 |
 | FR-SESS-7 | After cycles `1 .. N-1`, rest is **short rest**; after cycle `N`, rest is **long rest** | P0 |
 | FR-SESS-8 | User **may prematurely end the long rest** → session complete → idle; next session is manual | P0 |
 | FR-SESS-9 | Premature end of long rest must **not** auto-start a new session | P0 |
 | FR-SESS-10 | Short rests are **not** skippable and **not** pausable | P0 |
 | FR-SESS-11 | Long rests are **not** pausable (only early-endable) | P0 |
+| FR-SESS-12 | After long rest completes (timer or early end) → **IDLE**. There is **no** short-rest acknowledgement after long rest | P0 |
 
-#### 4.7.3 Session completion
+#### 4.7.3 Short-rest acknowledgement (FR-ACK)
+
+Applies only after **short rest**. Not used after long rest.
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-ACK-1 | When short rest reaches its planned end: play `short_rest_end` and enter **SHORT_REST_ACK** | P0 |
+| FR-ACK-2 | Acknowledgement window duration uses the session’s **decision window** setting (**10–20s**, default **15s**) — same value as work decision; no separate setting in v1 | P0 |
+| FR-ACK-3 | If the user **acknowledges** within the window → transition to **WORK_PLANNED** for the next cycle, **running** (not paused) | P0 |
+| FR-ACK-4 | If the user **does not** acknowledge within the window → still transition to **WORK_PLANNED** for the next cycle, but **immediately paused** under the active `workPauseStrategy` (soft or hard) | P0 |
+| FR-ACK-5 | SHORT_REST_ACK is **not** pausable and has no “continue / extend” action — only acknowledge (or wait for timeout → paused work) | P0 |
+| FR-ACK-6 | Persistence (M3): record a **`ShortRestAckSegment`** for the window. Outcome `acknowledged` on explicit ack; outcome `timeout_paused` when the window elapses. Elapsed acknowledgement time is **neither** focus/planned work, **nor** rest, **nor** extended work, **nor** work-decision time | P0 |
+
+#### 4.7.4 Session completion
 
 A session is **complete** when:
 
@@ -314,7 +330,7 @@ A session is **complete** when:
 
 After completion → idle; next session requires explicit start.
 
-#### 4.7.4 Illustrative timeline
+#### 4.7.5 Illustrative timeline
 
 Example: `N = 3`, work 25m, short rest 5m, long rest 15m, decision window 15s.
 
@@ -323,10 +339,14 @@ User starts session
   Cycle 1: Work 25m
            ├─ (focusing) → [alert work_planned_end] → Decision ≤15s
            │    ├─ ack rest → Short rest 5m → [alert short_rest_end]
+           │    │    → Short-rest ack ≤15s
+           │    │         ├─ ack → Cycle 2 work (running)
+           │    │         └─ timeout → Cycle 2 work (immediately paused)
            │    └─ timeout / continue → Extended work… → user Start rest (no end alarm)
-           │       → Short rest 5m → [alert short_rest_end]
+           │       → Short rest 5m → [alert short_rest_end] → Short-rest ack → …
            └─ (still soft-paused at planned end) → skip decision → Short rest 5m (auto)
-  Cycle 2: (auto) Work … → …
+                → Short-rest ack → …
+  Cycle 2: Work … → … → Short rest → Short-rest ack → …
   Cycle 3: Work … → … → Long rest 15m
            ├─ timer complete → [alert long_rest_end] → IDLE
            └─ user early end → IDLE (no alarm required)
@@ -339,24 +359,27 @@ User must Start again for a new session runtime
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| FR-AN-1 | Persist every work period, rest period, **extended-work segment**, **decision segment** (when an explicit decision action was taken), soft/hard pause slices, and session | P0 |
+| FR-AN-1 | Persist every work period, rest period, **extended-work segment**, **decision segment** (when an explicit decision action was taken), **short-rest acknowledgement segment**, soft/hard pause slices, and session | P0 |
 | FR-AN-2 | Extended work must be **explicitly labeled** in DB / volume data (not merely inferred from actual > planned) | P0 |
-| FR-AN-3 | Record timestamps, durations, session id, cycle index, phase type, planned vs actual, extended flag/seconds, pause strategy used; decision rows include outcome (`ack_rest` \| `continue`) | P0 |
-| FR-AN-4 | Dashboard: total focus time, **extended duration**, **extended occurrence count / rate**, total rest, soft-paused time, sessions completed, avg cycles/session. Decision-segment time is **not** rolled into focus, rest, or extended totals | P0 |
+| FR-AN-3 | Record timestamps, durations, session id, cycle index, phase type, planned vs actual, extended flag/seconds, pause strategy used; decision rows include outcome (`ack_rest` \| `continue`); short-rest ack rows include outcome (`acknowledged` \| `timeout_paused`) | P0 |
+| FR-AN-4 | Dashboard: total focus time, **extended duration**, **extended occurrence count / rate**, total rest, soft-paused time, sessions completed, avg cycles/session. Decision-segment and short-rest-ack time are **not** rolled into focus, rest, or extended totals | P0 |
 | FR-AN-5 | Time-range filters: today / 7 days / 30 days / all | P1 |
 | FR-AN-6 | Simple charts (focus/day, extended/day, sessions/day) | P1 |
 | FR-AN-7 | Data local to instance (export JSON/CSV P2) | P0 / P2 |
+| FR-AN-8 | **Live session stats (M2.5):** While a session is active, the timer/session surface shows in-memory totals for the current session: total worked time (planned focus + extended; exclude soft-paused interruption from “worked” if tracked separately), decision time, and rest time. Short-rest acknowledgement elapsed may be shown with decision time or as its own line; it must not inflate worked or rest | P0 |
+| FR-AN-9 | **Idle today stats (M3.5):** On the idle / idle-adjacent session surface (before Start), show aggregated stats for the **current local day** from persisted history (at minimum: worked, rest, and decision/ack deliberation totals consistent with FR-AN-4 exclusions). Full dashboard/charts remain M4 | P0 |
 
 **“Nice to know” stats (v1):**
 
 - Focus minutes (planned focus vs extended broken out)
 - Extended-work minutes, times used, % of cycles that extended
 - Decision-segment minutes (explicit ack/continue deliberation; optional detail)
+- Short-rest acknowledgement minutes (optional detail; exclude from focus/rest/extended)
 - Soft-paused minutes (interruption load)
 - Rest minutes (short vs long; long rest early-ended count)
 - Sessions completed; streak of days with ≥1 completed session
 - Average extended duration when extension happens
-
+- Today’s totals on idle (M3.5); richer ranges/charts on analytics (M4)
 ---
 
 ## 5. State machine (normative)
@@ -380,21 +403,27 @@ WORK_EXTENDED
   └─[user: Start rest]→ REST_SHORT or REST_LONG         // NO end-extended alarm
 
 REST_SHORT   // not pausable, not early-endable
-  └─[short rest elapsed]→ WORK_PLANNED                  // alert short_rest_end; auto next cycle
+  └─[short rest elapsed]→ SHORT_REST_ACK                // alert short_rest_end
+
+SHORT_REST_ACK  // duration: decisionWindowSec (10–20); acknowledgement only
+  ├─[user: Acknowledge]→ WORK_PLANNED                   // next cycle work, running
+  └─[window elapsed]→ WORK_PLANNED (immediately paused) // active soft/hard strategy; persist ShortRestAckSegment(outcome=timeout_paused)
 
 REST_LONG    // not pausable; early-endable
   ├─[long rest elapsed]→ IDLE                           // alert long_rest_end
-  └─[user: End long rest early]→ IDLE                   // no alarm required; no auto-start
+  └─[user: End long rest early]→ IDLE                   // no alarm required; no auto-start; no SHORT_REST_ACK
 ```
 
 **Forbidden transitions (v1):**
 
-- Cancel session to IDLE from WORK_* / REST_SHORT  
+- Cancel session to IDLE from WORK_* / REST_SHORT / SHORT_REST_ACK  
 - Increase any rest (or work) duration after Start  
-- Pause on REST_SHORT, REST_LONG, WORK_DECISION, or WORK_EXTENDED  
+- Pause on REST_SHORT, REST_LONG, WORK_DECISION, WORK_EXTENDED, or SHORT_REST_ACK  
 - Early-end REST_SHORT  
 - Scale rest upward because of overtime  
 - Soft-paused planned end → WORK_DECISION or WORK_EXTENDED (must auto-rest)  
+- REST_SHORT → WORK_PLANNED without SHORT_REST_ACK  
+- REST_LONG → SHORT_REST_ACK or WORK_* (long rest ends session → IDLE only)  
 
 ---
 
@@ -411,10 +440,13 @@ REST_LONG    // not pausable; early-endable
 
 - Large remaining time for planned phases; clear overtime during extended work  
 - Visible decision countdown (e.g. “Rest in 12s — or keep working”)  
+- Visible short-rest acknowledgement countdown (e.g. “Acknowledge to start work — or work starts paused”)  
 - Cycle progress (`2 / 3`)  
-- Phase labels: Work / Decision / Extended work / Short rest / Long rest  
+- Phase labels: Work / Decision / Extended work / Short rest / Short-rest ack / Long rest  
 - Soft-pause control on work (default); hard-pause only if experimental flag on  
-- Actions: Start; Acknowledge rest; Continue; Start rest (from extended); End long rest early  
+- Actions: Start; Acknowledge rest; Continue; Start rest (from extended); Acknowledge (from short-rest ack); End long rest early  
+- While session active (M2.5): live session stats — worked, decision, rest  
+- While idle (M3.5): today’s aggregated stats from persistence  
 - No “Stop session” while active  
 
 ### 6.3 Accessibility & clarity
@@ -425,7 +457,7 @@ REST_LONG    // not pausable; early-endable
 
 ### 6.4 Design note
 
-Keep the timer screen one calm composition; analytics on their own surface.
+Keep the timer screen one calm composition; full analytics charts on their own surface (M4). Live session HUD and idle today totals stay on the session surface.
 
 ---
 
@@ -466,6 +498,8 @@ Session {
 
 **Decision:** persisted only when the user takes an explicit decision action (ack or continue). Timeout does **not** create a decision row—the window is folded into extended work (FR-FLOW-11).
 
+**Short-rest acknowledgement:** always persisted for the window (explicit ack or timeout → paused work) as `ShortRestAckSegment` (FR-ACK-6).
+
 ```
 PlannedWorkSegment {
   id, sessionId, cycleIndex
@@ -482,6 +516,14 @@ DecisionSegment {
   durationSec
   outcome: "ack_rest" | "continue"
   // Not focus, not rest, not extended — deliberation only
+}
+
+ShortRestAckSegment {
+  id, sessionId, cycleIndex   // cycleIndex = cycle about to start (next work)
+  startedAt, endedAt
+  durationSec
+  outcome: "acknowledged" | "timeout_paused"
+  // Not focus, not rest, not extended, not work-decision — readiness acknowledgement only
 }
 
 ExtendedWorkSegment {
@@ -509,7 +551,7 @@ PauseSlice {
 }
 ```
 
-Analytics contract: sum `ExtendedWorkSegment` durations/counts for extended metrics; soft-paused time from `PlannedWorkSegment.softPausedSec` / `PauseSlice`; sum `DecisionSegment` separately (optional) and **exclude** it from focus, rest, and extended totals.
+Analytics contract: sum `ExtendedWorkSegment` durations/counts for extended metrics; soft-paused time from `PlannedWorkSegment.softPausedSec` / `PauseSlice`; sum `DecisionSegment` and `ShortRestAckSegment` separately (optional) and **exclude** both from focus, rest, and extended totals.
 
 ---
 
@@ -578,7 +620,9 @@ docker run -d \
 | `N = 1` | Work → decision → (optional extended) → long rest only |
 | Decision window spans tab blur | Wall clock still counts server-side; timeout → extended work |
 | Soft pause across refresh / downtime | Restore soft-pause active flag; **planned end unchanged**; downtime while soft-paused **counts toward** `softPausedSec` until manual resume **or** planned-end auto-rest (FR-PAUSE-S7) |
-| Soft pause held through planned end | Auto-close soft pause; **skip decision**; **auto-start** applicable rest (no extended work) |
+| Soft pause held through planned end | Auto-close soft pause; **skip decision**; **auto-start** applicable rest (no extended work); if that rest is short, short-rest acknowledgement still applies after the rest ends |
+| Short-rest acknowledgement ignored | Window elapses → next work starts **immediately paused** (active strategy) |
+| Down during SHORT_REST_ACK | Strict wall-clock: if window elapsed while down → open in next WORK_PLANNED already paused (`timeout_paused`); if still inside window → restore remaining ack countdown |
 
 ---
 
@@ -588,8 +632,10 @@ docker run -d \
 | --- | --- |
 | **M1 – Timer core** | Separate work/rest shapes, defaults (Settings tab) + session overrides, session lock, decision window, extended work, soft pause, unique alerts (placeholders OK), Docker |
 | **M2 – Pause modules** | Soft strategy default + hard strategy behind flag; encapsulation + tests for delete-ability |
-| **M3 – Persistence & resume** | SQLite, labeled extended segments, **decision-window attribution** (`DecisionSegment` vs fold-into-extended per FR-FLOW-11), strict wall-clock recovery (Q9 Option A) |
-| **M4 – Analytics** | Extended/pause stats + charts |
+| **M2.5 – Short-rest ack + live session stats** | `SHORT_REST_ACK` after short rest only (ack → running work; timeout → work immediately paused via active strategy); in-memory live session stats on the active session surface (worked, decision, rest) |
+| **M3 – Persistence & resume** | SQLite, labeled extended segments, **decision-window attribution** (`DecisionSegment` vs fold-into-extended per FR-FLOW-11), `ShortRestAckSegment`, strict wall-clock recovery (Q9 Option A) including SHORT_REST_ACK |
+| **M3.5 – Idle today stats** | On idle, show current-day aggregates from persisted history (FR-AN-9); precedes full analytics dashboard |
+| **M4 – Analytics** | Extended/pause stats + charts (today / ranges on analytics surface) |
 | **M5 – Polish** | Final sound pack (owner-picked), mute, export, proxy notes |
 
 ---
@@ -602,11 +648,11 @@ docker run -d \
 4. Decision window 10–20s; ack → rest; timeout → extended work; extended labeled in DB. Explicit ack/continue persist a `DecisionSegment` (neither focus nor rest nor extended); timeout folds the window into extended work (FR-FLOW-11).  
 5. Extended work never lengthens rest or grants long rest early.  
 6. Soft pause default; hard pause experimental; both modular/removable.  
-7. Short rest: no pause, no early end. Long rest: no pause, early end → idle (manual next session).  
-8. Session start user-only; cycles auto-chain inside session.  
-9. Analytics expose extended duration and frequency clearly.  
+7. Short rest: no pause, no early end; after short rest → acknowledgement window (ack → running work; timeout → paused work). Long rest: no pause, early end → idle (manual next session); **no** short-rest acknowledgement after long rest.  
+8. Session start user-only; cycles chain inside session via short-rest acknowledgement (not blind auto-start into running work).  
+9. Analytics expose extended duration and frequency clearly; live session stats while active (M2.5); idle today stats after persistence (M3.5); full dashboard/charts (M4).  
 10. No built-in auth in current scope.  
-11. After container downtime, resume via **strict wall-clock catch-up** (Q9 Option A), including soft-pause downtime accumulation.  
+11. After container downtime, resume via **strict wall-clock catch-up** (Q9 Option A), including soft-pause downtime accumulation and SHORT_REST_ACK timeout → paused work.  
 12. Soft pause held through planned end → auto-rest (skip decision / extended).
 
 ---
@@ -639,11 +685,12 @@ When the **service/container** was down and wall time advanced, what should happ
 | --- | --- | --- | --- | --- | --- |
 | S1 | Down 2 min during a 25 min work; 10 min were left | Resume with ~8 min left | Resume with 10 min left (downtime ignored) | Same as A if still in work | **A** |
 | S2 | Down 40 min; was in work with 5 min left | Work already “ended” while down → open in **decision** (or auto-extended if decision window also elapsed while down) | Still show 5 min left | Jump to decision immediately | **A** |
-| S3 | Down through entire short rest | Short rest completed while down → auto-start next work at “rest ended” anchor, possibly already partially into next work | Still in short rest with original remaining | Enter next work at full planned duration (skip leftover rest) | **A** |
+| S3 | Down through entire short rest | Short rest completed while down → enter **SHORT_REST_ACK** at rest-end anchor (or already timed out into next work **paused** if ack window also elapsed) | Still in short rest with original remaining | Enter next work at full planned duration running (skip leftover rest and ack) | **A** |
 | S4 | Down through decision window | Per FR-FLOW-4: decision elapsed → **extended work** started at decision expiry; overtime includes downtime | Still in decision with remaining window | Enter extended work now with overtime = 0 | **A** |
 | S5 | Down through most of long rest | Long rest completed → **IDLE**, session complete | Still in long rest | IDLE | **A** |
 | S6 | Down during extended work | Extended work continued (overtime includes downtime) until user Start rest | Extended frozen | Keep extended; overtime only while app up | **A** |
 | S7 | Down during soft pause | Soft-pause accumulator **includes** downtime until manual resume **or** planned-end auto-rest (FR-PAUSE-S7) | Soft pause frozen | — | **A** (include downtime) |
+| S8 | Down during SHORT_REST_ACK | If ack window elapsed while down → open in next WORK_PLANNED **already paused** (`timeout_paused`); if still inside window → restore remaining countdown | Still in ack with original remaining | Jump to running work now | **A** |
 
 **Why Option A:** Matches real-world elapsed time. Multi-phase catch-up is allowed when wall clock requires it; closed-over segments are marked `"recovery"`.
 
@@ -669,10 +716,11 @@ When the **service/container** was down and wall time advanced, what should happ
 1. User commits to **N cycles** (session runtime)—no bailout until done.  
 2. Work end → alert → short decision window → rest, or stay in flow via **extended work**.  
 3. Break length stays as configured (short or long)—**never** stretched by overtime.  
-4. Long rest only after **N** cycles; may be cut short; **does not** auto-start the next session.  
-5. Only the user starts a session; cycles inside auto-chain.  
-6. Everything is logged for personal analytics.  
-7. Distributed as a **self-hosted Docker** app.
+4. After each **short** rest → acknowledgement window: ack → next work running; ignore → next work immediately paused (soft/hard).  
+5. Long rest only after **N** cycles; may be cut short; **does not** auto-start the next session; **no** short-rest acknowledgement after long rest.  
+6. Only the user starts a session; cycles inside chain through short-rest acknowledgement.  
+7. Everything is logged for personal analytics (live session HUD in-session; today on idle; full analytics surface later).  
+8. Distributed as a **self-hosted Docker** app.
 
 ---
 
@@ -686,3 +734,4 @@ When the **service/container** was down and wall time advanced, what should happ
 | 1.3 | 2026-07-12 | Soft pause through planned end: auto-close pause, skip decision, auto-transition to rest |
 | 1.4 | 2026-07-16 | Settings is the tab name; Defaults vs This session labeling; session overrides include decision window |
 | 1.5 | 2026-07-22 | Decision-window persistence attribution (FR-FLOW-11): timeout ⊂ extended; explicit ack/continue → DecisionSegment; M3 / analytics / data model updated |
+| 1.6 | 2026-07-24 | Short-rest acknowledgement (FR-ACK / SHORT_REST_ACK); M2.5 live session stats; M3.5 idle today stats; milestones M2.5 + M3.5; recovery S8 |

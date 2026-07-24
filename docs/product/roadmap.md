@@ -4,9 +4,9 @@
 | --- | --- |
 | **Product** | Flexi Pomodoro |
 | **Document type** | Product roadmap |
-| **Version** | 1.4 |
+| **Version** | 1.5 |
 | **Status** | Active |
-| **Last updated** | 2026-07-22 (decision-window persistence attribution for M3; aligns with PRD 1.5) |
+| **Last updated** | 2026-07-24 (M2.5 short-rest ack + live session stats; M3.5 idle today stats; aligns with PRD 1.6) |
 | **Related** | [PRD](./PRD.md) (alpha scope) |
 
 ---
@@ -28,16 +28,18 @@ Clients (web UI and any later mobile UI) treat the backend as the source of trut
 
 ## Alpha — current PRD
 
-**Goal:** Deliver the flow-aware Pomodoro variant described in the PRD: committed sessions, decision window / extended work, soft (default) and hard (experimental) pause modules, persistence, analytics, and Docker self-hosting.
+**Goal:** Deliver the flow-aware Pomodoro variant described in the PRD: committed sessions, decision window / extended work, short-rest acknowledgement, soft (default) and hard (experimental) pause modules, persistence, analytics, and Docker self-hosting.
 
-**Scope source of truth:** [PRD](./PRD.md) (milestones M1–M5, product-level acceptance criteria).
+**Scope source of truth:** [PRD](./PRD.md) (milestones M1–M5 including M2.5 and M3.5, product-level acceptance criteria).
 
 | Milestone | Focus |
 | --- | --- |
 | **M1 – Timer core** | Work/rest shapes, defaults (Settings tab) & overrides (incl. decision window), session lock, decision window, extended work, soft pause, unique alerts, Docker |
 | **M2 – Pause modules** | Soft default + hard behind flag; encapsulated, deletable strategies with tests |
-| **M3 – Persistence & resume** | SQLite on volume; labeled extended segments; decision-window attribution (`DecisionSegment` vs fold-into-extended); strict wall-clock recovery |
-| **M4 – Analytics** | Extended/pause stats and dashboard surfaces |
+| **M2.5 – Short-rest ack + live session stats** | After short rest only: acknowledgement window (ack → running work; timeout → work immediately paused via active strategy); in-memory live session stats while active (worked, decision, rest) |
+| **M3 – Persistence & resume** | SQLite on volume; labeled extended segments; decision-window attribution (`DecisionSegment` vs fold-into-extended); `ShortRestAckSegment`; strict wall-clock recovery including SHORT_REST_ACK |
+| **M3.5 – Idle today stats** | On idle, show current-day aggregates from persisted history; precedes full analytics dashboard |
+| **M4 – Analytics** | Extended/pause stats and dashboard surfaces / charts |
 | **M5 – Polish** | Curated sound pack, mute, reverse-proxy notes |
 
 **Alpha exit:** PRD §13 acceptance criteria satisfied; no intentional PRD P0 gaps remaining.
@@ -70,13 +72,13 @@ Alpha milestones ship with focused engine unit tests; beta expands to **good uni
 
 | Area | What to cover |
 | --- | --- |
-| **Session engine** | Full state machine (PRD §5): decision ack/timeout/continue, extended work, soft-pause-at-planned-end, cycle chaining, long-rest early end, forbidden transitions |
+| **Session engine** | Full state machine (PRD §5): decision ack/timeout/continue, extended work, soft-pause-at-planned-end, short-rest acknowledgement (ack vs timeout→paused work), cycle chaining, long-rest early end, forbidden transitions |
 | **Pause modules** | Soft and hard strategies in isolation; `WorkPauseStrategy` contract; planned-end shift vs unchanged semantics |
-| **Recovery** | Strict wall-clock catch-up (PRD Q9 S1–S7): downtime through work, decision, rest, extended work, soft pause |
+| **Recovery** | Strict wall-clock catch-up (PRD Q9 S1–S8): downtime through work, decision, rest, short-rest ack, extended work, soft pause |
 | **Settings & overrides** | Defaults persistence (edited on Settings tab), session-only overrides (incl. decision window), param lock after start, validation bounds |
 | **Alerts** | Correct `pendingAlerts` per system boundary; no alarm on manual extended end or early long rest |
 | **API routes** | Fastify handlers: happy paths, invalid phase actions, error responses |
-| **Analytics** | Aggregation helpers: extended duration/count (timeout includes decision window), `DecisionSegment` excluded from focus/rest/extended, soft-paused time, session completion stats |
+| **Analytics** | Aggregation helpers: extended duration/count (timeout includes decision window), `DecisionSegment` / `ShortRestAckSegment` excluded from focus/rest/extended, soft-paused time, session completion stats, today aggregates for idle |
 | **Migrations** | Schema upgrade paths apply cleanly on a fixture DB |
 
 **Stable (1.0) test bar:**
@@ -162,3 +164,4 @@ Beta → Stable 1.0
 | 1.2 | 2026-07-15 | Beta → 1.0 v1 features: Debug mode (builds on alpha per-feature flags / short durations) |
 | 1.3 | 2026-07-16 | Align with PRD: Settings tab hosts Defaults; session overrides include decision window |
 | 1.4 | 2026-07-22 | M3 / analytics: decision-window attribution per PRD FR-FLOW-11 |
+| 1.5 | 2026-07-24 | Alpha milestones: M2.5 short-rest ack + live session stats; M3.5 idle today stats (PRD 1.6) |

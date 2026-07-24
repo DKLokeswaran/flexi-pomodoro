@@ -1,11 +1,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { SessionSnapshot } from "@flexi-pomodoro/shared";
-import {
-  alertsFromSnapshot,
-  connectSessionStream,
-  playAlerts,
-  syncAlertSeq,
-} from "../api";
+import { connectSessionStream } from "./sessionStream.sse";
+import { syncAlertSeq } from "../utils/alertSeq";
+import { alertsFromSnapshot, playAlerts } from "../utils/playAlerts";
 
 export function useSessionStream() {
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);

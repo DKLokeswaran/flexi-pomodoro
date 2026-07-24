@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchHealth } from "../api";
+import { fetchHealth } from "./health.api";
 
 export const healthQueryKey = ["health"] as const;
 

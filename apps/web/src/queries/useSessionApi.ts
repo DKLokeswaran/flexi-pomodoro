@@ -5,13 +5,9 @@ import type {
   StartSessionBody,
 } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
-import {
-  alertsFromSnapshot,
-  fetchSettings,
-  playAlerts,
-  postAction,
-  saveSettings,
-} from "../api";
+import { fetchSettings, saveSettings } from "./settings.api";
+import { postAction } from "./session.api";
+import { alertsFromSnapshot, playAlerts } from "../utils/playAlerts";
 import { REQUEST_FAILED } from "../constants/labels";
 import { useToast } from "../providers/ToastProvider";
 

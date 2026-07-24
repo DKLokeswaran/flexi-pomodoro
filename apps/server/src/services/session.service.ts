@@ -7,17 +7,9 @@ import {
   type PlannedWorkPhase,
   type RestKind,
   type RestPhase,
-  type DebugFlags,
-  type SessionOverrides,
   type SessionParams,
   type SessionSnapshot,
-  type Settings,
-  type SettingsPatch,
-  DEFAULT_SETTINGS,
-  mergeSessionParams,
-  parseSettingsPatch,
 } from "@flexi-pomodoro/shared";
-import { ZodError } from "zod";
 import { randomUUID } from "node:crypto";
 
 export class SessionError extends Error {
@@ -28,15 +20,6 @@ export class SessionError extends Error {
     super(message);
     this.name = "SessionError";
   }
-}
-
-export function toSessionError(err: unknown): SessionError {
-  if (err instanceof SessionError) return err;
-  if (err instanceof ZodError) {
-    const msg = err.issues.map((i) => i.message).join("; ") || "Invalid input";
-    return new SessionError(msg, "INVALID_SETTINGS");
-  }
-  throw err;
 }
 
 function iso(ms: number): string {
@@ -101,8 +84,7 @@ function closeSoftPauseIfActive(phase: PlannedWorkPhase, nowMs: number): void {
 
 export type SnapshotListener = (snapshot: SessionSnapshot) => void;
 
-export class SessionEngine {
-  private settings: Settings = { ...DEFAULT_SETTINGS };
+export class SessionService {
   private session: ActiveSession | null = null;
   /** Append-only alert log; clients receive deltas only. */
   private alertLog: AlertEvent[] = [];
@@ -110,19 +92,6 @@ export class SessionEngine {
   private listeners = new Set<SnapshotListener>();
   /** Per-listener delivery cursor (last seq sent). */
   private listenerCursors = new WeakMap<SnapshotListener, number>();
-
-  getSettings(): Settings {
-    return { ...this.settings };
-  }
-
-  updateSettings(partial: SettingsPatch): Settings {
-    try {
-      this.settings = parseSettingsPatch(this.settings, partial);
-    } catch (err) {
-      throw toSessionError(err);
-    }
-    return this.getSettings();
-  }
 
   subscribe(listener: SnapshotListener, sinceSeq = 0): () => void {
     this.listeners.add(listener);
@@ -194,23 +163,11 @@ export class SessionEngine {
     return snap;
   }
 
-  start(
-    overrides?: SessionOverrides,
-    nowMs: number = Date.now(),
-    opts?: { debug?: DebugFlags },
-  ): SessionSnapshot {
+  start(params: SessionParams, nowMs: number = Date.now()): SessionSnapshot {
     if (this.session) {
       throw new SessionError("A session is already active", "SESSION_ACTIVE");
     }
     const seqAtStart = this.alertSeq;
-    let params: SessionParams;
-    try {
-      params = mergeSessionParams(this.settings, overrides, {
-        debug: opts?.debug,
-      });
-    } catch (err) {
-      throw toSessionError(err);
-    }
     this.session = {
       id: randomUUID(),
       status: "active",

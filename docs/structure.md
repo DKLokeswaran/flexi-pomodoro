@@ -1,0 +1,111 @@
+# Repository Structure
+
+Annotated layout of the **committed** tree at `HEAD` (84 paths). Binary alert WAVs are listed by pattern only.
+
+```
+flexi-pomodoro/
+├── package.json                 # Workspace root: scripts, engines node>=20, version 0.0.1-alpha.4
+├── package-lock.json
+├── Dockerfile                   # Multi-stage: deps → build → runtime (port 3847)
+├── docker-compose.yml           # Single service + /data volume stub
+├── .dockerignore
+├── .gitignore
+├── .cursor/plans/
+│   └── m1_timer_core.plan.md    # M1 implementation plan notes
+├── docs/
+│   └── product/                 # Product docs (PRD, roadmap) — not generated tech reference
+├── packages/
+│   └── shared/                  # @flexi-pomodoro/shared
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── src/
+│           ├── index.ts         # Schemas, SESSION_API, phase/session types
+│           ├── bounds.ts        # Production SETTINGS_BOUNDS
+│           └── debug/
+│               ├── catalog.ts   # DEBUG_FEATURES registry + DebugFlagsSchema
+│               ├── types.ts
+│               ├── getSettingsBounds.ts
+│               └── features/shortDurations/
+│                   └── index.ts
+├── apps/
+│   ├── server/                  # @flexi-pomodoro/server
+│   │   ├── package.json
+│   │   ├── tsconfig.json        # excludes src/tests/**
+│   │   └── src/
+│   │       ├── index.ts         # listen entry
+│   │       ├── app.ts           # composition root
+│   │       ├── scheduler.ts
+│   │       ├── routes/
+│   │       │   ├── index.ts
+│   │       │   ├── health.routes.ts
+│   │       │   ├── settings.routes.ts
+│   │       │   └── session.routes.ts
+│   │       ├── services/
+│   │       │   ├── settings.service.ts
+│   │       │   └── session.service.ts
+│   │       └── tests/services/
+│   │           ├── settings.service.test.ts
+│   │           └── session.service.test.ts
+│   └── web/                     # @flexi-pomodoro/web
+│       ├── index.html
+│       ├── package.json
+│       ├── vite.config.ts       # proxy /api → :3847; __APP_VERSION__
+│       ├── tsconfig.json
+│       ├── tsconfig.node.json
+│       ├── public/alerts/       # placeholder-*.wav (7 files)
+│       └── src/
+│           ├── main.tsx
+│           ├── App.tsx / App.module.css
+│           ├── styles.css       # global tokens + shared utility classes
+│           ├── vite-env.d.ts
+│           ├── components/      # tabs + shared fields
+│           ├── components/timer/
+│           ├── components/about/
+│           ├── constants/
+│           ├── hooks/           # useNow, useSessionStream, SSE transport
+│           ├── providers/       # DebugFlags, Toast
+│           ├── queries/         # fetch helpers + React Query hooks
+│           └── utils/
+```
+
+## Top-level folder roles
+
+| Path | Role |
+|------|------|
+| `apps/server` | HTTP/SSE API, session engine, optional static host |
+| `apps/web` | React UI |
+| `packages/shared` | Cross-cutting domain contract |
+| `docs/product` | Product PRD and roadmap |
+| `.cursor/plans` | Internal planning artifact for M1 |
+
+## Language composition (committed files)
+
+| Extension | Count |
+|-----------|------:|
+| `.ts` | 34 |
+| `.tsx` | 15 |
+| `.css` | 11 |
+| `.json` | 9 |
+| `.wav` | 7 |
+| `.md` | 3 |
+| Other (yml, html, Docker, ignore) | 5 |
+
+## Where to add new code
+
+| Change | Location |
+|--------|----------|
+| New REST endpoint | `apps/server/src/routes/<domain>.routes.ts`; register in `routes/index.ts`; add path to `SESSION_API` in shared if shared |
+| Session transition / alert | `SessionService` + shared `AlertIdSchema` / phase types; extend tests under `apps/server/src/tests/services/` |
+| Settings field | Shared Zod schemas + `DEFAULT_SETTINGS` + `SettingsService` + Settings UI |
+| Debug feature | New folder under `packages/shared/src/debug/features/`; register in `DEBUG_FEATURES` |
+| UI tab / panel | `apps/web/src/components/`; wire in `App.tsx` + `Nav.tsx` |
+| API client call | `apps/web/src/queries/<domain>.api.ts` + hook in `useSessionApi.ts` / dedicated query hook |
+| Co-located styles | `<Component>.module.css` beside the component; shared tokens in `styles.css` |
+
+## Test location convention
+
+Server tests mirror services: `src/tests/services/<name>.service.test.ts`. Web has **no** committed unit/e2e tests.
+
+## Config & build artifacts (ignored / not committed)
+
+`node_modules/`, `dist/`, `coverage/`, `.env*`, `data/` — see `.gitignore`. Docker ignores `node_modules`, `dist`, `.git`, `*.md`, `.cursor`.

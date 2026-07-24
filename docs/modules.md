@@ -1,0 +1,435 @@
+# Module & Component Inventory
+
+Every committed TypeScript/TSX source file with exported symbols, key types, dependencies, and side effects. CSS modules export class-name maps only (omitted field-by-field). Binary WAVs omitted.
+
+---
+
+## `packages/shared`
+
+### `src/bounds.ts`
+
+| Export | Kind | Notes |
+|--------|------|-------|
+| `SETTINGS_BOUNDS` | const | Production min/max per session param |
+| `SettingsBounds` | type | Mapped mins/maxes |
+
+**Imports:** none.
+
+### `src/debug/types.ts`
+
+| Export | Kind |
+|--------|------|
+| `DebugFeatureMeta` | type `{ label; description? }` |
+| `DebugFeatureDef<Id>` | type `{ id; meta; applyBounds? }` |
+
+### `src/debug/features/shortDurations/index.ts`
+
+| Export | Kind |
+|--------|------|
+| `SHORT_DURATIONS_MIN_OVERLAY` | const mins = 1 for durations |
+| `shortDurationsFeature` | `DebugFeatureDef<"shortDurations">` |
+
+**Side effects:** none (pure).
+
+### `src/debug/catalog.ts`
+
+| Export | Kind |
+|--------|------|
+| `DEBUG_FEATURES` | readonly feature list |
+| `DebugFeatureId` | type |
+| `DEBUG_FEATURE_IDS` | readonly ids |
+| `DebugFlags` | type |
+| `DebugFlagsSchema` | Zod strict object |
+| `isDebugFeatureEnabled(flags, id)` | fn → boolean |
+| `DEBUG_FEATURE_META` | Record id → meta |
+| `getDebugFeature(id)` | fn → def (throws if missing) |
+| re-exports | `DebugFeatureDef`, `DebugFeatureMeta` |
+
+### `src/debug/getSettingsBounds.ts`
+
+| Export | Kind |
+|--------|------|
+| `getSettingsBounds(flags?)` | applies enabled features’ `applyBounds` |
+
+### `src/index.ts`
+
+**Re-exports:** bounds, debug catalog, `getSettingsBounds`, `SHORT_DURATIONS_MIN_OVERLAY`.
+
+| Export | Kind |
+|--------|------|
+| `AlertIdSchema` / `AlertId` | Zod enum / type |
+| `SESSION_API` | path constants object |
+| `WorkPauseStrategySchema` / `WorkPauseStrategy` | `"soft"` |
+| `SessionParamsSchema` / `SessionParams` | Zod / type |
+| `SessionOverridesSchema` / `SessionOverrides` | partial params |
+| `SettingsSchema` / `Settings` | params + mute + strategy |
+| `SettingsPatchSchema` / `SettingsPatch` | partial settings |
+| `StartSessionBody` | type overrides + `debug?` |
+| `DEFAULT_SETTINGS` | Settings |
+| `mergeSessionParams(settings, overrides?, opts?)` | → SessionParams |
+| `parseStartSessionBody(body)` | → `{ debug, overrides }` |
+| `parseSettingsPatch(current, patch)` | → Settings |
+| `PhaseKind`, phase interfaces, `Phase`, `RestKind` | types |
+| `SessionStatus` | `"idle"\|"active"\|"completed"` |
+| `AlertEvent`, `ActiveSession` | types |
+| `IdleSnapshot`, `ActiveSnapshot`, `SessionSnapshot` | types |
+
+**Dependencies:** `zod`, local bounds/debug modules.
+
+---
+
+## `apps/server`
+
+### `src/index.ts`
+
+No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
+
+### `src/app.ts`
+
+| Export | Kind |
+|--------|------|
+| `buildApp()` | async → `{ app, settings, session, scheduler }` |
+
+**Side effects:** Fastify logger; starts scheduler; may register static files; `onClose` stops scheduler.
+
+**Deps:** `fastify`, `@fastify/static`, `node:path`/`fs`/`url`, services, routes, scheduler.
+
+### `src/scheduler.ts`
+
+| Export | Kind |
+|--------|------|
+| `Scheduler` | interface `start`/`stop` |
+| `IntervalSchedulerOptions` | interface |
+| `IntervalScheduler` | class implementing `Scheduler` |
+
+**Methods:** `start()`, `stop()`. Uses `setInterval` (`unref` if available).
+
+### `src/routes/index.ts`
+
+| Export | Kind |
+|--------|------|
+| `RouteDeps` | `{ settings, session }` |
+| `registerRoutes(app, deps)` | registers health/settings/session |
+
+### `src/routes/health.routes.ts`
+
+| Export | Kind |
+|--------|------|
+| `registerHealthRoutes(app)` | GET health |
+
+### `src/routes/settings.routes.ts`
+
+| Export | Kind |
+|--------|------|
+| `registerSettingsRoutes(app, settings)` | GET/PUT settings |
+
+### `src/routes/session.routes.ts`
+
+| Export | Kind |
+|--------|------|
+| `registerSessionRoutes(app, { settings, session })` | session REST + SSE |
+
+**Side effects:** hijacks reply for SSE; heartbeats; subscribe/unsubscribe.
+
+### `src/services/settings.service.ts`
+
+| Export | Kind |
+|--------|------|
+| `SettingsError` | class |
+| `toSettingsError(err)` | normalizer |
+| `SettingsService` | class |
+
+**Public methods**
+
+| Method | Returns |
+|--------|---------|
+| `get()` | `Settings` copy |
+| `update(partial)` | `Settings` |
+| `resolveSessionParams(overrides?, debug?)` | `SessionParams` |
+
+### `src/services/session.service.ts`
+
+| Export | Kind |
+|--------|------|
+| `SessionError` | class |
+| `SnapshotListener` | `(snapshot) => void` |
+| `SessionService` | class |
+
+**Public methods**
+
+| Method | Signature / purpose |
+|--------|---------------------|
+| `subscribe(listener, sinceSeq?)` | → unsubscribe |
+| `getAlertSeq()` | number |
+| `getSnapshot(nowMs?, sinceSeq?)` | SessionSnapshot |
+| `start(params, nowMs?)` | SessionSnapshot |
+| `softPause(nowMs?)` | SessionSnapshot |
+| `softResume(nowMs?)` | SessionSnapshot |
+| `ackRest(nowMs?)` | SessionSnapshot |
+| `continueExtended(nowMs?)` | SessionSnapshot |
+| `startRest(nowMs?)` | SessionSnapshot |
+| `endLongRest(nowMs?)` | SessionSnapshot |
+| `tick(nowMs?, notify?)` | void — wall-clock catch-up |
+
+**Side effects:** mutates in-memory session/alerts; notifies listeners; `randomUUID` on start.
+
+### Tests
+
+`src/tests/services/session.service.test.ts`, `settings.service.test.ts` — no production exports (see [testing.md](./testing.md)).
+
+---
+
+## `apps/web` — entry & shell
+
+### `src/main.tsx`
+
+No exports. **Side effects:** mounts React root; providers; imports `styles.css`.
+
+### `src/App.tsx`
+
+| Export | Props / notes |
+|--------|----------------|
+| `App()` | Tab state; settings query; session stream; renders tabs |
+
+### `src/vite-env.d.ts`
+
+Declares `__APP_VERSION__: string`.
+
+---
+
+## Constants
+
+### `src/constants/labels.ts`
+
+| Export | Value role |
+|--------|------------|
+| `DECISION_WINDOW_LABEL` | UI label |
+| `REQUEST_FAILED` | Error fallback |
+
+### `src/constants/about.ts`
+
+Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, `BrandSlug`, `UiIconName`, `LinkIcon`, `LiveLinkCard`, `SoonLinkCard`, `CreditItem`), and data arrays `IMPORTANT_NOTES`, `FEATURES`, `LINKS_LIVE`, `LINKS_COMING_SOON`, `LEGAL_NOTES`, `FONT_CREDITS`, `CREDITS`, `INSTANCE_COMING_SOON`.
+
+---
+
+## Utils
+
+### `src/utils/time.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `formatMmSs(totalSec)` | `MM:SS` with optional minus |
+| `secFromIso(iso, nowMs)` | signed seconds to event |
+| `elapsedFromIso(iso, nowMs)` | non-negative elapsed |
+| `minutesToSec` / `secToMinutes` | conversions |
+
+### `src/utils/fetchJson.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `parseJson<T>(res)` | throw on !ok; return JSON |
+
+### `src/utils/alertSeqStore.ts`
+
+| Export | Kind |
+|--------|------|
+| `AlertSeqStore` | class `get`/`set`/`advance` |
+| `alertSeqStore` | singleton |
+
+**Side effects:** localStorage + `storage` listener.
+
+### `src/utils/alertSeq.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `syncAlertSeq()` | fetch server seq → store |
+
+### `src/utils/playAlerts.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `playAlerts(events)` | play new Audio deltas |
+| `alertsFromSnapshot(snapshot)` | extract pendingAlerts |
+
+**Side effects:** Audio playback; advances watermark.
+
+---
+
+## Hooks
+
+### `src/hooks/useNow.ts`
+
+| Export | I/O |
+|--------|-----|
+| `useNow(active: boolean): number` | 250ms ticker when active |
+
+### `src/hooks/sessionStream.sse.ts`
+
+| Export | Kind |
+|--------|------|
+| `SessionListener` | type |
+| `connectSessionStream(onSnapshot)` | → cleanup |
+
+**Side effects:** EventSource, intervals, focus/visibility listeners, alert sync.
+
+### `src/hooks/useSessionStream.ts`
+
+| Export | Returns |
+|--------|---------|
+| `useSessionStream()` | `{ snapshot, setSnapshot }` |
+
+Uses `useEffectEvent` for snapshot/idle handlers.
+
+---
+
+## Queries
+
+### `src/queries/health.api.ts`
+
+`fetchHealth(): Promise<{ ok: boolean }>`
+
+### `src/queries/settings.api.ts`
+
+`fetchSettings()`, `saveSettings(partial)`
+
+### `src/queries/session.api.ts`
+
+`fetchAlertSeq()`, `fetchSession()`, `postAction(path, body?)`
+
+### `src/queries/useHealthQuery.ts`
+
+`healthQueryKey`, `useHealthQuery()`
+
+### `src/queries/useSessionApi.ts`
+
+`settingsQueryKey`, `useSettingsQuery()`, `useSaveSettingsMutation()`, `useSessionActionMutation(onSnapshot)`
+
+**Side effects:** toasts; query cache updates; alert playback on action success.
+
+---
+
+## Providers
+
+### `src/providers/DebugFlagsProvider.tsx`
+
+| Export | Kind |
+|--------|------|
+| `DebugFlagsProvider({ children })` | provider |
+| `useDebugFlags()` | context hook |
+
+### `src/providers/ToastProvider.tsx`
+
+| Export | Kind |
+|--------|------|
+| `ToastKind`, `ToastInput` | types |
+| `ToastProvider({ children })` | provider + UI |
+| `useToast()` | context hook |
+
+---
+
+## Components
+
+### `src/components/Nav.tsx`
+
+| Export | Props |
+|--------|-------|
+| `Nav` | `{ tab: Tab; onChange: (tab) => void }` |
+| `Tab` | type union of tab ids |
+
+### `src/components/NumberField.tsx`
+
+| Props | Type |
+|-------|------|
+| `label` | string |
+| `value` | number |
+| `onChange` | `(v: number) => void` |
+| `step?` | number (default 1) |
+| `min?` | number |
+
+### `src/components/Stubs.tsx`
+
+| Export | Notes |
+|--------|-------|
+| `AnalyticsStub` | placeholder panel |
+
+### `src/components/TimerTab.tsx`
+
+| Props | Type |
+|-------|------|
+| `snapshot` | `SessionSnapshot \| null` |
+| `onAction` | `(path, body?) => void` |
+| `defaults` | `SessionTimingDefaults` |
+
+### `src/components/timer/IdleStartForm.tsx`
+
+| Export | Kind |
+|--------|------|
+| `SessionTimingDefaults` | type (duration fields) |
+| `IdleStartForm` | props `{ defaults, onStart }` |
+
+### `src/components/timer/ActiveTimer.tsx`
+
+| Props | Type |
+|-------|------|
+| `snapshot` | SessionSnapshot |
+| `phase` | Phase |
+| `params` | SessionParams |
+| `now` | number |
+| `onAction` | `(path: string) => void` |
+
+### `src/components/SettingsTab.tsx`
+
+| Props | Type |
+|-------|------|
+| `settings` | Settings |
+| `onSave` | `(s: Settings) => void` |
+| `locked` | boolean |
+| `saving?` | boolean |
+
+### `src/components/AboutTab.tsx`
+
+| Export | Props |
+|--------|-------|
+| `AboutTab` | none (uses health query + toast) |
+
+Internal helpers: `StatusPill`, `CreditRow`, `healthUi`, `buildDiagnostics` (not exported).
+
+### `src/components/about/AboutAccordion.tsx`
+
+| Props | Type |
+|-------|------|
+| `title` | string |
+| `summary?` | string |
+| `defaultOpen?` | boolean |
+| `children` | ReactNode |
+
+### `src/components/about/AboutIcon.tsx`
+
+| Props | Type |
+|-------|------|
+| `icon` | LinkIcon |
+| `className?` | string |
+
+### `src/components/about/LinkCard.tsx`
+
+| Props | Type |
+|-------|------|
+| `label` | string |
+| `description?` | string |
+| `cta` | string |
+| `href?` | string |
+| `external?` | boolean |
+| `icon` | LinkIcon |
+| `soon?` | boolean |
+
+---
+
+## CSS modules (committed)
+
+`App.module.css`, `Nav.module.css`, `NumberField.module.css`, `TimerTab.module.css`, `SettingsTab.module.css`, `AboutTab.module.css`, `timer/timerDisplay.module.css`, `about/AboutAccordion.module.css`, `about/LinkCard.module.css`, `providers/ToastProvider.module.css`, plus global `styles.css`.
+
+---
+
+## Config / non-TS
+
+Workspace manifests, Docker files, `vite.config.ts` (defines `__APP_VERSION__`, proxy), HTML shell — see [build-and-deploy.md](./build-and-deploy.md) and [structure.md](./structure.md).

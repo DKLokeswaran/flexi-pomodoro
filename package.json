@@ -13,7 +13,12 @@
     "build": "npm run build -w @flexi-pomodoro/shared && npm run build -w @flexi-pomodoro/web && npm run build -w @flexi-pomodoro/server",
     "start": "PORT=3847 WEB_DIST=$PWD/apps/web/dist npm run start -w @flexi-pomodoro/server",
     "test": "npm run test -w @flexi-pomodoro/server",
-    "typecheck": "npm run typecheck -w @flexi-pomodoro/shared && npm run typecheck -w @flexi-pomodoro/server && npm run typecheck -w @flexi-pomodoro/web"
+    "typecheck": "npm run typecheck -w @flexi-pomodoro/shared && npm run typecheck -w @flexi-pomodoro/server && npm run typecheck -w @flexi-pomodoro/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6"
   },
   "engines": {
     "node": ">=20"

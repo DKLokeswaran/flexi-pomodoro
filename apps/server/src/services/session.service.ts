@@ -65,10 +65,7 @@ function startPlannedWork(
 }
 
 /** Long rest after N cycles; otherwise short rest. */
-function restKindForCycle(
-  params: SessionParams,
-  cycleIndex: number,
-): RestKind {
+function restKindForCycle(params: SessionParams, cycleIndex: number): RestKind {
   return cycleIndex >= params.cyclesBeforeLongRest ? "long_rest" : "short_rest";
 }
 
@@ -140,10 +137,7 @@ export class SessionService {
   }
 
   /** Notify listeners, then return the snapshot for this command's delta. */
-  private notifyAndSnapshot(
-    nowMs: number,
-    sinceSeq: number,
-  ): SessionSnapshot {
+  private notifyAndSnapshot(nowMs: number, sinceSeq: number): SessionSnapshot {
     this.notify();
     return this.buildSnapshot(nowMs, sinceSeq);
   }

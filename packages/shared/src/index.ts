@@ -83,7 +83,8 @@ function sessionParamsSchemaForBounds(bounds: SettingsBounds) {
 }
 
 /** Production session params (settings + default start validation). */
-export const SessionParamsSchema = sessionParamsSchemaForBounds(SETTINGS_BOUNDS);
+export const SessionParamsSchema =
+  sessionParamsSchemaForBounds(SETTINGS_BOUNDS);
 export type SessionParams = z.infer<typeof SessionParamsSchema>;
 
 export const SessionOverridesSchema = SessionParamsSchema.partial();
@@ -117,7 +118,9 @@ export function mergeSessionParams(
   overrides?: SessionOverrides,
   options?: { debug?: DebugFlags },
 ): SessionParams {
-  const schema = sessionParamsSchemaForBounds(getSettingsBounds(options?.debug));
+  const schema = sessionParamsSchemaForBounds(
+    getSettingsBounds(options?.debug),
+  );
   return schema.parse({
     workDurationSec: overrides?.workDurationSec ?? settings.workDurationSec,
     shortRestDurationSec:
@@ -139,10 +142,10 @@ export function parseStartSessionBody(body: unknown): {
   debug: DebugFlags | undefined;
   overrides: SessionOverrides;
 } {
-  const rawBody = z.object({}).passthrough().parse(body ?? {}) as Record<
-    string,
-    unknown
-  >;
+  const rawBody = z
+    .object({})
+    .passthrough()
+    .parse(body ?? {}) as Record<string, unknown>;
   const { debug: debugRaw, ...overrideRaw } = rawBody;
   const debug =
     debugRaw === undefined ? undefined : DebugFlagsSchema.parse(debugRaw);
@@ -162,11 +165,7 @@ export function parseSettingsPatch(
 }
 
 export type PhaseKind =
-  | "planned_work"
-  | "decision"
-  | "extended_work"
-  | "short_rest"
-  | "long_rest";
+  "planned_work" | "decision" | "extended_work" | "short_rest" | "long_rest";
 
 export interface PlannedWorkPhase {
   kind: "planned_work";
@@ -204,10 +203,7 @@ export interface RestPhase {
 export type RestKind = RestPhase["kind"];
 
 export type Phase =
-  | PlannedWorkPhase
-  | DecisionPhase
-  | ExtendedWorkPhase
-  | RestPhase;
+  PlannedWorkPhase | DecisionPhase | ExtendedWorkPhase | RestPhase;
 
 export type SessionStatus = "idle" | "active" | "completed";
 

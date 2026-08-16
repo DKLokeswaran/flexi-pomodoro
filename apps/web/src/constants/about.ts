@@ -57,8 +57,7 @@ export type UiIconName =
   | "accessibility";
 
 export type LinkIcon =
-  | { kind: "brand"; slug: BrandSlug }
-  | { kind: "ui"; name: UiIconName };
+  { kind: "brand"; slug: BrandSlug } | { kind: "ui"; name: UiIconName };
 
 export type LiveLinkCard = {
   id: string;
@@ -107,7 +106,11 @@ export type SoonLinkCard = {
 };
 
 export const LINKS_COMING_SOON: SoonLinkCard[] = [
-  { id: "website", label: "Product website", icon: { kind: "ui", name: "globe" } },
+  {
+    id: "website",
+    label: "Product website",
+    icon: { kind: "ui", name: "globe" },
+  },
   { id: "docs", label: "Documentation", icon: { kind: "ui", name: "book" } },
   { id: "changelog", label: "Changelog", icon: { kind: "ui", name: "scroll" } },
   { id: "roadmap", label: "Public roadmap", icon: { kind: "ui", name: "map" } },
@@ -117,15 +120,27 @@ export const LINKS_COMING_SOON: SoonLinkCard[] = [
     label: "Contributing",
     icon: { kind: "ui", name: "git-pull-request" },
   },
-  { id: "security", label: "Security policy", icon: { kind: "ui", name: "shield" } },
-  { id: "privacy", label: "Privacy policy", icon: { kind: "ui", name: "lock" } },
+  {
+    id: "security",
+    label: "Security policy",
+    icon: { kind: "ui", name: "shield" },
+  },
+  {
+    id: "privacy",
+    label: "Privacy policy",
+    icon: { kind: "ui", name: "lock" },
+  },
   { id: "terms", label: "Terms of use", icon: { kind: "ui", name: "scale" } },
   {
     id: "oss-licenses",
     label: "Open-source licenses",
     icon: { kind: "ui", name: "file-code" },
   },
-  { id: "support", label: "Support / contact", icon: { kind: "ui", name: "mail" } },
+  {
+    id: "support",
+    label: "Support / contact",
+    icon: { kind: "ui", name: "mail" },
+  },
   {
     id: "shortcuts",
     label: "Keyboard shortcuts",

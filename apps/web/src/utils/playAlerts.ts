@@ -1,4 +1,8 @@
-import type { AlertEvent, AlertId, SessionSnapshot } from "@flexi-pomodoro/shared";
+import type {
+  AlertEvent,
+  AlertId,
+  SessionSnapshot,
+} from "@flexi-pomodoro/shared";
 import { alertSeqStore } from "./alertSeqStore";
 
 const ALERT_FILES: Record<AlertId, string> = {
@@ -22,7 +26,9 @@ export function playAlerts(events: AlertEvent[]): void {
     (alertEvent) => alertEvent.seq > lastPlayedSeq,
   );
   if (unplayedEvents.length === 0) return;
-  alertSeqStore.advance(Math.max(...unplayedEvents.map((alertEvent) => alertEvent.seq)));
+  alertSeqStore.advance(
+    Math.max(...unplayedEvents.map((alertEvent) => alertEvent.seq)),
+  );
   for (const alertEvent of unplayedEvents) {
     const src = ALERT_FILES[alertEvent.id];
     if (!src) continue;

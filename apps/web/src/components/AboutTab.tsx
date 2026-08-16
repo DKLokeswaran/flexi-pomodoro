@@ -78,8 +78,12 @@ export function AboutTab() {
   const healthQuery = useHealthQuery();
   const { pushToast } = useToast();
 
-  const availableCount = FEATURES.filter((feature) => feature.status === "available").length;
-  const soonCount = FEATURES.filter((feature) => feature.status === "soon").length;
+  const availableCount = FEATURES.filter(
+    (feature) => feature.status === "available",
+  ).length;
+  const soonCount = FEATURES.filter(
+    (feature) => feature.status === "soon",
+  ).length;
   const health = healthUi(healthQuery.isPending, healthQuery.isError);
 
   /** Copy instance diagnostics to the clipboard, with success/error toasts. */
@@ -113,13 +117,19 @@ export function AboutTab() {
         </ul>
       </section>
 
-      <section className={styles.section} aria-labelledby="about-release-heading">
+      <section
+        className={styles.section}
+        aria-labelledby="about-release-heading"
+      >
         <h3 id="about-release-heading">Release</h3>
         <p className={styles.release}>{RELEASE_STATUS}</p>
       </section>
 
       {/* Expandable feature inventory with available / coming-soon counts. */}
-      <section className={styles.section} aria-labelledby="about-features-heading">
+      <section
+        className={styles.section}
+        aria-labelledby="about-features-heading"
+      >
         <h3 id="about-features-heading">Features</h3>
         <AboutAccordion
           title={`Features & status (${FEATURES.length} items)`}
@@ -139,7 +149,10 @@ export function AboutTab() {
         </p>
       </section>
 
-      <section className={styles.section} aria-labelledby="about-links-live-heading">
+      <section
+        className={styles.section}
+        aria-labelledby="about-links-live-heading"
+      >
         <h3 id="about-links-live-heading">Links</h3>
         <div className={styles.linkCardGrid}>
           {LINKS_LIVE.map((card) => (
@@ -213,7 +226,10 @@ export function AboutTab() {
         </ul>
       </section>
 
-      <section className={styles.section} aria-labelledby="about-credits-heading">
+      <section
+        className={styles.section}
+        aria-labelledby="about-credits-heading"
+      >
         <h3 id="about-credits-heading">Credits</h3>
         <div className={styles.credits}>
           {CREDITS.map((item, index) => (

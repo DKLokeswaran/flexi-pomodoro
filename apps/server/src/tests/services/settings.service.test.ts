@@ -6,7 +6,10 @@ import {
   DEFAULT_SETTINGS,
 } from "@flexi-pomodoro/shared";
 import { ZodError } from "zod";
-import { SettingsError, SettingsService } from "../../services/settings.service.js";
+import {
+  SettingsError,
+  SettingsService,
+} from "../../services/settings.service.js";
 
 describe("parseStartSessionBody", () => {
   it("accepts 1s overrides when shortDurations is set", () => {

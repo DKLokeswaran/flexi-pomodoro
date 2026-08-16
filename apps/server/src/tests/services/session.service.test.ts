@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { SettingsError, SettingsService } from "../../services/settings.service.js";
+import {
+  SettingsError,
+  SettingsService,
+} from "../../services/settings.service.js";
 import { SessionService } from "../../services/session.service.js";
 
 const SESSION_START_MS = Date.parse("2026-07-12T10:00:00.000Z");
@@ -167,7 +170,8 @@ describe("SessionService", () => {
     phase = activePhase(session, afterDecision + 5_000);
     assert.equal(phase.kind, "long_rest");
     assert.equal(startRestSnapshot.status, "active");
-    if (startRestSnapshot.status !== "active") throw new Error("expected active");
+    if (startRestSnapshot.status !== "active")
+      throw new Error("expected active");
     assert.ok(
       !startRestSnapshot.session.pendingAlerts.some(
         (alertEvent) => alertEvent.id === "extended_work_auto_start",

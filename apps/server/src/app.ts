@@ -24,7 +24,9 @@ function webDistCandidates(): string[] {
 
 /** Serve the built web app if a dist folder exists; SPA fallback except /api. */
 async function registerWebStatic(app: FastifyInstance): Promise<void> {
-  const webDist = webDistCandidates().find((candidate) => existsSync(candidate));
+  const webDist = webDistCandidates().find((candidate) =>
+    existsSync(candidate),
+  );
   if (!webDist) return;
 
   await app.register(fastifyStatic, {

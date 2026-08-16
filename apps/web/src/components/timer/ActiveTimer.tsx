@@ -91,7 +91,9 @@ function actionsForPhase(phase: Phase): PhaseAction[] {
 /** Contextual hint under the clock for decision and overtime. */
 function phaseHint(phase: Phase, nowMs: number): string | null {
   if (phase.kind === "decision") {
-    const remaining = formatMmSs(remainingSecFromIso(phase.decisionEndsAt, nowMs));
+    const remaining = formatMmSs(
+      remainingSecFromIso(phase.decisionEndsAt, nowMs),
+    );
     return `Keep working — or rest in ${remaining}`;
   }
   if (phase.kind === "extended_work") {
@@ -125,7 +127,9 @@ export function ActiveTimer({
         {phaseTitle(phase.kind)}
         {softPausedLabel}
       </p>
-      <div className={displayStyles.clock}>{displayClock(snapshot, params, now)}</div>
+      <div className={displayStyles.clock}>
+        {displayClock(snapshot, params, now)}
+      </div>
       <p className={displayStyles.cycle}>
         Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
       </p>

@@ -45,7 +45,9 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
       // ignore transient errors; reconnect will retry
     }
     if (closed) return;
-    eventSource = new EventSource(`${SESSION_API.events}${sinceSeqQueryString()}`);
+    eventSource = new EventSource(
+      `${SESSION_API.events}${sinceSeqQueryString()}`,
+    );
     eventSource.onmessage = (event) => {
       const snapshot = parseSnapshotMessage(event.data);
       if (snapshot) onSnapshot(snapshot);

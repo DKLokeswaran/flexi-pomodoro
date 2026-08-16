@@ -21,8 +21,7 @@ export function TimerTab({
   const sessionIsActive = snapshot?.status === "active";
   const now = useNow(Boolean(sessionIsActive));
   const phase = snapshot?.status === "active" ? snapshot.session.phase : null;
-  const params =
-    snapshot?.status === "active" ? snapshot.session.params : null;
+  const params = snapshot?.status === "active" ? snapshot.session.params : null;
 
   return (
     <section className={styles.timerShell} aria-live="polite">

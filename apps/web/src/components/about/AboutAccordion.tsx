@@ -32,9 +32,7 @@ export function AboutAccordion({
       >
         <ChevronRight className={styles.chevron} aria-hidden />
         <span className={styles.title}>{title}</span>
-        {summary ? (
-          <span className={styles.summary}>{summary}</span>
-        ) : null}
+        {summary ? <span className={styles.summary}>{summary}</span> : null}
       </button>
       {open ? (
         <div id={panelId} className={styles.panel}>

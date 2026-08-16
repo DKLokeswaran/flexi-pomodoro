@@ -57,13 +57,8 @@ export function useSessionActionMutation(
 ) {
   const { pushToast } = useToast();
   return useMutation({
-    mutationFn: ({
-      path,
-      body,
-    }: {
-      path: string;
-      body?: StartSessionBody;
-    }) => postAction(path, body),
+    mutationFn: ({ path, body }: { path: string; body?: StartSessionBody }) =>
+      postAction(path, body),
     onSuccess: (snapshot, variables) => {
       onSnapshot(snapshot);
       playAlerts(alertsFromSnapshot(snapshot));

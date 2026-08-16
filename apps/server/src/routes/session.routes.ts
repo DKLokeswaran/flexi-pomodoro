@@ -21,7 +21,10 @@ function parseSinceSeq(rawSinceSeq: unknown): number {
 }
 
 /** Missing/zero watermark → current high-water (no history replay). */
-function resolveSinceSeq(rawSinceSeq: unknown, session: SessionService): number {
+function resolveSinceSeq(
+  rawSinceSeq: unknown,
+  session: SessionService,
+): number {
   const parsed = parseSinceSeq(rawSinceSeq);
   return parsed > 0 ? parsed : session.getAlertSeq();
 }
@@ -37,7 +40,10 @@ function openSseReply(reply: FastifyReply): void {
 }
 
 /** Serialize one snapshot as a Server-Sent Event data frame. */
-function writeSseSnapshot(reply: FastifyReply, snapshot: SessionSnapshot): void {
+function writeSseSnapshot(
+  reply: FastifyReply,
+  snapshot: SessionSnapshot,
+): void {
   reply.raw.write(`data: ${JSON.stringify(snapshot)}\n\n`);
 }
 
@@ -95,21 +101,42 @@ export function registerSessionRoutes(
     },
   );
 
-  app.post<{ Body: StartSessionBody }>(SESSION_API.start, async (req, reply) => {
-    try {
-      const { debug, overrides } = parseStartSessionBody(req.body ?? {});
-      const params = settings.resolveSessionParams(overrides, debug);
-      return session.start(params, Date.now());
-    } catch (error) {
-      const { statusCode, body } = errorReply(error);
-      return reply.code(statusCode).send(body);
-    }
-  });
+  app.post<{ Body: StartSessionBody }>(
+    SESSION_API.start,
+    async (req, reply) => {
+      try {
+        const { debug, overrides } = parseStartSessionBody(req.body ?? {});
+        const params = settings.resolveSessionParams(overrides, debug);
+        return session.start(params, Date.now());
+      } catch (error) {
+        const { statusCode, body } = errorReply(error);
+        return reply.code(statusCode).send(body);
+      }
+    },
+  );
 
-  app.post(SESSION_API.ackRest, sessionAction(() => session.ackRest()));
-  app.post(SESSION_API.continue, sessionAction(() => session.continueExtended()));
-  app.post(SESSION_API.startRest, sessionAction(() => session.startRest()));
-  app.post(SESSION_API.softPause, sessionAction(() => session.softPause()));
-  app.post(SESSION_API.softResume, sessionAction(() => session.softResume()));
-  app.post(SESSION_API.endLongRest, sessionAction(() => session.endLongRest()));
+  app.post(
+    SESSION_API.ackRest,
+    sessionAction(() => session.ackRest()),
+  );
+  app.post(
+    SESSION_API.continue,
+    sessionAction(() => session.continueExtended()),
+  );
+  app.post(
+    SESSION_API.startRest,
+    sessionAction(() => session.startRest()),
+  );
+  app.post(
+    SESSION_API.softPause,
+    sessionAction(() => session.softPause()),
+  );
+  app.post(
+    SESSION_API.softResume,
+    sessionAction(() => session.softResume()),
+  );
+  app.post(
+    SESSION_API.endLongRest,
+    sessionAction(() => session.endLongRest()),
+  );
 }

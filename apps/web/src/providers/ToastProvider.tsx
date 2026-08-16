@@ -41,7 +41,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ pushToast }}>
       {children}
-      <div className={styles.stack} aria-live="polite" aria-relevant="additions">
+      <div
+        className={styles.stack}
+        aria-live="polite"
+        aria-relevant="additions"
+      >
         {toast ? (
           <div
             className={`${styles.toast} ${

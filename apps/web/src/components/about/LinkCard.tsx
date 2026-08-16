@@ -12,6 +12,7 @@ type LinkCardProps = {
   soon?: boolean;
 };
 
+/** About-tab link card: live CTA or a disabled "coming soon" row. */
 export function LinkCard({
   label,
   description,

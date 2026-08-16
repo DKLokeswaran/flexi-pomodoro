@@ -9,6 +9,7 @@ type AboutAccordionProps = {
   children: ReactNode;
 };
 
+/** Collapsible section used on the About tab for long lists. */
 export function AboutAccordion({
   title,
   summary,
@@ -27,7 +28,7 @@ export function AboutAccordion({
         className={styles.trigger}
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((isOpen) => !isOpen)}
       >
         <ChevronRight className={styles.chevron} aria-hidden />
         <span className={styles.title}>{title}</span>

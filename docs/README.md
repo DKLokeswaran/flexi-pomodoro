@@ -1,6 +1,6 @@
 # Flexi Pomodoro — Technical Documentation
 
-Self-hosted, flow-aware Pomodoro timer. This documentation set describes the **committed** codebase at `HEAD` on branch `master` (version `0.0.1-alpha.4`). Product requirements and roadmap live separately under [`product/`](./product/).
+Self-hosted, flow-aware Pomodoro timer. This documentation set describes the current source tree on branch `master` (version `0.0.1-alpha.4`). Product requirements and roadmap live separately under [`product/`](./product/).
 
 ## Quick start
 
@@ -81,4 +81,4 @@ Request flow (session action): route → Zod / shared parsers → `SettingsServi
 
 ## Scope note
 
-This technical documentation is derived exclusively from **committed** git history (`git show HEAD:…`). Staged and uncommitted working-tree changes are not reflected here.
+This technical documentation matches the current source tree.

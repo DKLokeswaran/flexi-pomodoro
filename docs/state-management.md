@@ -124,8 +124,8 @@ Transport (`connectSessionStream`):
 
 No dedicated selector library. Inline derivation examples:
 
-- `App`: `active = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`
-- `ActiveTimer`: `displayClock`, `actionsForPhase`
+- `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`
+- `ActiveTimer`: `displayClock`, `actionsForPhase`, `phaseHint`
 - `AboutTab`: feature available/soon counts; health UI mapping
 
 ---
@@ -134,7 +134,7 @@ No dedicated selector library. Inline derivation examples:
 
 | Hook | Inputs | Outputs |
 |------|--------|---------|
-| `useNow(active)` | boolean | `number` (Date.now, 250ms) |
+| `useNow(isTicking)` | boolean | `number` (Date.now, 250ms) |
 | `useSessionStream()` | — | `{ snapshot, setSnapshot }` |
 | `useDebugFlags()` | — | context value (throws if missing) |
 | `useToast()` | — | `{ pushToast }` |

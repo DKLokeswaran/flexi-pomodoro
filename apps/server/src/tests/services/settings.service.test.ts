@@ -57,16 +57,16 @@ describe("SettingsService", () => {
     const settings = new SettingsService();
     assert.throws(
       () => settings.update({ workPauseStrategy: "hard" as "soft" }),
-      (err: unknown) => {
-        assert.ok(err instanceof SettingsError);
-        assert.equal(err.code, "INVALID_SETTINGS");
+      (error: unknown) => {
+        assert.ok(error instanceof SettingsError);
+        assert.equal(error.code, "INVALID_SETTINGS");
         return true;
       },
     );
     assert.throws(
       () => settings.update({ cyclesBeforeLongRest: 3.5 }),
-      (err: unknown) => {
-        assert.ok(err instanceof SettingsError);
+      (error: unknown) => {
+        assert.ok(error instanceof SettingsError);
         return true;
       },
     );
@@ -76,9 +76,9 @@ describe("SettingsService", () => {
     const settings = new SettingsService();
     assert.throws(
       () => settings.update({ workDurationSec: 1 }),
-      (err: unknown) => {
-        assert.ok(err instanceof SettingsError);
-        assert.equal(err.code, "INVALID_SETTINGS");
+      (error: unknown) => {
+        assert.ok(error instanceof SettingsError);
+        assert.equal(error.code, "INVALID_SETTINGS");
         return true;
       },
     );

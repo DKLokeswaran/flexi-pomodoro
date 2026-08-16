@@ -17,12 +17,14 @@ const ALERT_FILES: Record<AlertId, string> = {
  */
 export function playAlerts(events: AlertEvent[]): void {
   if (events.length === 0) return;
-  const last = alertSeqStore.get();
-  const fresh = events.filter((e) => e.seq > last);
-  if (fresh.length === 0) return;
-  alertSeqStore.advance(Math.max(...fresh.map((e) => e.seq)));
-  for (const event of fresh) {
-    const src = ALERT_FILES[event.id];
+  const lastPlayedSeq = alertSeqStore.get();
+  const unplayedEvents = events.filter(
+    (alertEvent) => alertEvent.seq > lastPlayedSeq,
+  );
+  if (unplayedEvents.length === 0) return;
+  alertSeqStore.advance(Math.max(...unplayedEvents.map((alertEvent) => alertEvent.seq)));
+  for (const alertEvent of unplayedEvents) {
+    const src = ALERT_FILES[alertEvent.id];
     if (!src) continue;
     const audio = new Audio(src);
     void audio.play().catch(() => {
@@ -31,6 +33,7 @@ export function playAlerts(events: AlertEvent[]): void {
   }
 }
 
+/** Pending alerts live on the snapshot when idle, else on the nested session. */
 export function alertsFromSnapshot(snapshot: SessionSnapshot): AlertEvent[] {
   if (snapshot.status === "idle") return snapshot.pendingAlerts;
   return snapshot.session.pendingAlerts;

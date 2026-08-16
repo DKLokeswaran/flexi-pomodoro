@@ -9,6 +9,7 @@ import { fetchSettings, saveSettings } from "./settings.api";
 import { postAction } from "./session.api";
 import { alertsFromSnapshot, playAlerts } from "../utils/playAlerts";
 import { REQUEST_FAILED } from "../constants/labels";
+import { errorMessage } from "../utils/errorMessage";
 import { useToast } from "../providers/ToastProvider";
 
 export const settingsQueryKey = ["settings"] as const;
@@ -23,11 +24,7 @@ const ACTION_SUCCESS: Record<string, string> = {
   [SESSION_API.endLongRest]: "Session complete",
 };
 
-function errorMessage(err: unknown, fallback: string): string {
-  if (err instanceof Error && err.message) return err.message;
-  return fallback;
-}
-
+/** Load persisted settings (used as start-form defaults). */
 export function useSettingsQuery() {
   return useQuery({
     queryKey: settingsQueryKey,
@@ -35,26 +32,28 @@ export function useSettingsQuery() {
   });
 }
 
+/** PUT settings and keep the query cache + success/error toasts in sync. */
 export function useSaveSettingsMutation() {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const { pushToast } = useToast();
   return useMutation({
     mutationFn: (patch: SettingsPatch) => saveSettings(patch),
     onSuccess: (data) => {
-      qc.setQueryData(settingsQueryKey, data);
+      queryClient.setQueryData(settingsQueryKey, data);
       pushToast({ kind: "success", message: "Defaults saved" });
     },
-    onError: (err) => {
+    onError: (error) => {
       pushToast({
         kind: "error",
-        message: errorMessage(err, "Save failed"),
+        message: errorMessage(error, "Save failed"),
       });
     },
   });
 }
 
+/** POST a timer action, apply the returned snapshot, play alerts, toast. */
 export function useSessionActionMutation(
-  onSnapshot: (snap: SessionSnapshot) => void,
+  onSnapshot: (snapshot: SessionSnapshot) => void,
 ) {
   const { pushToast } = useToast();
   return useMutation({
@@ -65,18 +64,18 @@ export function useSessionActionMutation(
       path: string;
       body?: StartSessionBody;
     }) => postAction(path, body),
-    onSuccess: (snap, variables) => {
-      onSnapshot(snap);
-      playAlerts(alertsFromSnapshot(snap));
+    onSuccess: (snapshot, variables) => {
+      onSnapshot(snapshot);
+      playAlerts(alertsFromSnapshot(snapshot));
       const message = ACTION_SUCCESS[variables.path];
       if (message) {
         pushToast({ kind: "success", message });
       }
     },
-    onError: (err) => {
+    onError: (error) => {
       pushToast({
         kind: "error",
-        message: errorMessage(err, REQUEST_FAILED),
+        message: errorMessage(error, REQUEST_FAILED),
       });
     },
   });

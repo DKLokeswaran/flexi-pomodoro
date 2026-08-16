@@ -4,15 +4,18 @@ import { connectSessionStream } from "./sessionStream.sse";
 import { syncAlertSeq } from "../utils/alertSeq";
 import { alertsFromSnapshot, playAlerts } from "../utils/playAlerts";
 
+/** Live session snapshot via SSE, plus alert playback and idle watermark sync. */
 export function useSessionStream() {
   const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null);
   const prevStatusRef = useRef<SessionSnapshot["status"] | null>(null);
 
+  /** Store the snapshot and play any new alert deltas. */
   const onSnapshot = useEffectEvent((next: SessionSnapshot) => {
     setSnapshot(next);
     playAlerts(alertsFromSnapshot(next));
   });
 
+  /** After active → idle, snap the alert watermark to the server high-water. */
   const onIdle = useEffectEvent(async () => {
     try {
       await syncAlertSeq();

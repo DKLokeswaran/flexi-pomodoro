@@ -5,50 +5,57 @@ import {
   SESSION_API,
   parseStartSessionBody,
 } from "@flexi-pomodoro/shared";
-import { ZodError } from "zod";
-import {
-  SettingsError,
-  toSettingsError,
-  type SettingsService,
-} from "../services/settings.service.js";
-import { SessionError, SessionService } from "../services/session.service.js";
+import type { SettingsService } from "../services/settings.service.js";
+import { SessionService } from "../services/session.service.js";
+import { errorReply } from "../utils/errorReply.js";
 
-function errorReply(err: unknown): { statusCode: number; body: object } {
-  if (err instanceof ZodError) {
-    return errorReply(toSettingsError(err));
-  }
-  if (err instanceof SettingsError) {
-    return {
-      statusCode: 400,
-      body: { error: err.message, code: err.code },
-    };
-  }
-  if (err instanceof SessionError) {
-    const status =
-      err.code === "NO_SESSION" || err.code === "SESSION_ACTIVE"
-        ? 409
-        : err.code === "FORBIDDEN" || err.code === "PARAMS_LOCKED"
-          ? 403
-          : 400;
-    return {
-      statusCode: status,
-      body: { error: err.message, code: err.code },
-    };
-  }
-  throw err;
-}
-
-function parseSinceSeq(raw: unknown): number {
-  const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : 0;
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+/** Parse a query/body watermark; missing or invalid values become 0. */
+function parseSinceSeq(rawSinceSeq: unknown): number {
+  const parsed =
+    typeof rawSinceSeq === "string"
+      ? Number(rawSinceSeq)
+      : typeof rawSinceSeq === "number"
+        ? rawSinceSeq
+        : 0;
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
 }
 
 /** Missing/zero watermark → current high-water (no history replay). */
-function resolveSinceSeq(raw: unknown, session: SessionService): number {
-  const parsed = parseSinceSeq(raw);
+function resolveSinceSeq(rawSinceSeq: unknown, session: SessionService): number {
+  const parsed = parseSinceSeq(rawSinceSeq);
   return parsed > 0 ? parsed : session.getAlertSeq();
 }
 
+/** Hijack the reply and write SSE headers for a live session stream. */
+function openSseReply(reply: FastifyReply): void {
+  reply.hijack();
+  reply.raw.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+}
+
+/** Serialize one snapshot as a Server-Sent Event data frame. */
+function writeSseSnapshot(reply: FastifyReply, snapshot: SessionSnapshot): void {
+  reply.raw.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+}
+
+/** Wrap a session mutation so domain errors become HTTP error replies. */
+function sessionAction(
+  runAction: () => SessionSnapshot,
+): (req: FastifyRequest, reply: FastifyReply) => Promise<unknown> {
+  return async (_req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      return runAction();
+    } catch (error) {
+      const { statusCode, body } = errorReply(error);
+      return reply.code(statusCode).send(body);
+    }
+  };
+}
+
+/** REST + SSE endpoints for reading and mutating the in-memory session. */
 export function registerSessionRoutes(
   app: FastifyInstance,
   { settings, session }: { settings: SettingsService; session: SessionService },
@@ -68,22 +75,13 @@ export function registerSessionRoutes(
   app.get<{ Querystring: { sinceSeq?: string } }>(
     SESSION_API.events,
     async (req, reply) => {
-      reply.hijack();
-      reply.raw.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      });
-
-      const send = (data: SessionSnapshot) => {
-        reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
-      };
+      openSseReply(reply);
 
       const sinceSeq = resolveSinceSeq(req.query.sinceSeq, session);
-      send(session.getSnapshot(Date.now(), sinceSeq));
+      writeSseSnapshot(reply, session.getSnapshot(Date.now(), sinceSeq));
 
       const unsubscribe = session.subscribe((snapshot) => {
-        send(snapshot);
+        writeSseSnapshot(reply, snapshot);
       }, session.getAlertSeq());
 
       const heartbeat = setInterval(() => {
@@ -102,27 +100,16 @@ export function registerSessionRoutes(
       const { debug, overrides } = parseStartSessionBody(req.body ?? {});
       const params = settings.resolveSessionParams(overrides, debug);
       return session.start(params, Date.now());
-    } catch (err) {
-      const { statusCode, body } = errorReply(err);
+    } catch (error) {
+      const { statusCode, body } = errorReply(error);
       return reply.code(statusCode).send(body);
     }
   });
 
-  const action =
-    (fn: () => SessionSnapshot) =>
-    async (_req: FastifyRequest, reply: FastifyReply) => {
-      try {
-        return fn();
-      } catch (err) {
-        const { statusCode, body } = errorReply(err);
-        return reply.code(statusCode).send(body);
-      }
-    };
-
-  app.post(SESSION_API.ackRest, action(() => session.ackRest()));
-  app.post(SESSION_API.continue, action(() => session.continueExtended()));
-  app.post(SESSION_API.startRest, action(() => session.startRest()));
-  app.post(SESSION_API.softPause, action(() => session.softPause()));
-  app.post(SESSION_API.softResume, action(() => session.softResume()));
-  app.post(SESSION_API.endLongRest, action(() => session.endLongRest()));
+  app.post(SESSION_API.ackRest, sessionAction(() => session.ackRest()));
+  app.post(SESSION_API.continue, sessionAction(() => session.continueExtended()));
+  app.post(SESSION_API.startRest, sessionAction(() => session.startRest()));
+  app.post(SESSION_API.softPause, sessionAction(() => session.softPause()));
+  app.post(SESSION_API.softResume, sessionAction(() => session.softResume()));
+  app.post(SESSION_API.endLongRest, sessionAction(() => session.endLongRest()));
 }

@@ -50,14 +50,16 @@ export const SESSION_API = {
 export const WorkPauseStrategySchema = z.literal("soft");
 export type WorkPauseStrategy = z.infer<typeof WorkPauseStrategySchema>;
 
-function boundedInt(name: string, bounds: { min: number; max: number }) {
+/** Integer field constrained to a named min/max range. */
+function boundedInt(fieldName: string, bounds: { min: number; max: number }) {
   return z
-    .number({ error: `${name} must be a number` })
-    .int({ error: `${name} must be an integer` })
-    .min(bounds.min, { error: `${name} must be >= ${bounds.min}` })
-    .max(bounds.max, { error: `${name} must be <= ${bounds.max}` });
+    .number({ error: `${fieldName} must be a number` })
+    .int({ error: `${fieldName} must be an integer` })
+    .min(bounds.min, { error: `${fieldName} must be >= ${bounds.min}` })
+    .max(bounds.max, { error: `${fieldName} must be <= ${bounds.max}` });
 }
 
+/** Session-timing object schema using the given min/max bounds. */
 function sessionParamsSchemaForBounds(bounds: SettingsBounds) {
   return z.object({
     workDurationSec: boundedInt("workDurationSec", bounds.workDurationSec),
@@ -109,12 +111,13 @@ export const DEFAULT_SETTINGS: Settings = {
   workPauseStrategy: "soft",
 };
 
+/** Overlay start-session overrides on persisted defaults, then validate bounds. */
 export function mergeSessionParams(
   settings: Settings,
   overrides?: SessionOverrides,
-  opts?: { debug?: DebugFlags },
+  options?: { debug?: DebugFlags },
 ): SessionParams {
-  const schema = sessionParamsSchemaForBounds(getSettingsBounds(opts?.debug));
+  const schema = sessionParamsSchemaForBounds(getSettingsBounds(options?.debug));
   return schema.parse({
     workDurationSec: overrides?.workDurationSec ?? settings.workDurationSec,
     shortRestDurationSec:
@@ -136,11 +139,11 @@ export function parseStartSessionBody(body: unknown): {
   debug: DebugFlags | undefined;
   overrides: SessionOverrides;
 } {
-  const raw = z.object({}).passthrough().parse(body ?? {}) as Record<
+  const rawBody = z.object({}).passthrough().parse(body ?? {}) as Record<
     string,
     unknown
   >;
-  const { debug: debugRaw, ...overrideRaw } = raw;
+  const { debug: debugRaw, ...overrideRaw } = rawBody;
   const debug =
     debugRaw === undefined ? undefined : DebugFlagsSchema.parse(debugRaw);
   const overrides = sessionParamsSchemaForBounds(getSettingsBounds(debug))
@@ -149,6 +152,7 @@ export function parseStartSessionBody(body: unknown): {
   return { debug, overrides };
 }
 
+/** Merge a settings patch onto current settings and re-validate the result. */
 export function parseSettingsPatch(
   current: Settings,
   patch: unknown,

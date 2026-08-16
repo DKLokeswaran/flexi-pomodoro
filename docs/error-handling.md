@@ -10,7 +10,7 @@
 | `code` | string | `"INVALID_SETTINGS"` |
 | `name` | `"SettingsError"` | |
 
-`toSettingsError(err)`: passthrough `SettingsError`; maps `ZodError` issues to joined messages; rethrows unknowns.
+`toSettingsError(error)`: passthrough `SettingsError`; maps `ZodError` issues to joined messages; rethrows unknowns.
 
 ### `SessionError` (`apps/server/src/services/session.service.ts`)
 
@@ -39,13 +39,14 @@
 ### Server
 
 - **No global Fastify `setErrorHandler`** in committed `app.ts`.
-- Session and settings routes wrap handlers with local `errorReply`, returning `{ error, code }` and status 400/403/409.
-- Unmapped errors are **rethrown** (`throw err`) → Fastify default 500 logging.
+- Session and settings routes wrap handlers with shared `errorReply` (`apps/server/src/utils/errorReply.ts`), returning `{ error, code }` and status 400/403/409.
+- Unmapped errors are **rethrown** → Fastify default 500 logging.
 - Zod errors on session start/settings are normalized via `toSettingsError` / `ZodError` branch.
 
 ### Client
 
 - `parseJson`: non-OK responses throw `Error` with server `error` field or `"Request failed (status)"`.
+- `errorMessage(error, fallback)` (`apps/web/src/utils/errorMessage.ts`) prefers `Error.message` for toasts and settings-load failures.
 - Mutations show toast via `ToastProvider`.
 - SSE/poll errors are mostly swallowed (transient reconnect).
 - `DebugFlagsProvider` / `AlertSeqStore`: localStorage failures caught; in-memory continues.
@@ -78,7 +79,7 @@ See `SETTINGS_BOUNDS` in [data-model.md](./data-model.md) / [api-reference.md](.
 
 - Zod field messages like `` `${name} must be >= ${bounds.min}` `` via `boundedInt`.
 - Session messages are human sentences, e.g. `"Soft pause is only available during planned work"`.
-- Client toast uses `err.message` when present.
+- Client toast uses `errorMessage(error, fallback)` (`Error.message` when present).
 
 ---
 

@@ -8,7 +8,7 @@ export const DEBUG_FEATURES = [shortDurationsFeature] as const;
 export type DebugFeatureId = (typeof DEBUG_FEATURES)[number]["id"];
 
 export const DEBUG_FEATURE_IDS: readonly DebugFeatureId[] = DEBUG_FEATURES.map(
-  (f) => f.id,
+  (feature) => feature.id,
 );
 
 export type DebugFlags = {
@@ -19,30 +19,31 @@ export type DebugFlags = {
 export const DebugFlagsSchema: z.ZodType<DebugFlags> = z
   .object(
     Object.fromEntries(
-      DEBUG_FEATURE_IDS.map((id) => [id, z.boolean().optional()]),
+      DEBUG_FEATURE_IDS.map((featureId) => [featureId, z.boolean().optional()]),
     ) as {
       [K in DebugFeatureId]: z.ZodOptional<z.ZodBoolean>;
     },
   )
   .strict();
 
+/** True when the given feature flag is present and set. */
 export function isDebugFeatureEnabled(
   flags: DebugFlags | undefined,
-  id: DebugFeatureId,
+  featureId: DebugFeatureId,
 ): boolean {
-  return Boolean(flags?.[id]);
+  return Boolean(flags?.[featureId]);
 }
 
 export const DEBUG_FEATURE_META: Record<DebugFeatureId, DebugFeatureMeta> =
-  Object.fromEntries(DEBUG_FEATURES.map((f) => [f.id, f.meta])) as Record<
-    DebugFeatureId,
-    DebugFeatureMeta
-  >;
+  Object.fromEntries(
+    DEBUG_FEATURES.map((feature) => [feature.id, feature.meta]),
+  ) as Record<DebugFeatureId, DebugFeatureMeta>;
 
-export function getDebugFeature(id: DebugFeatureId): DebugFeatureDef {
-  const feature = DEBUG_FEATURES.find((f) => f.id === id);
+/** Look up a registered feature definition; throws if the id is unknown. */
+export function getDebugFeature(featureId: DebugFeatureId): DebugFeatureDef {
+  const feature = DEBUG_FEATURES.find((entry) => entry.id === featureId);
   if (!feature) {
-    throw new Error(`Unknown debug feature: ${id}`);
+    throw new Error(`Unknown debug feature: ${featureId}`);
   }
   return feature;
 }

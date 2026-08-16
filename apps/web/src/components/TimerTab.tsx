@@ -8,6 +8,7 @@ import {
 } from "./timer/IdleStartForm";
 import styles from "./TimerTab.module.css";
 
+/** Timer tab: idle start form or the running-session display. */
 export function TimerTab({
   snapshot,
   onAction,
@@ -17,15 +18,15 @@ export function TimerTab({
   onAction: (path: string, body?: StartSessionBody) => void;
   defaults: SessionTimingDefaults;
 }) {
-  const active = snapshot?.status === "active";
-  const now = useNow(Boolean(active));
+  const sessionIsActive = snapshot?.status === "active";
+  const now = useNow(Boolean(sessionIsActive));
   const phase = snapshot?.status === "active" ? snapshot.session.phase : null;
   const params =
     snapshot?.status === "active" ? snapshot.session.params : null;
 
   return (
     <section className={styles.timerShell} aria-live="polite">
-      {!active || !phase || !params || !snapshot ? (
+      {!sessionIsActive || !phase || !params || !snapshot ? (
         <IdleStartForm
           defaults={defaults}
           onStart={(body) => onAction(SESSION_API.start, body)}

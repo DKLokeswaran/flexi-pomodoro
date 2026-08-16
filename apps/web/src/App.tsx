@@ -11,8 +11,10 @@ import {
   useSettingsQuery,
 } from "./queries/useSessionApi";
 import { useSessionStream } from "./hooks/useSessionStream";
+import { errorMessage } from "./utils/errorMessage";
 import styles from "./App.module.css";
 
+/** Root shell: tab navigation and the selected tab's panel. */
 export function App() {
   const [tab, setTab] = useState<Tab>("timer");
   const { snapshot, setSnapshot } = useSessionStream();
@@ -21,7 +23,7 @@ export function App() {
   const sessionAction = useSessionActionMutation(setSnapshot);
 
   const settings = settingsQuery.data ?? DEFAULT_SETTINGS;
-  const active = snapshot?.status === "active";
+  const sessionIsActive = snapshot?.status === "active";
 
   return (
     <div className={styles.app}>
@@ -30,9 +32,7 @@ export function App() {
 
       {settingsQuery.isError ? (
         <p className={styles.error}>
-          {settingsQuery.error instanceof Error
-            ? settingsQuery.error.message
-            : "Failed to load settings"}
+          {errorMessage(settingsQuery.error, "Failed to load settings")}
         </p>
       ) : null}
 
@@ -47,9 +47,9 @@ export function App() {
       {tab === "settings" ? (
         <SettingsTab
           settings={settings}
-          locked={Boolean(active)}
+          locked={Boolean(sessionIsActive)}
           saving={saveSettings.isPending}
-          onSave={(next) => saveSettings.mutate(next)}
+          onSave={(nextSettings) => saveSettings.mutate(nextSettings)}
         />
       ) : null}
 

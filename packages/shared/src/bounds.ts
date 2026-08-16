@@ -1,3 +1,4 @@
+/** Production min/max for session timing fields (seconds, except cycle count). */
 export const SETTINGS_BOUNDS = {
   workDurationSec: { min: 60, max: 180 * 60 },
   shortRestDurationSec: { min: 60, max: 60 * 60 },

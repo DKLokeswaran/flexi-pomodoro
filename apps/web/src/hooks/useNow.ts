@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 
 /** Local wall-clock ticker for rendering remaining/overtime from anchors. */
-export function useNow(active: boolean): number {
+export function useNow(isTicking: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!active) return;
-    const id = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(id);
-  }, [active]);
+    if (!isTicking) return;
+    const intervalId = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(intervalId);
+  }, [isTicking]);
   return now;
 }

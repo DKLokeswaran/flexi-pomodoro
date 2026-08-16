@@ -15,6 +15,7 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Mount the app with React Query, debug flags, and toasts. */
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

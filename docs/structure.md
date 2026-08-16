@@ -1,6 +1,6 @@
 # Repository Structure
 
-Annotated layout of the **committed** tree at `HEAD` (84 paths). Binary alert WAVs are listed by pattern only.
+Annotated layout of the source tree (86 paths in `apps/`, `packages/`, and repo-root config; binary alert WAVs listed by pattern only).
 
 ```
 flexi-pomodoro/
@@ -43,6 +43,8 @@ flexi-pomodoro/
 │   │       ├── services/
 │   │       │   ├── settings.service.ts
 │   │       │   └── session.service.ts
+│   │       ├── utils/
+│   │       │   └── errorReply.ts  # HTTP mapping for SettingsError / SessionError
 │   │       └── tests/services/
 │   │           ├── settings.service.test.ts
 │   │           └── session.service.test.ts
@@ -65,7 +67,7 @@ flexi-pomodoro/
 │           ├── hooks/           # useNow, useSessionStream, SSE transport
 │           ├── providers/       # DebugFlags, Toast
 │           ├── queries/         # fetch helpers + React Query hooks
-│           └── utils/
+│           └── utils/           # time, fetchJson, alerts, errorMessage
 ```
 
 ## Top-level folder roles
@@ -82,7 +84,7 @@ flexi-pomodoro/
 
 | Extension | Count |
 |-----------|------:|
-| `.ts` | 34 |
+| `.ts` | 36 |
 | `.tsx` | 15 |
 | `.css` | 11 |
 | `.json` | 9 |
@@ -95,6 +97,7 @@ flexi-pomodoro/
 | Change | Location |
 |--------|----------|
 | New REST endpoint | `apps/server/src/routes/<domain>.routes.ts`; register in `routes/index.ts`; add path to `SESSION_API` in shared if shared |
+| HTTP error mapping | `apps/server/src/utils/errorReply.ts` (shared by session and settings routes) |
 | Session transition / alert | `SessionService` + shared `AlertIdSchema` / phase types; extend tests under `apps/server/src/tests/services/` |
 | Settings field | Shared Zod schemas + `DEFAULT_SETTINGS` + `SettingsService` + Settings UI |
 | Debug feature | New folder under `packages/shared/src/debug/features/`; register in `DEBUG_FEATURES` |

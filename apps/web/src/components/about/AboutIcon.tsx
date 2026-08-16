@@ -46,6 +46,7 @@ type AboutIconProps = {
   className?: string;
 };
 
+/** Brand SVG or Lucide icon for About link cards. */
 export function AboutIcon({ icon, className }: AboutIconProps) {
   if (icon.kind === "brand") {
     const brand = BRAND_SVGS[icon.slug];

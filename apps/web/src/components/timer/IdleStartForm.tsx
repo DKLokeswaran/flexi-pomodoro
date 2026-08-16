@@ -15,55 +15,62 @@ export type SessionTimingDefaults = {
 };
 
 type OverrideDraft = {
-  work: number;
-  shortRest: number;
-  longRest: number;
-  cycles: number;
-  decision: number;
+  workDuration: number;
+  shortRestDuration: number;
+  longRestDuration: number;
+  cyclesBeforeLongRest: number;
+  decisionWindowSec: number;
 };
 
+/** Seconds when short-durations debug is on; otherwise minutes. */
+function durationForDisplay(durationSec: number, useSeconds: boolean): number {
+  return useSeconds ? durationSec : secToMinutes(durationSec);
+}
+
+/** Round seconds as-is, or convert minutes to seconds for the start API. */
+function durationForApi(value: number, useSeconds: boolean): number {
+  return useSeconds ? Math.round(value) : minutesToSec(value);
+}
+
+/** Seed the start form from persisted defaults and the current duration unit. */
 function draftFromDefaults(
   defaults: SessionTimingDefaults,
-  shortDurations: boolean,
+  useSeconds: boolean,
 ): OverrideDraft {
   return {
-    work: shortDurations
-      ? defaults.workDurationSec
-      : secToMinutes(defaults.workDurationSec),
-    shortRest: shortDurations
-      ? defaults.shortRestDurationSec
-      : secToMinutes(defaults.shortRestDurationSec),
-    longRest: shortDurations
-      ? defaults.longRestDurationSec
-      : secToMinutes(defaults.longRestDurationSec),
-    cycles: defaults.cyclesBeforeLongRest,
-    decision: defaults.decisionWindowSec,
+    workDuration: durationForDisplay(defaults.workDurationSec, useSeconds),
+    shortRestDuration: durationForDisplay(
+      defaults.shortRestDurationSec,
+      useSeconds,
+    ),
+    longRestDuration: durationForDisplay(
+      defaults.longRestDurationSec,
+      useSeconds,
+    ),
+    cyclesBeforeLongRest: defaults.cyclesBeforeLongRest,
+    decisionWindowSec: defaults.decisionWindowSec,
   };
 }
 
+/** Build POST /start body from the draft, attaching debug flags when needed. */
 function toStartBody(
   draft: OverrideDraft,
-  shortDurations: boolean,
+  useSeconds: boolean,
 ): StartSessionBody {
   const overrides: StartSessionBody = {
-    workDurationSec: shortDurations
-      ? Math.round(draft.work)
-      : minutesToSec(draft.work),
-    shortRestDurationSec: shortDurations
-      ? Math.round(draft.shortRest)
-      : minutesToSec(draft.shortRest),
-    longRestDurationSec: shortDurations
-      ? Math.round(draft.longRest)
-      : minutesToSec(draft.longRest),
-    cyclesBeforeLongRest: Math.round(draft.cycles),
-    decisionWindowSec: Math.round(draft.decision),
+    workDurationSec: durationForApi(draft.workDuration, useSeconds),
+    shortRestDurationSec: durationForApi(draft.shortRestDuration, useSeconds),
+    longRestDurationSec: durationForApi(draft.longRestDuration, useSeconds),
+    cyclesBeforeLongRest: Math.round(draft.cyclesBeforeLongRest),
+    decisionWindowSec: Math.round(draft.decisionWindowSec),
   };
-  if (shortDurations) {
+  if (useSeconds) {
     overrides.debug = { shortDurations: true };
   }
   return overrides;
 }
 
+/** Idle timer: Ready clock plus per-session duration overrides and Start. */
 export function IdleStartForm({
   defaults,
   onStart,
@@ -82,16 +89,12 @@ export function IdleStartForm({
   }, [defaults, shortDurations]);
 
   const durationUnit = shortDurations ? "sec" : "min";
-
-  const fields: {
-    key: keyof OverrideDraft;
-    label: string;
-  }[] = [
-    { key: "work", label: `Work (${durationUnit})` },
-    { key: "shortRest", label: `Short rest (${durationUnit})` },
-    { key: "cycles", label: "Cycles (N)" },
-    { key: "longRest", label: `Long rest (${durationUnit})` },
-    { key: "decision", label: DECISION_WINDOW_LABEL },
+  const fields: { key: keyof OverrideDraft; label: string }[] = [
+    { key: "workDuration", label: `Work (${durationUnit})` },
+    { key: "shortRestDuration", label: `Short rest (${durationUnit})` },
+    { key: "cyclesBeforeLongRest", label: "Cycles (N)" },
+    { key: "longRestDuration", label: `Long rest (${durationUnit})` },
+    { key: "decisionWindowSec", label: DECISION_WINDOW_LABEL },
   ];
 
   return (
@@ -108,11 +111,11 @@ export function IdleStartForm({
               label={label}
               value={overrides[key]}
               step={1}
-              min={key === "decision" && !shortDurations ? 10 : 1}
-              onChange={(v) =>
-                setOverrides((o) => ({
-                  ...o,
-                  [key]: Math.round(v),
+              min={key === "decisionWindowSec" && !shortDurations ? 10 : 1}
+              onChange={(value) =>
+                setOverrides((draft) => ({
+                  ...draft,
+                  [key]: Math.round(value),
                 }))
               }
             />

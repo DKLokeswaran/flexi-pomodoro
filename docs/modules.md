@@ -66,7 +66,7 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 | `SettingsPatchSchema` / `SettingsPatch` | partial settings |
 | `StartSessionBody` | type overrides + `debug?` |
 | `DEFAULT_SETTINGS` | Settings |
-| `mergeSessionParams(settings, overrides?, opts?)` | → SessionParams |
+| `mergeSessionParams(settings, overrides?, options?)` | → SessionParams |
 | `parseStartSessionBody(body)` | → `{ debug, overrides }` |
 | `parseSettingsPatch(current, patch)` | → Settings |
 | `PhaseKind`, phase interfaces, `Phase`, `RestKind` | types |
@@ -123,6 +123,8 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 |--------|------|
 | `registerSettingsRoutes(app, settings)` | GET/PUT settings |
 
+**Deps:** `errorReply` from `../utils/errorReply.js`.
+
 ### `src/routes/session.routes.ts`
 
 | Export | Kind |
@@ -131,12 +133,22 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 
 **Side effects:** hijacks reply for SSE; heartbeats; subscribe/unsubscribe.
 
+**Deps:** `errorReply` from `../utils/errorReply.js`.
+
+### `src/utils/errorReply.ts`
+
+| Export | Kind |
+|--------|------|
+| `errorReply(error)` | `{ statusCode, body }` for Zod / SettingsError / SessionError |
+
+Unknown errors are rethrown.
+
 ### `src/services/settings.service.ts`
 
 | Export | Kind |
 |--------|------|
 | `SettingsError` | class |
-| `toSettingsError(err)` | normalizer |
+| `toSettingsError(error)` | normalizer |
 | `SettingsService` | class |
 
 **Public methods**
@@ -222,12 +234,19 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 | `secFromIso(iso, nowMs)` | signed seconds to event |
 | `elapsedFromIso(iso, nowMs)` | non-negative elapsed |
 | `minutesToSec` / `secToMinutes` | conversions |
+| `remainingSecFromIso(iso, nowMs)` | non-negative countdown seconds |
 
 ### `src/utils/fetchJson.ts`
 
 | Export | Purpose |
 |--------|---------|
-| `parseJson<T>(res)` | throw on !ok; return JSON |
+| `parseJson<T>(response)` | throw on !ok; return JSON |
+
+### `src/utils/errorMessage.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `errorMessage(error, fallback?)` | `Error.message` or fallback (`REQUEST_FAILED`) |
 
 ### `src/utils/alertSeqStore.ts`
 
@@ -235,6 +254,7 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 |--------|------|
 | `AlertSeqStore` | class `get`/`set`/`advance` |
 | `alertSeqStore` | singleton |
+| `sinceSeqQueryString()` | `?sinceSeq=N` or empty |
 
 **Side effects:** localStorage + `storage` listener.
 
@@ -261,7 +281,7 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 
 | Export | I/O |
 |--------|-----|
-| `useNow(active: boolean): number` | 250ms ticker when active |
+| `useNow(isTicking: boolean): number` | 250ms ticker when ticking |
 
 ### `src/hooks/sessionStream.sse.ts`
 
@@ -342,7 +362,7 @@ Uses `useEffectEvent` for snapshot/idle handlers.
 |-------|------|
 | `label` | string |
 | `value` | number |
-| `onChange` | `(v: number) => void` |
+| `onChange` | `(value: number) => void` |
 | `step?` | number (default 1) |
 | `min?` | number |
 
@@ -392,7 +412,7 @@ Uses `useEffectEvent` for snapshot/idle handlers.
 |--------|-------|
 | `AboutTab` | none (uses health query + toast) |
 
-Internal helpers: `StatusPill`, `CreditRow`, `healthUi`, `buildDiagnostics` (not exported).
+Internal helpers: `StatusPill`, `CreditRow`, `healthUi`, `healthClassName`, `buildDiagnostics` (not exported).
 
 ### `src/components/about/AboutAccordion.tsx`
 

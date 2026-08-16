@@ -1,5 +1,6 @@
 import styles from "./NumberField.module.css";
 
+/** Labeled numeric input; min defaults to step when not provided. */
 export function NumberField({
   label,
   value,
@@ -9,7 +10,7 @@ export function NumberField({
 }: {
   label: string;
   value: number;
-  onChange: (v: number) => void;
+  onChange: (value: number) => void;
   step?: number;
   min?: number;
 }) {
@@ -22,7 +23,7 @@ export function NumberField({
           step={step}
           min={min ?? step}
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onChange={(event) => onChange(Number(event.target.value))}
         />
       </label>
     </div>

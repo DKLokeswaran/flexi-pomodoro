@@ -1,13 +1,19 @@
-import type { Phase, SessionParams, SessionSnapshot } from "@flexi-pomodoro/shared";
+import type {
+  Phase,
+  PhaseKind,
+  SessionParams,
+  SessionSnapshot,
+} from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
 import {
   elapsedFromIso,
   formatMmSs,
-  secFromIso,
+  remainingSecFromIso,
 } from "../../utils/time";
 import displayStyles from "./timerDisplay.module.css";
 
-function phaseTitle(kind: string): string {
+/** Short UI title for the current phase kind. */
+function phaseTitle(kind: PhaseKind): string {
   switch (kind) {
     case "planned_work":
       return "Work";
@@ -19,11 +25,10 @@ function phaseTitle(kind: string): string {
       return "Short rest";
     case "long_rest":
       return "Long rest";
-    default:
-      return kind;
   }
 }
 
+/** Primary countdown (or planned + overtime) based on phase wall-clock anchors. */
 function displayClock(
   snapshot: SessionSnapshot,
   params: SessionParams,
@@ -37,14 +42,14 @@ function displayClock(
     return `${planned} + ${extended}`;
   }
   if (phase.kind === "decision") {
-    return formatMmSs(Math.max(0, secFromIso(phase.decisionEndsAt, nowMs)));
+    return formatMmSs(remainingSecFromIso(phase.decisionEndsAt, nowMs));
   }
   if (
     phase.kind === "planned_work" ||
     phase.kind === "short_rest" ||
     phase.kind === "long_rest"
   ) {
-    return formatMmSs(Math.max(0, secFromIso(phase.plannedEndAt, nowMs)));
+    return formatMmSs(remainingSecFromIso(phase.plannedEndAt, nowMs));
   }
   return "00:00";
 }
@@ -55,6 +60,7 @@ type PhaseAction = {
   primary?: boolean;
 };
 
+/** Buttons allowed for the current phase (empty for short rest). */
 function actionsForPhase(phase: Phase): PhaseAction[] {
   if (phase.kind === "planned_work") {
     return phase.softPaused
@@ -82,6 +88,19 @@ function actionsForPhase(phase: Phase): PhaseAction[] {
   return [];
 }
 
+/** Contextual hint under the clock for decision and overtime. */
+function phaseHint(phase: Phase, nowMs: number): string | null {
+  if (phase.kind === "decision") {
+    const remaining = formatMmSs(remainingSecFromIso(phase.decisionEndsAt, nowMs));
+    return `Keep working — or rest in ${remaining}`;
+  }
+  if (phase.kind === "extended_work") {
+    return "Overtime — start rest when ready";
+  }
+  return null;
+}
+
+/** Running-session display: phase, clock, cycle, hints, and phase actions. */
 export function ActiveTimer({
   snapshot,
   phase,
@@ -96,37 +115,30 @@ export function ActiveTimer({
   onAction: (path: string) => void;
 }) {
   const actions = actionsForPhase(phase);
+  const hint = phaseHint(phase, now);
+  const softPausedLabel =
+    phase.kind === "planned_work" && phase.softPaused ? " · soft-paused" : "";
 
   return (
     <>
       <p className={displayStyles.phaseLabel} data-phase={phase.kind}>
         {phaseTitle(phase.kind)}
-        {phase.kind === "planned_work" && phase.softPaused
-          ? " · soft-paused"
-          : ""}
+        {softPausedLabel}
       </p>
       <div className={displayStyles.clock}>{displayClock(snapshot, params, now)}</div>
       <p className={displayStyles.cycle}>
         Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
       </p>
-      {phase.kind === "decision" ? (
-        <p className={displayStyles.decisionHint}>
-          Keep working — or rest in{" "}
-          {formatMmSs(Math.max(0, secFromIso(phase.decisionEndsAt, now)))}
-        </p>
-      ) : null}
-      {phase.kind === "extended_work" ? (
-        <p className={displayStyles.decisionHint}>Overtime — start rest when ready</p>
-      ) : null}
+      {hint ? <p className={displayStyles.decisionHint}>{hint}</p> : null}
       <div className="actions">
-        {actions.map((a) => (
+        {actions.map((action) => (
           <button
-            key={a.path}
+            key={action.path}
             type="button"
-            className={a.primary ? "btn btn-primary" : "btn"}
-            onClick={() => onAction(a.path)}
+            className={action.primary ? "btn btn-primary" : "btn"}
+            onClick={() => onAction(action.path)}
           >
-            {a.label}
+            {action.label}
           </button>
         ))}
       </div>

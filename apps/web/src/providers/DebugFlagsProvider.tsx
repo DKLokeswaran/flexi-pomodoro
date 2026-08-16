@@ -21,21 +21,23 @@ type PersistedDebugPrefs = {
 
 const DEFAULT_PREFS: PersistedDebugPrefs = { debugMode: false, flags: {} };
 
+/** Load debug mode + feature flags from localStorage; ignore corrupt data. */
 function readPersisted(): PersistedDebugPrefs {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PREFS;
     const data: unknown = JSON.parse(raw);
     if (!data || typeof data !== "object") return DEFAULT_PREFS;
-    const obj = data as Record<string, unknown>;
-    const debugMode = obj.debugMode === true;
-    const flags = DebugFlagsSchema.parse(obj.flags ?? {});
+    const parsed = data as Record<string, unknown>;
+    const debugMode = parsed.debugMode === true;
+    const flags = DebugFlagsSchema.parse(parsed.flags ?? {});
     return { debugMode, flags: debugMode ? flags : {} };
   } catch {
     return DEFAULT_PREFS;
   }
 }
 
+/** Persist prefs; swallow quota / private-mode failures. */
 function writePersisted(prefs: PersistedDebugPrefs): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
@@ -49,13 +51,14 @@ type DebugFlagsContextValue = {
   debugMode: boolean;
   setDebugMode: (enabled: boolean) => void;
   flags: DebugFlags;
-  setFlag: (id: DebugFeatureId, enabled: boolean) => void;
+  setFlag: (featureId: DebugFeatureId, enabled: boolean) => void;
   /** True only when debugMode is on and the feature flag is set. */
-  isEnabled: (id: DebugFeatureId) => boolean;
+  isEnabled: (featureId: DebugFeatureId) => boolean;
 };
 
 const DebugFlagsContext = createContext<DebugFlagsContextValue | null>(null);
 
+/** Browser-local debug mode and per-feature flags, synced across tabs. */
 export function DebugFlagsProvider({ children }: { children: ReactNode }) {
   const [initialPrefs] = useState(readPersisted);
   const [debugMode, setDebugModeState] = useState(initialPrefs.debugMode);
@@ -66,8 +69,8 @@ export function DebugFlagsProvider({ children }: { children: ReactNode }) {
   }, [debugMode, flags]);
 
   useEffect(() => {
-    const onStorage = (ev: StorageEvent) => {
-      if (ev.key !== STORAGE_KEY && ev.key !== null) return;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY && event.key !== null) return;
       const next = readPersisted();
       setDebugModeState(next.debugMode);
       setFlags(next.flags);
@@ -76,6 +79,7 @@ export function DebugFlagsProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  /** Enable/disable debug mode; clearing the gate also clears feature flags. */
   const setDebugMode = (enabled: boolean) => {
     setDebugModeState(enabled);
     if (!enabled) {
@@ -83,21 +87,23 @@ export function DebugFlagsProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const setFlag = (id: DebugFeatureId, enabled: boolean) => {
+  /** Set or clear one feature flag while debug mode is on. */
+  const setFlag = (featureId: DebugFeatureId, enabled: boolean) => {
     if (!debugMode) return;
-    setFlags((prev) => {
-      const next = { ...prev };
+    setFlags((previousFlags) => {
+      const nextFlags = { ...previousFlags };
       if (enabled) {
-        next[id] = true;
+        nextFlags[featureId] = true;
       } else {
-        delete next[id];
+        delete nextFlags[featureId];
       }
-      return next;
+      return nextFlags;
     });
   };
 
-  const isEnabled = (id: DebugFeatureId) =>
-    debugMode && isDebugFeatureEnabled(flags, id);
+  /** True only when debugMode is on and the feature flag is set. */
+  const isEnabled = (featureId: DebugFeatureId) =>
+    debugMode && isDebugFeatureEnabled(flags, featureId);
 
   return (
     <DebugFlagsContext.Provider
@@ -108,10 +114,11 @@ export function DebugFlagsProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Access debug flags; must be rendered under DebugFlagsProvider. */
 export function useDebugFlags(): DebugFlagsContextValue {
-  const ctx = useContext(DebugFlagsContext);
-  if (!ctx) {
+  const context = useContext(DebugFlagsContext);
+  if (!context) {
     throw new Error("useDebugFlags must be used within DebugFlagsProvider");
   }
-  return ctx;
+  return context;
 }

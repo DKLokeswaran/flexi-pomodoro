@@ -10,6 +10,7 @@ import {
 } from "@flexi-pomodoro/shared";
 import { ZodError } from "zod";
 
+/** Validation failure when reading or updating settings. */
 export class SettingsError extends Error {
   constructor(
     message: string,
@@ -20,39 +21,45 @@ export class SettingsError extends Error {
   }
 }
 
-export function toSettingsError(err: unknown): SettingsError {
-  if (err instanceof SettingsError) return err;
-  if (err instanceof ZodError) {
-    const msg = err.issues.map((i) => i.message).join("; ") || "Invalid input";
-    return new SettingsError(msg, "INVALID_SETTINGS");
+/** Convert Zod issues into SettingsError; rethrow anything else. */
+export function toSettingsError(error: unknown): SettingsError {
+  if (error instanceof SettingsError) return error;
+  if (error instanceof ZodError) {
+    const message =
+      error.issues.map((issue) => issue.message).join("; ") || "Invalid input";
+    return new SettingsError(message, "INVALID_SETTINGS");
   }
-  throw err;
+  throw error;
 }
 
+/** In-memory persisted defaults used when starting a session. */
 export class SettingsService {
   private settings: Settings = { ...DEFAULT_SETTINGS };
 
+  /** Return a shallow copy of the current persisted defaults. */
   get(): Settings {
     return { ...this.settings };
   }
 
+  /** Merge and validate a patch onto persisted defaults. */
   update(partial: SettingsPatch): Settings {
     try {
       this.settings = parseSettingsPatch(this.settings, partial);
-    } catch (err) {
-      throw toSettingsError(err);
+    } catch (error) {
+      throw toSettingsError(error);
     }
     return this.get();
   }
 
+  /** Merge defaults + optional start overrides under the given debug bounds. */
   resolveSessionParams(
     overrides?: SessionOverrides,
     debug?: DebugFlags,
   ): SessionParams {
     try {
       return mergeSessionParams(this.settings, overrides, { debug });
-    } catch (err) {
-      throw toSettingsError(err);
+    } catch (error) {
+      throw toSettingsError(error);
     }
   }
 }

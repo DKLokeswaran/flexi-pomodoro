@@ -173,7 +173,7 @@ Subscribe cursor advances per listener after each send. Client disconnect unsubs
 
 ## Session action POSTs (no body)
 
-All return `SessionSnapshot` on success. Mapped via shared `errorReply`:
+All return `SessionSnapshot` on success. Mapped via `errorReply` (`apps/server/src/utils/errorReply.ts`):
 
 | Path | Service method | Typical error codes |
 |------|----------------|---------------------|
@@ -184,7 +184,7 @@ All return `SessionSnapshot` on success. Mapped via shared `errorReply`:
 | `/api/session/soft-resume` | `softResume` | `NOT_PAUSED`, `INVALID_PHASE`, `NO_SESSION` |
 | `/api/session/end-long-rest` | `endLongRest` | `INVALID_PHASE`, `NO_SESSION` |
 
-Status mapping in `session.routes.ts`:
+Status mapping in `errorReply.ts`:
 
 | Code family | HTTP |
 |-------------|------|

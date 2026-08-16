@@ -19,6 +19,7 @@ import { AboutAccordion } from "./about/AboutAccordion";
 import { LinkCard } from "./about/LinkCard";
 import styles from "./AboutTab.module.css";
 
+/** Available vs coming-soon badge for the features list. */
 function StatusPill({ status }: { status: FeatureStatus }) {
   const label = status === "available" ? "Available" : "Coming soon";
   return (
@@ -32,6 +33,7 @@ function StatusPill({ status }: { status: FeatureStatus }) {
   );
 }
 
+/** One credit line: label plus plain-text value. */
 function CreditRow({ item }: { item: CreditItem }) {
   return (
     <p className={styles.creditLine}>
@@ -43,12 +45,21 @@ function CreditRow({ item }: { item: CreditItem }) {
 
 type HealthUi = { state: "unknown" | "ok" | "error"; label: string };
 
+/** Map query status to a short health label for the instance section. */
 function healthUi(isPending: boolean, isError: boolean): HealthUi {
   if (isPending) return { state: "unknown", label: "Checking…" };
   if (isError) return { state: "error", label: "Unreachable" };
   return { state: "ok", label: "OK" };
 }
 
+/** CSS class for the API health value (ok / error / still checking). */
+function healthClassName(state: HealthUi["state"]): string {
+  if (state === "ok") return styles.healthOk;
+  if (state === "error") return styles.healthError;
+  return styles.healthUnknown;
+}
+
+/** Plain-text diagnostics blob for the copy button. */
 function buildDiagnostics(healthText: string): string {
   return [
     "Flexi Pomodoro diagnostics",
@@ -61,15 +72,17 @@ function buildDiagnostics(healthText: string): string {
   ].join("\n");
 }
 
+/** About page: notes, features, links, instance health, legal, credits. */
 export function AboutTab() {
   const year = new Date().getFullYear();
   const healthQuery = useHealthQuery();
   const { pushToast } = useToast();
 
-  const availableCount = FEATURES.filter((f) => f.status === "available").length;
-  const soonCount = FEATURES.filter((f) => f.status === "soon").length;
+  const availableCount = FEATURES.filter((feature) => feature.status === "available").length;
+  const soonCount = FEATURES.filter((feature) => feature.status === "soon").length;
   const health = healthUi(healthQuery.isPending, healthQuery.isError);
 
+  /** Copy instance diagnostics to the clipboard, with success/error toasts. */
   async function copyDiagnostics() {
     try {
       await navigator.clipboard.writeText(buildDiagnostics(health.label));
@@ -90,6 +103,7 @@ export function AboutTab() {
         <p className={styles.copyright}>© {year} Flexi Pomodoro</p>
       </header>
 
+      {/* Product caveats shown above the feature list. */}
       <section className={styles.section} aria-labelledby="about-notes-heading">
         <h3 id="about-notes-heading">Important notes</h3>
         <ul className={styles.notes}>
@@ -104,6 +118,7 @@ export function AboutTab() {
         <p className={styles.release}>{RELEASE_STATUS}</p>
       </section>
 
+      {/* Expandable feature inventory with available / coming-soon counts. */}
       <section className={styles.section} aria-labelledby="about-features-heading">
         <h3 id="about-features-heading">Features</h3>
         <AboutAccordion
@@ -155,6 +170,7 @@ export function AboutTab() {
         </AboutAccordion>
       </section>
 
+      {/* Instance identity plus a one-click diagnostics dump. */}
       <section
         className={styles.section}
         aria-labelledby="about-instance-heading"
@@ -177,17 +193,7 @@ export function AboutTab() {
           </div>
           <div className={styles.instanceRow}>
             <dt>API health</dt>
-            <dd
-              className={
-                health.state === "ok"
-                  ? styles.healthOk
-                  : health.state === "error"
-                    ? styles.healthError
-                    : styles.healthUnknown
-              }
-            >
-              {health.label}
-            </dd>
+            <dd className={healthClassName(health.state)}>{health.label}</dd>
           </div>
           {INSTANCE_COMING_SOON.map(({ label, value }) => (
             <div key={label} className={styles.instanceRow}>
@@ -210,14 +216,14 @@ export function AboutTab() {
       <section className={styles.section} aria-labelledby="about-credits-heading">
         <h3 id="about-credits-heading">Credits</h3>
         <div className={styles.credits}>
-          {CREDITS.map((item, i) => (
-            <CreditRow key={`${item.kind}-${i}`} item={item} />
+          {CREDITS.map((item, index) => (
+            <CreditRow key={`${item.kind}-${index}`} item={item} />
           ))}
           <p className={styles.creditLine}>
             <span className={styles.creditLabel}>Fonts</span>
-            {FONT_CREDITS.map((font, i) => (
+            {FONT_CREDITS.map((font, index) => (
               <span key={font.name}>
-                {i > 0 ? ", " : null}
+                {index > 0 ? ", " : null}
                 <a href={font.href} target="_blank" rel="noopener noreferrer">
                   {font.name}
                 </a>

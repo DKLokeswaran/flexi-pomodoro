@@ -1,23 +1,13 @@
 import type { FastifyInstance } from "fastify";
-import { type SettingsPatch, SESSION_API, SettingsPatchSchema } from "@flexi-pomodoro/shared";
-import { ZodError } from "zod";
 import {
-  SettingsError,
-  SettingsService,
-  toSettingsError,
-} from "../services/settings.service.js";
+  type SettingsPatch,
+  SESSION_API,
+  SettingsPatchSchema,
+} from "@flexi-pomodoro/shared";
+import type { SettingsService } from "../services/settings.service.js";
+import { errorReply } from "../utils/errorReply.js";
 
-function errorReply(err: unknown): { statusCode: number; body: object } {
-  const normalized = err instanceof ZodError ? toSettingsError(err) : err;
-  if (normalized instanceof SettingsError) {
-    return {
-      statusCode: 400,
-      body: { error: normalized.message, code: normalized.code },
-    };
-  }
-  throw err;
-}
-
+/** GET/PUT persisted session defaults (production bounds; not debug overrides). */
 export function registerSettingsRoutes(
   app: FastifyInstance,
   settings: SettingsService,
@@ -28,8 +18,8 @@ export function registerSettingsRoutes(
     try {
       const patch = SettingsPatchSchema.parse(req.body ?? {});
       return settings.update(patch);
-    } catch (err) {
-      const { statusCode, body } = errorReply(err);
+    } catch (error) {
+      const { statusCode, body } = errorReply(error);
       return reply.code(statusCode).send(body);
     }
   });

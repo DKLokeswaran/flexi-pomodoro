@@ -1,10 +1,13 @@
 const ALERT_SEQ_KEY = "flexi-pomodoro:lastPlayedAlertSeq";
 
+/** Read a persisted sequence, or 0 if missing/invalid/unavailable. */
 function readStoredSeq(): number {
   try {
-    const raw = localStorage.getItem(ALERT_SEQ_KEY);
-    const n = raw ? Number(raw) : 0;
-    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+    const storedValue = localStorage.getItem(ALERT_SEQ_KEY);
+    const parsedSeq = storedValue ? Number(storedValue) : 0;
+    return Number.isFinite(parsedSeq) && parsedSeq >= 0
+      ? Math.floor(parsedSeq)
+      : 0;
   } catch {
     return 0;
   }
@@ -17,8 +20,8 @@ export class AlertSeqStore {
   constructor() {
     this.memorySeq = readStoredSeq();
     if (typeof window !== "undefined") {
-      window.addEventListener("storage", (ev) => {
-        if (ev.key !== ALERT_SEQ_KEY && ev.key !== null) return;
+      window.addEventListener("storage", (event) => {
+        if (event.key !== ALERT_SEQ_KEY && event.key !== null) return;
         const stored = readStoredSeq();
         if (stored !== this.memorySeq) {
           this.memorySeq = stored;
@@ -27,6 +30,7 @@ export class AlertSeqStore {
     }
   }
 
+  /** Current watermark (in-memory, initialized from localStorage). */
   get(): number {
     return this.memorySeq;
   }
@@ -50,3 +54,9 @@ export class AlertSeqStore {
 }
 
 export const alertSeqStore = new AlertSeqStore();
+
+/** `?sinceSeq=N` when the client watermark is positive; otherwise empty. */
+export function sinceSeqQueryString(): string {
+  const sinceSeq = alertSeqStore.get();
+  return sinceSeq > 0 ? `?sinceSeq=${sinceSeq}` : "";
+}

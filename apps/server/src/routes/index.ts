@@ -10,6 +10,7 @@ export interface RouteDeps {
   session: SessionService;
 }
 
+/** Register health, settings, and session HTTP routes. */
 export async function registerRoutes(
   app: FastifyInstance,
   deps: RouteDeps,

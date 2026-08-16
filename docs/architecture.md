@@ -81,7 +81,7 @@ On the web, React Context provides `DebugFlagsProvider` and `ToastProvider`; Tan
 |---------|----------------|
 | Logging | Fastify `{ logger: true }` |
 | Validation | Zod (`SessionParamsSchema`, `SettingsPatchSchema`, `parseStartSessionBody`, `DebugFlagsSchema`) |
-| Error mapping | Per-route `errorReply` helpers → HTTP 400/403/409 + `{ error, code }` |
+| Error mapping | Shared `errorReply` in `apps/server/src/utils/errorReply.ts` → HTTP 400/403/409 + `{ error, code }` |
 | Auth / rate limit / tracing | Not found in committed history |
 | Static assets | `@fastify/static` when web dist is discoverable |
 | Real-time | SSE with 25s heartbeat comments; client also polls every 5 minutes and on focus/visibility |

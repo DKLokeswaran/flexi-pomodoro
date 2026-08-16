@@ -10,6 +10,38 @@ import { minutesToSec, secToMinutes } from "../utils/time";
 import { NumberField } from "./NumberField";
 import styles from "./SettingsTab.module.css";
 
+type SettingsDraft = {
+  workMinutes: number;
+  shortRestMinutes: number;
+  longRestMinutes: number;
+  cyclesBeforeLongRest: number;
+  decisionWindowSec: number;
+};
+
+/** Convert persisted seconds into the minutes-based settings form draft. */
+function draftFromSettings(settings: Settings): SettingsDraft {
+  return {
+    workMinutes: secToMinutes(settings.workDurationSec),
+    shortRestMinutes: secToMinutes(settings.shortRestDurationSec),
+    longRestMinutes: secToMinutes(settings.longRestDurationSec),
+    cyclesBeforeLongRest: settings.cyclesBeforeLongRest,
+    decisionWindowSec: settings.decisionWindowSec,
+  };
+}
+
+/** Convert the minutes draft back into a Settings object for PUT. */
+function settingsFromDraft(settings: Settings, draft: SettingsDraft): Settings {
+  return {
+    ...settings,
+    workDurationSec: minutesToSec(draft.workMinutes),
+    shortRestDurationSec: minutesToSec(draft.shortRestMinutes),
+    longRestDurationSec: minutesToSec(draft.longRestMinutes),
+    cyclesBeforeLongRest: draft.cyclesBeforeLongRest,
+    decisionWindowSec: draft.decisionWindowSec,
+  };
+}
+
+/** Persistent defaults plus browser-local debug feature flags. */
 export function SettingsTab({
   settings,
   onSave,
@@ -17,28 +49,21 @@ export function SettingsTab({
   saving,
 }: {
   settings: Settings;
-  onSave: (s: Settings) => void;
+  onSave: (nextSettings: Settings) => void;
   locked: boolean;
   saving?: boolean;
 }) {
   const { debugMode, setDebugMode, flags, setFlag } = useDebugFlags();
-  const [draft, setDraft] = useState({
-    workMin: secToMinutes(settings.workDurationSec),
-    shortRestMin: secToMinutes(settings.shortRestDurationSec),
-    longRestMin: secToMinutes(settings.longRestDurationSec),
-    cycles: settings.cyclesBeforeLongRest,
-    decisionSec: settings.decisionWindowSec,
-  });
+  const [draft, setDraft] = useState(draftFromSettings(settings));
 
   useEffect(() => {
-    setDraft({
-      workMin: secToMinutes(settings.workDurationSec),
-      shortRestMin: secToMinutes(settings.shortRestDurationSec),
-      longRestMin: secToMinutes(settings.longRestDurationSec),
-      cycles: settings.cyclesBeforeLongRest,
-      decisionSec: settings.decisionWindowSec,
-    });
+    setDraft(draftFromSettings(settings));
   }, [settings]);
+
+  /** Update one numeric draft field, rounded to a whole number. */
+  const setRoundedField = (key: keyof SettingsDraft, value: number) => {
+    setDraft((current) => ({ ...current, [key]: Math.round(value) }));
+  };
 
   return (
     <section className="panel">
@@ -55,42 +80,34 @@ export function SettingsTab({
       <div className="form-grid">
         <NumberField
           label="Work (min)"
-          value={draft.workMin}
+          value={draft.workMinutes}
           step={1}
-          onChange={(v) =>
-            setDraft((d) => ({ ...d, workMin: Math.round(v) }))
-          }
+          onChange={(value) => setRoundedField("workMinutes", value)}
         />
         <NumberField
           label="Short rest (min)"
-          value={draft.shortRestMin}
+          value={draft.shortRestMinutes}
           step={1}
-          onChange={(v) =>
-            setDraft((d) => ({ ...d, shortRestMin: Math.round(v) }))
-          }
+          onChange={(value) => setRoundedField("shortRestMinutes", value)}
         />
         <NumberField
           label="Cycles (N)"
-          value={draft.cycles}
+          value={draft.cyclesBeforeLongRest}
           step={1}
-          onChange={(v) => setDraft((d) => ({ ...d, cycles: Math.round(v) }))}
+          onChange={(value) => setRoundedField("cyclesBeforeLongRest", value)}
         />
         <NumberField
           label="Long rest (min)"
-          value={draft.longRestMin}
+          value={draft.longRestMinutes}
           step={1}
-          onChange={(v) =>
-            setDraft((d) => ({ ...d, longRestMin: Math.round(v) }))
-          }
+          onChange={(value) => setRoundedField("longRestMinutes", value)}
         />
         <NumberField
           label={DECISION_WINDOW_LABEL}
-          value={draft.decisionSec}
+          value={draft.decisionWindowSec}
           step={1}
           min={10}
-          onChange={(v) =>
-            setDraft((d) => ({ ...d, decisionSec: Math.round(v) }))
-          }
+          onChange={(value) => setRoundedField("decisionWindowSec", value)}
         />
       </div>
       <div className="actions" style={{ justifyContent: "flex-start" }}>
@@ -98,16 +115,7 @@ export function SettingsTab({
           type="button"
           className="btn btn-primary"
           disabled={locked || saving}
-          onClick={() =>
-            onSave({
-              ...settings,
-              workDurationSec: minutesToSec(draft.workMin),
-              shortRestDurationSec: minutesToSec(draft.shortRestMin),
-              longRestDurationSec: minutesToSec(draft.longRestMin),
-              cyclesBeforeLongRest: draft.cycles,
-              decisionWindowSec: draft.decisionSec,
-            })
-          }
+          onClick={() => onSave(settingsFromDraft(settings, draft))}
         >
           Save defaults
         </button>
@@ -119,7 +127,7 @@ export function SettingsTab({
           <input
             type="checkbox"
             checked={debugMode}
-            onChange={(e) => setDebugMode(e.target.checked)}
+            onChange={(event) => setDebugMode(event.target.checked)}
           />
           <span>
             Enable debug mode
@@ -130,19 +138,26 @@ export function SettingsTab({
           </span>
         </label>
         {debugMode
-          ? DEBUG_FEATURE_IDS.map((id) => {
-              const meta = DEBUG_FEATURE_META[id];
+          ? DEBUG_FEATURE_IDS.map((featureId) => {
+              const meta = DEBUG_FEATURE_META[featureId];
               return (
-                <label key={id} className={`${styles.debugFlag} ${styles.debugFlagNested}`}>
+                <label
+                  key={featureId}
+                  className={`${styles.debugFlag} ${styles.debugFlagNested}`}
+                >
                   <input
                     type="checkbox"
-                    checked={Boolean(flags[id])}
-                    onChange={(e) => setFlag(id, e.target.checked)}
+                    checked={Boolean(flags[featureId])}
+                    onChange={(event) =>
+                      setFlag(featureId, event.target.checked)
+                    }
                   />
                   <span>
                     {meta.label}
                     {meta.description ? (
-                      <span className={styles.debugFlagDesc}>{meta.description}</span>
+                      <span className={styles.debugFlagDesc}>
+                        {meta.description}
+                      </span>
                     ) : null}
                   </span>
                 </label>

@@ -9,6 +9,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "about", label: "About" },
 ];
 
+/** Primary tab bar for Timer, Settings, Analytics, and About. */
 export function Nav({
   tab,
   onChange,

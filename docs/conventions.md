@@ -24,7 +24,7 @@ Derived from committed patterns (not aspirational rules).
 
 ## File organization
 
-- Server: `routes/` + `services/` + `tests/services/` (layer-based after 6df9a85).
+- Server: `routes/` + `services/` + `utils/` + `tests/services/` (layer-based after 6df9a85).
 - Web: `components/` (tabs + `timer/` + `about/`), `providers/`, `queries/`, `hooks/`, `utils/`, `constants/`.
 - Styles: CSS modules co-located; global tokens/utilities in `styles.css`.
 - Barrel files: route registration via `routes/index.ts`; shared via `packages/shared/src/index.ts`. Web API monolith barrel was removed (split into queries).
@@ -35,7 +35,7 @@ Derived from committed patterns (not aspirational rules).
 - **Exports:** named exports preferred for components/hooks (`export function App`); default exports uncommon.
 - **Functions:** mix of `function` declarations and arrow functions for small callbacks; classes for `SessionService`, `SettingsService`, `IntervalScheduler`, `AlertSeqStore`.
 - **Async:** `async/await` for fetch and `buildApp`; fire-and-forget `void audio.play().catch`; SSE setup uses async `openSse`.
-- Observed large files: `session.service.ts` (~417 lines), About tab (~231), shared `index.ts` (~240).
+- Observed large files: `session.service.ts` (~482 lines), About tab (~237), shared `index.ts` (~244).
 
 ## Async & cancellation
 
@@ -45,7 +45,7 @@ Derived from committed patterns (not aspirational rules).
 
 ## Comments & docs
 
-- Prefer short JSDoc on non-obvious public helpers (`parseStartSessionBody`, `tick`, soft-pause analytics notes).
+- Prefer short JSDoc (one or two lines) on functions and notable blocks: purpose at a high level.
 - Inline comments for protocol quirks (SSE CONNECTING vs CLOSED; decision attribution).
 - **TODO/FIXME:** none in committed `*.ts` / `*.tsx` / `*.md` sources searched.
 

@@ -23,9 +23,11 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 const TOAST_MS = 3_500;
 
+/** Holds a single status toast and auto-dismisses it after TOAST_MS. */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastInput | null>(null);
 
+  /** Replace the current toast (previous one is dropped). */
   const pushToast = useCallback((next: ToastInput) => {
     setToast(next);
   }, []);
@@ -63,10 +65,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Access pushToast; must be rendered under ToastProvider. */
 export function useToast(): ToastContextValue {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
+  const context = useContext(ToastContext);
+  if (!context) {
     throw new Error("useToast must be used within ToastProvider");
   }
-  return ctx;
+  return context;
 }

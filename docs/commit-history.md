@@ -6,19 +6,20 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 21 |
+| Total commits | 24 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-07-24 |
+| Latest commit date | 2026-08-13 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (21) |
-| Conventional-commit prefix count (`feat`/`fix`/…) | 0 (messages are sentence-style) |
+| Most active contributor | Lokeswaran DK (24) |
+| Conventional-commit prefix count (`feat`/`fix`/…) | 1 (`chore: ignore .pi directory`) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4` |
 
 ## Commit velocity
 
 | Month | Commits |
 |-------|--------:|
-| 2026-07 | 21 |
+| 2026-07 | 23 |
+| 2026-08 | 1 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -86,6 +87,12 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Split web API client into domain modules + SSE transport module.
 - Split server into services/routes with mirrored tests.
 - Move PRD/roadmap under `docs/product/`.
+- Add technical reference docs under `docs/` (architecture, API, modules, operations).
+- Expand PRD and roadmap with SHORT_REST_ACK, live session stats, idle today stats, and M2.5/M3.5 alpha milestones.
+
+### 2026-08-13 — Ignore local tooling
+
+- Ignore the `.pi` directory.
 
 ## Breaking changes
 
@@ -99,6 +106,9 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| cd52edd | Lokeswaran DK | 2026-08-13 | chore: ignore .pi directory |
+| 84bd35c | Lokeswaran DK | 2026-07-24 | Document short-rest acknowledgement and M2.5/M3.5 alpha milestones. |
+| aa1123e | Lokeswaran DK | 2026-07-24 | Add technical reference docs generated from committed codebase history. |
 | 735e7ab | Lokeswaran DK | 2026-07-24 | Move PRD and roadmap under docs/product for clearer doc organization. |
 | 6df9a85 | Lokeswaran DK | 2026-07-24 | Split server into layer-based services, routes, and mirrored tests. |
 | 1d73dd0 | Lokeswaran DK | 2026-07-24 | Split monolithic api client into domain modules and session SSE transport. |
@@ -120,3 +130,5 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 5b956c9 | Lokeswaran DK | 2026-07-12 | Lock PRD recovery policy to strict wall-clock catch-up. |
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
+
+Last Synced Commit: cd52edda371ef25163e185091c6c042ce3584a95

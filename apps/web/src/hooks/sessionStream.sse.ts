@@ -2,19 +2,32 @@ import type { SessionSnapshot } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
 import { fetchSession } from "../queries/session.api";
 import { syncAlertSeq } from "../utils/alertSeq";
-import { alertSeqStore } from "../utils/alertSeqStore";
+import { sinceSeqQueryString } from "../utils/alertSeqStore";
 
+/** Callback that receives live session snapshots from the stream. */
 export type SessionListener = (snapshot: SessionSnapshot) => void;
+
+const POLL_INTERVAL_MS = 5 * 60_000;
+
+/** Parse an SSE data payload; ignore malformed frames. */
+function parseSnapshotMessage(raw: string): SessionSnapshot | null {
+  try {
+    return JSON.parse(raw) as SessionSnapshot;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Hybrid transport: SSE for live transitions + 5-minute poll fallback.
  * Local countdown uses wall-clock anchors (no sub-second API polling).
  */
 export function connectSessionStream(onSnapshot: SessionListener): () => void {
-  let es: EventSource | null = null;
+  let eventSource: EventSource | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let closed = false;
 
+  // Fallback poll: current snapshot, ignore transient network errors.
   const poll = async () => {
     try {
       onSnapshot(await fetchSession());
@@ -23,6 +36,7 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
     }
   };
 
+  // Open (or reopen) EventSource after aligning the alert watermark.
   const openSse = async () => {
     if (closed) return;
     try {
@@ -31,20 +45,15 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
       // ignore transient errors; reconnect will retry
     }
     if (closed) return;
-    const sinceSeq = alertSeqStore.get();
-    const q = sinceSeq > 0 ? `?sinceSeq=${sinceSeq}` : "";
-    es = new EventSource(`${SESSION_API.events}${q}`);
-    es.onmessage = (ev) => {
-      try {
-        onSnapshot(JSON.parse(ev.data) as SessionSnapshot);
-      } catch {
-        // ignore
-      }
+    eventSource = new EventSource(`${SESSION_API.events}${sinceSeqQueryString()}`);
+    eventSource.onmessage = (event) => {
+      const snapshot = parseSnapshotMessage(event.data);
+      if (snapshot) onSnapshot(snapshot);
     };
-    es.onerror = () => {
+    eventSource.onerror = () => {
       // CONNECTING = browser auto-retry; only handle a fully closed stream.
-      if (es?.readyState !== EventSource.CLOSED) return;
-      es = null;
+      if (eventSource?.readyState !== EventSource.CLOSED) return;
+      eventSource = null;
       if (closed) return;
       void openSse();
     };
@@ -52,8 +61,9 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
 
   void openSse();
   void poll();
-  pollTimer = setInterval(poll, 5 * 60_000);
+  pollTimer = setInterval(poll, POLL_INTERVAL_MS);
 
+  // Refresh on tab focus so a missed SSE event is recovered quickly.
   const onFocus = () => {
     void poll();
   };
@@ -64,7 +74,7 @@ export function connectSessionStream(onSnapshot: SessionListener): () => void {
 
   return () => {
     closed = true;
-    es?.close();
+    eventSource?.close();
     if (pollTimer) clearInterval(pollTimer);
     window.removeEventListener("focus", onFocus);
   };

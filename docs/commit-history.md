@@ -6,13 +6,13 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 30 |
+| Total commits | 31 |
 | First commit date | 2026-07-12 |
 | Latest commit date | 2026-08-18 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (30) |
+| Most active contributor | Lokeswaran DK (31) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
-| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4` |
+| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` |
 
 ## Commit velocity
 
@@ -110,6 +110,7 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Add hard pause plugin (frozen countdown, shifted `plannedEndAt` on resume).
 - Settings experimental gate + hard pause toggle; session start locks strategy from settings.
 - Timer UI: strategy-aware labels, `timerFrozenAt` clock freeze, About marks hard pause available.
+- Isolated soft/hard pause plugin tests; hard-pause engine cases; FR-PAUSE-S6 phase rejection; tag `v0.0.2-alpha.0`.
 
 ## Breaking changes
 
@@ -124,6 +125,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 700b290 | Lokeswaran DK | 2026-08-18 | Add pause strategy tests and tag v0.0.2-alpha.0. |
 | b639f4f | Lokeswaran DK | 2026-08-18 | Add hard pause strategy with Settings toggle and session-start wiring. |
 | c2863b4 | Lokeswaran DK | 2026-08-18 | Extract soft pause into a WorkPauseStrategy plugin with strategy-agnostic pause and resume APIs. |
 | c5413fa | Lokeswaran DK | 2026-08-17 | chore: ignore the Prettier format commit in git blame |
@@ -155,4 +157,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: b639f4f2f5e3ce6a7a8ea98cccbcd74ab4e7be0d
+Last Synced Commit: 700b29022919ef642dc92f611472852903db19c2

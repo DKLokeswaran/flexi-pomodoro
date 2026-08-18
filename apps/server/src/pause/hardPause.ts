@@ -16,7 +16,7 @@ function onPause(phase: PlannedWorkPhase, nowMs: number): void {
 function onResume(phase: PlannedWorkPhase, nowMs: number): void {
   if (!phase.paused || !phase.pauseStartedAt) return;
   const pauseStartedMs = parseIso(phase.pauseStartedAt);
-  const pausedMs = Math.max(0, nowMs - pauseStartedMs);
+  const pausedMs = nowMs - pauseStartedMs;
   phase.pausedSec += Math.floor(pausedMs / 1000);
   phase.plannedEndAt = msToIso(parseIso(phase.plannedEndAt) + pausedMs);
   phase.paused = false;

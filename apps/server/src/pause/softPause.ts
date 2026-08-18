@@ -6,11 +6,7 @@ import type { PlannedEndAction, WorkPauseStrategy } from "./types.js";
 function closePauseIfActive(phase: PlannedWorkPhase, nowMs: number): void {
   if (!phase.paused || !phase.pauseStartedAt) return;
   const pauseStartedMs = parseIso(phase.pauseStartedAt);
-  const pauseEndMs = Math.min(nowMs, parseIso(phase.plannedEndAt));
-  phase.pausedSec += Math.max(
-    0,
-    Math.floor((pauseEndMs - pauseStartedMs) / 1000),
-  );
+  phase.pausedSec += Math.floor((nowMs - pauseStartedMs) / 1000);
   phase.paused = false;
   phase.pauseStartedAt = null;
   phase.timerFrozenAt = null;

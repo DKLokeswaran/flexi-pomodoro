@@ -203,20 +203,21 @@ describe("SessionService", () => {
       activePhase(session, SESSION_START_MS) as { plannedEndAt: string }
     ).plannedEndAt;
 
-    session.softPause(SESSION_START_MS + 20_000);
+    session.pause(SESSION_START_MS + 20_000);
     let phase = activePhase(session, SESSION_START_MS + 20_000);
     assert.equal(phase.kind, "planned_work");
     if (phase.kind !== "planned_work") throw new Error("expected planned_work");
-    assert.equal(phase.softPaused, true);
+    assert.equal(phase.paused, true);
+    assert.equal(phase.timerFrozenAt, null);
     assert.equal(phase.plannedEndAt, plannedEnd);
 
-    session.softResume(SESSION_START_MS + 30_000);
+    session.resume(SESSION_START_MS + 30_000);
     phase = activePhase(session, SESSION_START_MS + 30_000);
     assert.equal(phase.kind, "planned_work");
     if (phase.kind !== "planned_work") throw new Error("expected planned_work");
-    assert.equal(phase.softPaused, false);
+    assert.equal(phase.paused, false);
     assert.equal(phase.plannedEndAt, plannedEnd);
-    assert.equal(phase.softPausedSec, 10);
+    assert.equal(phase.pausedSec, 10);
 
     phase = activePhase(session, SESSION_START_MS + 60_000);
     assert.equal(phase.kind, "decision");
@@ -225,7 +226,7 @@ describe("SessionService", () => {
   it("soft-paused through planned end → auto rest, skip decision", () => {
     const { settings, session } = servicesWithShortTimers(2);
     startSession(settings, session, SESSION_START_MS);
-    session.softPause(SESSION_START_MS + 40_000);
+    session.pause(SESSION_START_MS + 40_000);
 
     const seqBefore = session.getAlertSeq();
     const atEnd = SESSION_START_MS + 60_000;

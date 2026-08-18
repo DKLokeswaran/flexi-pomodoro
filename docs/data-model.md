@@ -17,6 +17,8 @@ Holds a single `Settings` object, initialized from `DEFAULT_SETTINGS`.
 | Field | Type | Role |
 |-------|------|------|
 | `session` | `ActiveSession \| null` | Current session or idle |
+| `pausePlugin` | `WorkPauseStrategy \| null` | Pause plugin resolved at start; cleared when the session ends |
+| `pauseRegistry` | `PauseStrategyRegistry` | Constructor default `defaultPauseRegistry()` (`buildApp` does not inject a custom registry) |
 | `alertLog` | `AlertEvent[]` | Append-only until session ends |
 | `alertSeq` | number | Monotonic high-water; reset to 0 after idle delivery |
 | `listeners` | `Set<SnapshotListener>` | SSE subscribers |
@@ -41,11 +43,12 @@ Holds a single `Settings` object, initialized from `DEFAULT_SETTINGS`.
 | `startedAt` | ISO string |
 | `plannedDurationSec` | number |
 | `plannedEndAt` | ISO string |
-| `softPaused` | boolean |
-| `softPausedSec` | number (accumulated) |
-| `softPauseStartedAt` | ISO string \| null |
+| `paused` | boolean |
+| `pausedSec` | number (accumulated interruption) |
+| `pauseStartedAt` | ISO string \| null |
+| `timerFrozenAt` | ISO string \| null (hard: freeze clock at pause start; soft: always null) |
 
-Soft pause does **not** extend `plannedEndAt`; it accumulates `softPausedSec` for analytics (M3). Soft-paused at planned end → auto rest, skip decision.
+Soft pause does **not** extend `plannedEndAt`; it accumulates `pausedSec` for analytics (M3). Paused at planned end → auto rest, skip decision. `timerFrozenAt` is reserved for hard pause; the soft plugin leaves it null.
 
 #### `DecisionPhase`
 

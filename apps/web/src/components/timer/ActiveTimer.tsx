@@ -63,9 +63,9 @@ type PhaseAction = {
 /** Buttons allowed for the current phase (empty for short rest). */
 function actionsForPhase(phase: Phase): PhaseAction[] {
   if (phase.kind === "planned_work") {
-    return phase.softPaused
-      ? [{ label: "Resume", path: SESSION_API.softResume, primary: true }]
-      : [{ label: "Soft pause", path: SESSION_API.softPause }];
+    return phase.paused
+      ? [{ label: "Resume", path: SESSION_API.resume, primary: true }]
+      : [{ label: "Soft pause", path: SESSION_API.pause }];
   }
   if (phase.kind === "decision") {
     return [
@@ -118,14 +118,14 @@ export function ActiveTimer({
 }) {
   const actions = actionsForPhase(phase);
   const hint = phaseHint(phase, now);
-  const softPausedLabel =
-    phase.kind === "planned_work" && phase.softPaused ? " · soft-paused" : "";
+  const pausedLabel =
+    phase.kind === "planned_work" && phase.paused ? " · soft-paused" : "";
 
   return (
     <>
       <p className={displayStyles.phaseLabel} data-phase={phase.kind}>
         {phaseTitle(phase.kind)}
-        {softPausedLabel}
+        {pausedLabel}
       </p>
       <div className={displayStyles.clock}>
         {displayClock(snapshot, params, now)}

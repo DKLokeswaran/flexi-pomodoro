@@ -28,8 +28,8 @@
 | `SESSION_ACTIVE` | Start while active |
 | `NO_SESSION` | Action without session |
 | `INVALID_PHASE` | Action not valid for current phase |
-| `ALREADY_PAUSED` | Soft pause twice |
-| `NOT_PAUSED` | Soft resume when not paused |
+| `ALREADY_PAUSED` | Pause while already paused |
+| `NOT_PAUSED` | Resume when not paused |
 | `FORBIDDEN` / `PARAMS_LOCKED` | Mapped to HTTP 403 in routes (reserved) |
 
 ---
@@ -61,7 +61,7 @@
 | Schema / parser | Where applied | Rules |
 |-----------------|---------------|-------|
 | `SessionParamsSchema` | Defaults / merge | Integer bounds from `SETTINGS_BOUNDS` |
-| `SettingsSchema` / `SettingsPatchSchema` | PUT settings | Params + `alertsMuted` + `workPauseStrategy: "soft"` |
+| `SettingsSchema` / `SettingsPatchSchema` | PUT settings | Params + `alertsMuted` + `workPauseStrategy: "soft" \| "hard"` |
 | `parseStartSessionBody` | POST start | Strict `debug`; overrides against debug-aware bounds |
 | `DebugFlagsSchema` | start body + localStorage restore | Strict; unknown keys fail |
 | `mergeSessionParams` | SettingsService | Parses merged settings+overrides |
@@ -78,7 +78,7 @@ See `SETTINGS_BOUNDS` in [data-model.md](./data-model.md) / [api-reference.md](.
 ### Error message patterns
 
 - Zod field messages like `` `${name} must be >= ${bounds.min}` `` via `boundedInt`.
-- Session messages are human sentences, e.g. `"Soft pause is only available during planned work"`.
+- Session messages are human sentences, e.g. `"Pause is only available during planned work"`.
 - Client toast uses `errorMessage(error, fallback)` (`Error.message` when present).
 
 ---
@@ -89,11 +89,11 @@ See `SETTINGS_BOUNDS` in [data-model.md](./data-model.md) / [api-reference.md](.
 |---------|------|
 | A session is already active | `SESSION_ACTIVE` |
 | No active session | `NO_SESSION` |
-| Soft pause is only available during planned work | `INVALID_PHASE` |
-| Already soft-paused | `ALREADY_PAUSED` |
+| Pause is only available during planned work | `INVALID_PHASE` |
+| Already paused | `ALREADY_PAUSED` |
 | Planned work already ended | `INVALID_PHASE` |
-| Soft resume is only available during planned work | `INVALID_PHASE` |
-| Not soft-paused | `NOT_PAUSED` |
+| Resume is only available during planned work | `INVALID_PHASE` |
+| Not paused | `NOT_PAUSED` |
 | Acknowledge rest is only valid in decision | `INVALID_PHASE` |
 | Continue is only valid in decision | `INVALID_PHASE` |
 | Start rest is only valid during extended work | `INVALID_PHASE` |

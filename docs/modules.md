@@ -59,7 +59,7 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 |--------|------|
 | `AlertIdSchema` / `AlertId` | Zod enum / type |
 | `SESSION_API` | path constants object |
-| `WorkPauseStrategySchema` / `WorkPauseStrategy` | `"soft"` |
+| `WorkPauseStrategySchema` / `WorkPauseStrategy` | `"soft" \| "hard"` |
 | `SessionParamsSchema` / `SessionParams` | Zod / type |
 | `SessionOverridesSchema` / `SessionOverrides` | partial params |
 | `SettingsSchema` / `Settings` | params + mute + strategy |
@@ -135,6 +135,35 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 
 **Deps:** `errorReply` from `../utils/errorReply.js`.
 
+### `src/pause/types.ts`
+
+| Export | Kind | Notes |
+|--------|------|-------|
+| `WorkPauseStrategyId` | type re-export | Shared `"soft" \| "hard"` |
+| `PlannedEndAction` | type | `"rest" \| "decision"` |
+| `WorkPauseStrategy` | interface | Pause plugin: `id`, `onPause`, `onResume`, `isCountdownFrozen`, `onPlannedEnd` |
+
+**Deps:** `@flexi-pomodoro/shared` (`PlannedWorkPhase`).
+
+### `src/pause/softPause.ts`
+
+| Export | Kind | Notes |
+|--------|------|-------|
+| `softPauseStrategy` | `WorkPauseStrategy` | `id: "soft"`; countdown not frozen; still-paused at planned end → `"rest"` |
+
+**Deps:** shared `PlannedWorkPhase`, `msToIso` / `parseIso` from `../utils/iso.js`.
+
+### `src/pause/registry.ts`
+
+| Export | Kind | Notes |
+|--------|------|-------|
+| `PauseStrategyRegistry` | class | `get(id)` lookup; constructor takes a strategy list |
+| `defaultPauseRegistry()` | fn | Registers `softPauseStrategy` only |
+
+### `src/pause/index.ts`
+
+Barrel: `defaultPauseRegistry`, `PauseStrategyRegistry`, `softPauseStrategy`, pause types.
+
 ### `src/utils/errorReply.ts`
 
 | Export | Kind |
@@ -142,6 +171,15 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 | `errorReply(error)` | `{ statusCode, body }` for Zod / SettingsError / SessionError |
 
 Unknown errors are rethrown.
+
+### `src/utils/iso.ts`
+
+| Export | Kind |
+|--------|------|
+| `msToIso(ms)` | millisecond timestamp → ISO-8601 string |
+| `parseIso(value)` | ISO-8601 string → milliseconds since epoch |
+
+**Imports:** none.
 
 ### `src/services/settings.service.ts`
 
@@ -171,12 +209,13 @@ Unknown errors are rethrown.
 
 | Method | Signature / purpose |
 |--------|---------------------|
+| `constructor(pauseRegistry?)` | defaults to `defaultPauseRegistry()` |
 | `subscribe(listener, sinceSeq?)` | → unsubscribe |
 | `getAlertSeq()` | number |
 | `getSnapshot(nowMs?, sinceSeq?)` | SessionSnapshot |
-| `start(params, nowMs?)` | SessionSnapshot |
-| `softPause(nowMs?)` | SessionSnapshot |
-| `softResume(nowMs?)` | SessionSnapshot |
+| `start(params, nowMs?)` | SessionSnapshot — locks `"soft"` and resolves `pausePlugin` |
+| `pause(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onPause` |
+| `resume(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onResume` |
 | `ackRest(nowMs?)` | SessionSnapshot |
 | `continueExtended(nowMs?)` | SessionSnapshot |
 | `startRest(nowMs?)` | SessionSnapshot |

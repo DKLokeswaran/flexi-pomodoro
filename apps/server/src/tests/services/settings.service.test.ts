@@ -56,16 +56,14 @@ describe("parseSettingsPatch", () => {
 });
 
 describe("SettingsService", () => {
-  it("rejects hard pause strategy and invalid settings", () => {
+  it("accepts hard pause strategy", () => {
     const settings = new SettingsService();
-    assert.throws(
-      () => settings.update({ workPauseStrategy: "hard" as "soft" }),
-      (error: unknown) => {
-        assert.ok(error instanceof SettingsError);
-        assert.equal(error.code, "INVALID_SETTINGS");
-        return true;
-      },
-    );
+    const next = settings.update({ workPauseStrategy: "hard" });
+    assert.equal(next.workPauseStrategy, "hard");
+  });
+
+  it("rejects invalid settings", () => {
+    const settings = new SettingsService();
     assert.throws(
       () => settings.update({ cyclesBeforeLongRest: 3.5 }),
       (error: unknown) => {

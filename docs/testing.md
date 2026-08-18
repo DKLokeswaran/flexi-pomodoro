@@ -40,7 +40,7 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | Alert seq reset | New session alerts restart at seq 1 |
 | Decision timeout | → extended with backdated `startedAt`; startRest without replaying auto-start in pending |
 | Continue | Extended `startedAt` = click time |
-| Soft pause mid-work | `plannedEndAt` unchanged; `softPausedSec` accumulates |
+| Soft pause mid-work | `plannedEndAt` unchanged; `pausedSec` accumulates; `timerFrozenAt` stays null |
 | Soft-paused through end | Auto rest; skip decision |
 | N=1 | Long rest after first work path |
 | Tick catch-up | Past work+decision → extended in one snapshot |
@@ -53,13 +53,13 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 |-------|-------|
 | `parseStartSessionBody` | Accepts 1s with flag; rejects 1s without; rejects unknown debug keys (`ZodError`) |
 | `parseSettingsPatch` | Rejects sub-minute work |
-| `SettingsService` | Rejects `workPauseStrategy: "hard"`; rejects non-int cycles; rejects 1s work in settings |
+| `SettingsService` | Accepts `workPauseStrategy: "hard"`; rejects non-int cycles; rejects 1s work in settings |
 
 ---
 
 ## Mocking patterns
 
-Not found. Tests use real `SettingsService` + `SessionService` and inject deterministic `nowMs` into service methods (`start`, `getSnapshot`, `ackRest`, etc.). Scheduler is not exercised in these unit tests.
+Not found. Tests use real `SettingsService` + `SessionService` and inject deterministic `nowMs` into service methods (`start`, `pause`, `resume`, `getSnapshot`, `ackRest`, etc.). Scheduler is not exercised in these unit tests.
 
 ## Fixtures
 

@@ -128,12 +128,12 @@ export function registerSessionRoutes(
     sessionAction(() => session.startRest()),
   );
   app.post(
-    SESSION_API.softPause,
-    sessionAction(() => session.softPause()),
+    SESSION_API.pause,
+    sessionAction(() => session.pause()),
   );
   app.post(
-    SESSION_API.softResume,
-    sessionAction(() => session.softResume()),
+    SESSION_API.resume,
+    sessionAction(() => session.resume()),
   );
   app.post(
     SESSION_API.endLongRest,

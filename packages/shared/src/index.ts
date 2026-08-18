@@ -41,13 +41,12 @@ export const SESSION_API = {
   ackRest: "/api/session/ack-rest",
   continue: "/api/session/continue",
   startRest: "/api/session/start-rest",
-  softPause: "/api/session/soft-pause",
-  softResume: "/api/session/soft-resume",
+  pause: "/api/session/pause",
+  resume: "/api/session/resume",
   endLongRest: "/api/session/end-long-rest",
 } as const;
 
-/** M1: only soft is accepted. Hard arrives in M2. */
-export const WorkPauseStrategySchema = z.literal("soft");
+export const WorkPauseStrategySchema = z.enum(["soft", "hard"]);
 export type WorkPauseStrategy = z.infer<typeof WorkPauseStrategySchema>;
 
 /** Integer field constrained to a named min/max range. */
@@ -173,9 +172,11 @@ export interface PlannedWorkPhase {
   startedAt: string;
   plannedDurationSec: number;
   plannedEndAt: string;
-  softPaused: boolean;
-  softPausedSec: number;
-  softPauseStartedAt: string | null;
+  paused: boolean;
+  pausedSec: number;
+  pauseStartedAt: string | null;
+  /** Hard: freeze clock at pause start; soft: always null. */
+  timerFrozenAt: string | null;
 }
 
 export interface DecisionPhase {

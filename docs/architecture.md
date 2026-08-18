@@ -10,7 +10,7 @@ Flexi Pomodoro is an **npm-workspace monorepo** with three packages:
 | `@flexi-pomodoro/server` | Fastify HTTP/SSE API, in-memory session engine, settings store, static web serving |
 | `@flexi-pomodoro/web` | React SPA (Vite); talks to the server via REST + Server-Sent Events |
 
-Backend style is **layered**: composition root (`app.ts`) → routes → services → (no persistence layer yet; M3 SQLite is planned). The session engine is an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`).
+Backend style is **layered**: composition root (`app.ts`) → routes → services → pause plugins → (no persistence layer yet; M3 SQLite is planned). The session engine is an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`). Pause policy is injected as a `WorkPauseStrategy` plugin, not inlined in the engine.
 
 Frontend style is **feature-oriented folders** under `apps/web/src`: components (by tab/feature), providers, queries (API + React Query hooks), hooks (SSE stream), utils, constants. Tab switching is local React state (no client router).
 
@@ -32,9 +32,11 @@ flowchart TB
     Routes["routes/*.routes.ts"]
     SettSvc["SettingsService"]
     SessSvc["SessionService"]
+    Pause["PauseStrategyRegistry"]
     Sched["IntervalScheduler"]
     Routes --> SettSvc
     Routes --> SessSvc
+    SessSvc --> Pause
     Sched -->|"tick every 250ms"| SessSvc
   end
 
@@ -53,6 +55,7 @@ flowchart TB
 | **Service layer** | `SettingsService`, `SessionService` | Business rules and state; routes stay thin |
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
 | **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later |
+| **Strategy (pause plugins)** | `PauseStrategyRegistry` + `WorkPauseStrategy` | Engine calls `onPause` / `onResume` / `isCountdownFrozen` / `onPlannedEnd`; default registry registers `soft` only |
 | **Catalog / plugin registration** | `DEBUG_FEATURES` in `packages/shared/src/debug/catalog.ts` | Debug features register id, meta, optional `applyBounds` |
 | **Schema-driven validation** | Zod schemas in shared | Shared between server routes and client start body |
 | **Watermark / cursor** | Server `listenerCursors` + client `AlertSeqStore` | Alert delivery is delta-only via `sinceSeq` |
@@ -65,7 +68,7 @@ No DI container. Wiring is explicit:
 ```typescript
 // apps/server/src/app.ts (committed pattern)
 const settings = new SettingsService();
-const session = new SessionService();
+const session = new SessionService(); // PauseStrategyRegistry defaults to soft only
 await registerRoutes(app, { settings, session });
 const scheduler = new IntervalScheduler({
   intervalMs: 250,
@@ -101,10 +104,10 @@ There are **no DB transactions**. Session and settings live in process memory on
 ```mermaid
 stateDiagram-v2
   [*] --> planned_work: start
-  planned_work --> decision: plannedEnd (not soft-paused)
-  planned_work --> short_rest: plannedEnd while soft-paused, cycle < N
-  planned_work --> long_rest: plannedEnd while soft-paused, cycle >= N
-  planned_work --> planned_work: softPause / softResume
+  planned_work --> decision: plannedEnd (not paused)
+  planned_work --> short_rest: plannedEnd while paused, cycle < N
+  planned_work --> long_rest: plannedEnd while paused, cycle >= N
+  planned_work --> planned_work: pause / resume
   decision --> short_rest: ackRest, cycle < N
   decision --> long_rest: ackRest, cycle >= N
   decision --> extended_work: continue (from click) OR timeout (backdated)
@@ -116,7 +119,20 @@ stateDiagram-v2
 
 `N` is `cyclesBeforeLongRest`. Rest kind is chosen by `cycleIndex >= N` → long rest, else short rest.
 
-Decision timeout attributes elapsed decision time to **extended work** (`startedAt` = decision start). Explicit **continue** starts extended work at the click time (decision elapsed excluded). Soft-paused through planned end **skips decision** and enters rest at planned end.
+Decision timeout attributes elapsed decision time to **extended work** (`startedAt` = decision start). Explicit **continue** starts extended work at the click time (decision elapsed excluded). Soft pause through planned end **skips decision** and enters rest at planned end (`onPlannedEnd` → `"rest"`). While a strategy reports `isCountdownFrozen`, planned-end ticks are skipped.
+
+## Pause plugins
+
+Pause behavior lives under `apps/server/src/pause/`, not inline in the session engine.
+
+| Piece | Role |
+|-------|------|
+| `WorkPauseStrategy` | Plugin contract: `id`, `onPause`, `onResume`, `isCountdownFrozen`, `onPlannedEnd` |
+| `PauseStrategyRegistry` | Lookup by strategy id; inject a subset of plugins for delete-ability tests |
+| `defaultPauseRegistry()` | Production table: `softPauseStrategy` only |
+| `softPauseStrategy` | Countdown keeps running; `plannedEndAt` unchanged; still-paused at planned end → auto-rest |
+
+`SessionService` resolves `pausePlugin` at `start` from the registry (`"soft"` today) and clears it when the session completes. HTTP is strategy-agnostic: `POST /api/session/pause` and `POST /api/session/resume`.
 
 ## Frontend architecture
 
@@ -149,6 +165,7 @@ No React Router. `App` holds `tab: "timer" | "settings" | "analytics" | "about"`
 
 - **Authoritative phase changes**: SSE (`/api/session/events`) + hybrid poll fallback (`sessionStream.sse.ts`).
 - **UI countdown**: local `useNow` (250ms) computes remaining/overtime from ISO anchors on the snapshot — no sub-second API polling.
+- **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`; the label remains "Soft pause" because session start still always locks `"soft"`.
 
 ### Code splitting
 

@@ -20,8 +20,8 @@ Base URL (dev): Vite proxies `/api` → `http://127.0.0.1:3847`. Production: sam
 | POST | `/api/session/ack-rest` | Decision → rest |
 | POST | `/api/session/continue` | Decision → extended work |
 | POST | `/api/session/start-rest` | Extended work → rest |
-| POST | `/api/session/soft-pause` | Soft-pause planned work |
-| POST | `/api/session/soft-resume` | Resume soft-pause |
+| POST | `/api/session/pause` | Pause planned work (active pause strategy) |
+| POST | `/api/session/resume` | Resume planned work (active pause strategy) |
 | POST | `/api/session/end-long-rest` | End session early from long rest |
 
 ---
@@ -59,7 +59,7 @@ Discriminated by `status`:
 | `status` | `"active"` | |
 | `startedAt` | ISO string | |
 | `params` | `SessionParams` | Locked for session |
-| `pauseStrategy` | `"soft"` | M1 only |
+| `pauseStrategy` | `"soft" \| "hard"` | Copied onto the session at start; runtime currently always starts `"soft"` |
 | `phase` | `Phase` | See [data-model.md](./data-model.md) |
 | `pendingAlerts` | `AlertEvent[]` | Deltas since `sinceSeq` |
 | `alertSeq` | number | High-water |
@@ -85,7 +85,7 @@ Settings additionally:
 | Field | Type | Notes |
 |-------|------|-------|
 | `alertsMuted` | boolean | Present in schema; mute UX not fully wired in M1 UI |
-| `workPauseStrategy` | `"soft"` | Literal; `"hard"` rejected |
+| `workPauseStrategy` | `"soft" \| "hard"` | Default `"soft"`; PUT accepts `"hard"`. Session start still always locks `"soft"` until the hard plugin is wired |
 
 Defaults (`DEFAULT_SETTINGS`): 25×60 / 5×60 / N=4 / 15×60 / decision 15 / `alertsMuted: false` / `workPauseStrategy: "soft"`.
 
@@ -180,8 +180,8 @@ All return `SessionSnapshot` on success. Mapped via `errorReply` (`apps/server/s
 | `/api/session/ack-rest` | `ackRest` | `NO_SESSION` 409, `INVALID_PHASE` 400 |
 | `/api/session/continue` | `continueExtended` | same |
 | `/api/session/start-rest` | `startRest` | same |
-| `/api/session/soft-pause` | `softPause` | `ALREADY_PAUSED`, `INVALID_PHASE`, `NO_SESSION` |
-| `/api/session/soft-resume` | `softResume` | `NOT_PAUSED`, `INVALID_PHASE`, `NO_SESSION` |
+| `/api/session/pause` | `pause` | `ALREADY_PAUSED`, `INVALID_PHASE`, `NO_SESSION` |
+| `/api/session/resume` | `resume` | `NOT_PAUSED`, `INVALID_PHASE`, `NO_SESSION` |
 | `/api/session/end-long-rest` | `endLongRest` | `INVALID_PHASE`, `NO_SESSION` |
 
 Status mapping in `errorReply.ts`:

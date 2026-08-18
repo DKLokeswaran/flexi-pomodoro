@@ -238,16 +238,16 @@ Applies to **planned work only**. Short rest and long rest are never pausable. L
 | --- | --- | --- |
 | FR-PAUSE-S1 | Soft pause is the **default** work-pause behavior | P0 |
 | FR-PAUSE-S2 | While soft-paused, planned work **keeps counting down**; the session stays active | P0 |
-| FR-PAUSE-S3 | **Planned end time does not change.** Soft pause only accumulates `softPausedSec` (time the user marked as not focusing) | P0 |
+| FR-PAUSE-S3 | **Planned end time does not change.** Soft pause only accumulates `pausedSec` (time the user marked as not focusing) | P0 |
 | FR-PAUSE-S4 | Soft-paused time is persisted for analytics (interruption load vs focus); it does not extend planned work | P0 |
 | FR-PAUSE-S5 | Soft pause does not end the session and does not unlock mid-session cancel | P0 |
 | FR-PAUSE-S6 | Soft pause is available **only during planned work**. It is not available in decision, extended work, short-rest acknowledgement, or rest | P0 |
 | FR-PAUSE-S7 | **Soft pause at planned end (normative):** If planned work reaches its end while still soft-paused: (1) auto-close the soft-pause slice (count soft-paused time through planned end); (2) **skip the decision window**; (3) **automatically start** the applicable rest (short or long)—user was not focusing, so do not offer / auto-enter extended work; (4) play the usual planned-work-end and rest-entry alerts | P0 |
 | FR-PAUSE-S8 | Otherwise, soft pause ends via **manual resume** (or equivalent). Soft pause does not clear by itself before planned end | P0 |
 
-Illustrative (mid-block resume): work 25:00 from T0→T25. Soft-pause 3:00 mid-block, then resume → decision still at **T25**; `softPausedSec = 180`; focused ≈ 22:00.
+Illustrative (mid-block resume): work 25:00 from T0→T25. Soft-pause 3:00 mid-block, then resume → decision still at **T25**; `pausedSec = 180`; focused ≈ 22:00.
 
-Illustrative (never resume): soft-pause at 40:00 of a 50:00 work block, never resume → at **T50** soft pause auto-closes, **no decision / no extended work**, auto-start applicable rest; `softPausedSec` includes 40:00→50:00.
+Illustrative (never resume): soft-pause at 40:00 of a 50:00 work block, never resume → at **T50** soft pause auto-closes, **no decision / no extended work**, auto-start applicable rest; `pausedSec` includes 40:00→50:00.
 
 #### 4.6.2 Hard pause (experimental)
 
@@ -269,16 +269,15 @@ Illustrative: work 25:00, hard-pause 3:00 with 10:00 left → on resume still 10
 | FR-PAUSE-M3 | Deleting either strategy later = remove module + setting option + tests for that module; no rewrite of rest/extended-work logic | P0 |
 | FR-PAUSE-M4 | Single setting `workPauseStrategy: "soft" \| "hard"` selects the active module (`"soft"` default) | P0 |
 
-Suggested interface (illustrative):
+Suggested interface:
 
 ```
 WorkPauseStrategy {
-  onPause(ctx): void
-  onResume(ctx): void
-  // soft: returns plannedEnd unchanged
-  // hard: returns plannedEnd shifted by paused duration
-  resolvePlannedEnd(plannedEnd, pauseState): datetime
-  getAnalyticsSlices(pauseState): PauseSlice[]
+  id: "soft" | "hard"
+  onPause(phase, nowMs): void
+  onResume(phase, nowMs): void
+  isCountdownFrozen(phase): boolean
+  onPlannedEnd(phase, plannedEndMs): "rest" | "decision"
 }
 ```
 
@@ -506,7 +505,7 @@ PlannedWorkSegment {
   plannedDurationSec          // fixed; end not moved by soft pause
   plannedEndAt                // authoritative end (may be shifted only by hard pause)
   startedAt, endedAt
-  softPausedSec               // interruption accumulator; does not change plannedEndAt under soft
+  pausedSec                   // interruption accumulator; does not change plannedEndAt under soft
   endedReason: "planned_complete" | "soft_paused_auto_rest" | "recovery"
 }
 
@@ -551,7 +550,7 @@ PauseSlice {
 }
 ```
 
-Analytics contract: sum `ExtendedWorkSegment` durations/counts for extended metrics; soft-paused time from `PlannedWorkSegment.softPausedSec` / `PauseSlice`; sum `DecisionSegment` and `ShortRestAckSegment` separately (optional) and **exclude** both from focus, rest, and extended totals.
+Analytics contract: sum `ExtendedWorkSegment` durations/counts for extended metrics; soft-paused time from `PlannedWorkSegment.pausedSec` / `PauseSlice`; sum `DecisionSegment` and `ShortRestAckSegment` separately (optional) and **exclude** both from focus, rest, and extended totals.
 
 ---
 
@@ -619,7 +618,7 @@ docker run -d \
 | Defaults edited mid-session (via Settings) | Affect future sessions only |
 | `N = 1` | Work → decision → (optional extended) → long rest only |
 | Decision window spans tab blur | Wall clock still counts server-side; timeout → extended work |
-| Soft pause across refresh / downtime | Restore soft-pause active flag; **planned end unchanged**; downtime while soft-paused **counts toward** `softPausedSec` until manual resume **or** planned-end auto-rest (FR-PAUSE-S7) |
+| Soft pause across refresh / downtime | Restore pause active flag; **planned end unchanged**; downtime while paused **counts toward** `pausedSec` until manual resume **or** planned-end auto-rest (FR-PAUSE-S7) |
 | Soft pause held through planned end | Auto-close soft pause; **skip decision**; **auto-start** applicable rest (no extended work); if that rest is short, short-rest acknowledgement still applies after the rest ends |
 | Short-rest acknowledgement ignored | Window elapses → next work starts **immediately paused** (active strategy) |
 | Down during SHORT_REST_ACK | Strict wall-clock: if window elapsed while down → open in next WORK_PLANNED already paused (`timeout_paused`); if still inside window → restore remaining ack countdown |
@@ -672,7 +671,7 @@ Where **Decision** is filled, that is the product ruling. Where **Decision** is 
 | Q6 | PWA / installable / offline timer? | Scope | Not required for v1 | |
 | Q7 | Exact sound assets / custom upload? | Packaging | Ship 1–2 built-in alarm sounds | **Resolved (process):** Owner picks free/open-license samples; **unique sound per transition**; no LLM-generated default tones |
 | Q8 | Time units in UI: minutes only or mm:ss? | UX | Minutes for settings; mm:ss on live timer | |
-| Q9 | If container was down through an entire rest, skip ahead how many phases? | Recovery | Advance through completed phases by wall clock; stop at next **user decision** boundary (WORK_BOUNDARY) | **Resolved:** **Option A — strict wall-clock catch-up** for all scenarios below (S1–S7). Soft-pause downtime is included in `softPausedSec` |
+| Q9 | If container was down through an entire rest, skip ahead how many phases? | Recovery | Advance through completed phases by wall clock; stop at next **user decision** boundary (WORK_BOUNDARY) | **Resolved:** **Option A — strict wall-clock catch-up** for all scenarios below (S1–S7). Soft-pause downtime is included in `pausedSec` |
 | Q10 | Product name “Flexi Pomodoro” final? | Branding | Working title only | |
 
 ### Q9 — Recovery scenarios

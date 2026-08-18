@@ -47,12 +47,14 @@ flowchart LR
   Sched["IntervalScheduler 250ms"]
   Sess["SessionService"]
   Sett["SettingsService"]
+  Pause["PauseStrategyRegistry"]
 
   Browser -->|"REST + SSE /api/*"| API
   Browser -.-> Shared
   API -.-> Shared
   API --> Sett
   API --> Sess
+  Sess --> Pause
   Sched -->|"tick(nowMs)"| Sess
 ```
 

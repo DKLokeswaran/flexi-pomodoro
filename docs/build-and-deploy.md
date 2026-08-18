@@ -13,6 +13,8 @@
 | `start` | `PORT=3847 WEB_DIST=$PWD/apps/web/dist` server start |
 | `test` | Server tests |
 | `typecheck` | shared + server + web |
+| `format` | `prettier --write .` |
+| `format:check` | `prettier --check .` |
 
 ### `@flexi-pomodoro/server`
 

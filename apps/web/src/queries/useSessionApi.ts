@@ -19,8 +19,8 @@ const ACTION_SUCCESS: Record<string, string> = {
   [SESSION_API.ackRest]: "Rest started",
   [SESSION_API.continue]: "Extended work started",
   [SESSION_API.startRest]: "Rest started",
-  [SESSION_API.softPause]: "Soft pause on",
-  [SESSION_API.softResume]: "Soft pause off",
+  [SESSION_API.pause]: "Soft pause on",
+  [SESSION_API.resume]: "Soft pause off",
   [SESSION_API.endLongRest]: "Session complete",
 };
 

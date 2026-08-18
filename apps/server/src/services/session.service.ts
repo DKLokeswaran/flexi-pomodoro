@@ -12,6 +12,12 @@ import {
   type SessionSnapshot,
 } from "@flexi-pomodoro/shared";
 import { randomUUID } from "node:crypto";
+import {
+  defaultPauseRegistry,
+  PauseStrategyRegistry,
+  type WorkPauseStrategy,
+} from "../pause/index.js";
+import { msToIso, parseIso } from "../utils/iso.js";
 
 /** Domain error from session commands (wrong phase, no session, etc.). */
 export class SessionError extends Error {
@@ -22,16 +28,6 @@ export class SessionError extends Error {
     super(message);
     this.name = "SessionError";
   }
-}
-
-/** Convert a millisecond timestamp to an ISO-8601 string. */
-function msToIso(ms: number): string {
-  return new Date(ms).toISOString();
-}
-
-/** Parse an ISO-8601 timestamp to milliseconds since epoch. */
-function parseIso(value: string): number {
-  return Date.parse(value);
 }
 
 /** True while wall-clock time is still before the given ISO deadline. */
@@ -58,9 +54,10 @@ function startPlannedWork(
     startedAt: msToIso(nowMs),
     plannedDurationSec: params.workDurationSec,
     plannedEndAt: msToIso(nowMs + params.workDurationSec * 1000),
-    softPaused: false,
-    softPausedSec: 0,
-    softPauseStartedAt: null,
+    paused: false,
+    pausedSec: 0,
+    pauseStartedAt: null,
+    timerFrozenAt: null,
   };
 }
 
@@ -89,31 +86,24 @@ function startRest(
   };
 }
 
-/** If a soft pause is open, add its elapsed seconds and clear pause flags. */
-function closeSoftPauseIfActive(phase: PlannedWorkPhase, nowMs: number): void {
-  if (!phase.softPaused || !phase.softPauseStartedAt) return;
-  const pauseStartedMs = parseIso(phase.softPauseStartedAt);
-  const pauseEndMs = Math.min(nowMs, parseIso(phase.plannedEndAt));
-  phase.softPausedSec += Math.max(
-    0,
-    Math.floor((pauseEndMs - pauseStartedMs) / 1000),
-  );
-  phase.softPaused = false;
-  phase.softPauseStartedAt = null;
-}
-
 /** Called with a snapshot whenever the engine notifies subscribers. */
 export type SnapshotListener = (snapshot: SessionSnapshot) => void;
 
 /** In-memory session engine: phases, alerts, and snapshot subscribers. */
 export class SessionService {
   private session: ActiveSession | null = null;
+  /** Pause plugin resolved at start; cleared when the session ends. */
+  private pausePlugin: WorkPauseStrategy | null = null;
   /** Append-only alert log; clients receive deltas only. */
   private alertLog: AlertEvent[] = [];
   private alertSeq = 0;
   private listeners = new Set<SnapshotListener>();
   /** Per-listener delivery cursor (last seq sent). */
   private listenerCursors = new WeakMap<SnapshotListener, number>();
+
+  constructor(
+    private readonly pauseRegistry: PauseStrategyRegistry = defaultPauseRegistry(),
+  ) {}
 
   /** Register a snapshot listener and return an unsubscribe function. */
   subscribe(listener: SnapshotListener, sinceSeq = 0): () => void {
@@ -211,12 +201,14 @@ export class SessionService {
       throw new SessionError("A session is already active", "SESSION_ACTIVE");
     }
     const seqAtStart = this.alertSeq;
+    const pauseStrategy = "soft";
+    this.pausePlugin = this.pauseRegistry.get(pauseStrategy)!;
     this.session = {
       id: randomUUID(),
       status: "active",
       startedAt: msToIso(nowMs),
       params,
-      pauseStrategy: "soft",
+      pauseStrategy,
       phase: startPlannedWork(params, 1, nowMs),
       pendingAlerts: [],
       alertSeq: this.alertSeq,
@@ -224,37 +216,36 @@ export class SessionService {
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
 
-  /** Soft-pause planned work without moving the planned end. */
-  softPause(nowMs: number = Date.now()): SessionSnapshot {
+  /** Pause planned work via the session's pause strategy. */
+  pause(nowMs: number = Date.now()): SessionSnapshot {
     const { session, seqAtStart } = this.beginActiveCommand(nowMs);
     const phase = this.requirePhase(
       session,
       "planned_work",
-      "Soft pause is only available during planned work",
+      "Pause is only available during planned work",
     );
-    if (phase.softPaused) {
-      throw new SessionError("Already soft-paused", "ALREADY_PAUSED");
+    if (phase.paused) {
+      throw new SessionError("Already paused", "ALREADY_PAUSED");
     }
     if (nowMs >= parseIso(phase.plannedEndAt)) {
       throw new SessionError("Planned work already ended", "INVALID_PHASE");
     }
-    phase.softPaused = true;
-    phase.softPauseStartedAt = msToIso(nowMs);
+    this.pausePlugin!.onPause(phase, nowMs);
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
 
-  /** End an active soft pause and accumulate paused seconds. */
-  softResume(nowMs: number = Date.now()): SessionSnapshot {
+  /** End an active pause via the session's pause strategy. */
+  resume(nowMs: number = Date.now()): SessionSnapshot {
     const { session, seqAtStart } = this.beginActiveCommand(nowMs);
     const phase = this.requirePhase(
       session,
       "planned_work",
-      "Soft resume is only available during planned work",
+      "Resume is only available during planned work",
     );
-    if (!phase.softPaused) {
-      throw new SessionError("Not soft-paused", "NOT_PAUSED");
+    if (!phase.paused) {
+      throw new SessionError("Not paused", "NOT_PAUSED");
     }
-    closeSoftPauseIfActive(phase, nowMs);
+    this.pausePlugin!.onResume(phase, nowMs);
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
 
@@ -366,17 +357,17 @@ export class SessionService {
     }
   }
 
-  /** Planned end → rest if still soft-paused, otherwise enter the decision window. */
+  /** Planned end: skip ticks while frozen; otherwise apply strategy policy. */
   private advancePlannedWork(
     session: ActiveSession,
     phase: PlannedWorkPhase,
     nowMs: number,
   ): boolean {
+    if (this.pausePlugin!.isCountdownFrozen(phase)) return false;
     if (isBeforeDeadline(phase.plannedEndAt, nowMs)) return false;
-    const wasSoftPaused = phase.softPaused;
     const plannedEndMs = parseIso(phase.plannedEndAt);
-    closeSoftPauseIfActive(phase, plannedEndMs);
-    if (wasSoftPaused) {
+    const action = this.pausePlugin!.onPlannedEnd(phase, plannedEndMs);
+    if (action === "rest") {
       this.enterRestFromWork(session, plannedEndMs, ["work_planned_end"]);
       return true;
     }
@@ -443,6 +434,7 @@ export class SessionService {
   /** Drop the in-memory session (engine becomes idle). */
   private completeSession(): void {
     this.session = null;
+    this.pausePlugin = null;
   }
 
   /** Clear alert history and seq after delivery when a session has ended. */

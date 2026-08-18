@@ -6,12 +6,12 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 24 |
+| Total commits | 28 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-08-13 |
+| Latest commit date | 2026-08-17 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (24) |
-| Conventional-commit prefix count (`feat`/`fix`/…) | 1 (`chore: ignore .pi directory`) |
+| Most active contributor | Lokeswaran DK (28) |
+| Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4` |
 
 ## Commit velocity
@@ -19,7 +19,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | Month | Commits |
 |-------|--------:|
 | 2026-07 | 23 |
-| 2026-08 | 1 |
+| 2026-08 | 5 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -29,16 +29,16 @@ Counts include historical paths that may have been renamed/moved.
 |--------:|------|
 | 6 | `docs/PRD.md` (later moved to `docs/product/PRD.md`) |
 | 6 | `apps/web/src/App.tsx` |
-| 5 | `package-lock.json` |
+| 6 | `package-lock.json` |
 | 5 | `apps/web/src/styles.css` |
 | 5 | `apps/web/src/api.ts` (later split) |
-| 4 | `package.json` |
+| 5 | `packages/shared/src/index.ts` |
+| 5 | `package.json` |
 | 4 | `docs/roadmap.md` (later `docs/product/roadmap.md`) |
 | 4 | `apps/web/src/main.tsx` |
 | 4 | `apps/server/src/session/engine.ts` (later `services/session.service.ts`) |
 | 4 | `apps/server/src/session/engine.test.ts` |
 | 4 | `apps/server/src/routes/api.ts` (later `session.routes.ts`) |
-| 3 | `packages/shared/src/index.ts` |
 | 3 | `.cursor/plans/m1_timer_core.plan.md` |
 | 3 | `apps/web/src/hooks/useSessionStream.ts` |
 | 3 | Timer UI / NumberField / Nav (various names) |
@@ -94,6 +94,16 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 
 - Ignore the `.pi` directory.
 
+### 2026-08-16 — Readability pass
+
+- Clearer names, smaller functions, and shared helpers across server, web, and shared (including a shared HTTP `errorReply` mapper).
+
+### 2026-08-17 — Prettier
+
+- Add Prettier with project config (`format` / `format:check`).
+- Reformat existing source; no behavior changes.
+- Ignore the format commit in git blame.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -106,6 +116,10 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| c5413fa | Lokeswaran DK | 2026-08-17 | chore: ignore the Prettier format commit in git blame |
+| 473d4b5 | Lokeswaran DK | 2026-08-17 | style: apply Prettier formatting |
+| c7a7d79 | Lokeswaran DK | 2026-08-17 | chore: add Prettier with project config |
+| 8589993 | Lokeswaran DK | 2026-08-16 | Improve readability across server, web, and shared with clearer names, smaller functions, and shared helpers. |
 | cd52edd | Lokeswaran DK | 2026-08-13 | chore: ignore .pi directory |
 | 84bd35c | Lokeswaran DK | 2026-07-24 | Document short-rest acknowledgement and M2.5/M3.5 alpha milestones. |
 | aa1123e | Lokeswaran DK | 2026-07-24 | Add technical reference docs generated from committed codebase history. |
@@ -131,4 +145,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: cd52edda371ef25163e185091c6c042ce3584a95
+Last Synced Commit: c5413faed702088aa1860627659fff73c9786bf6

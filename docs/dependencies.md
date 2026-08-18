@@ -84,8 +84,12 @@ No dedicated crypto/auth client libraries committed.
 
 ## Linting / formatting packages
 
-**Not found** (no ESLint/Prettier deps or configs in committed tree).
+| Package | Declared | Locked | Scope |
+|---------|----------|--------|-------|
+| `prettier` | ^3.9.6 | 3.9.6 | root dev |
+
+No ESLint package or config committed.
 
 ## Transitive dependencies
 
-Hundreds via `package-lock.json` (3543 lines). Prefer lockfile for exact transitive versions; only direct packages are tabulated above.
+Hundreds via `package-lock.json` (3562 lines). Prefer lockfile for exact transitive versions; only direct packages are tabulated above.

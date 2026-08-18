@@ -1,6 +1,6 @@
 # Repository Structure
 
-Annotated layout of the source tree (86 paths in `apps/`, `packages/`, and repo-root config; binary alert WAVs listed by pattern only).
+Annotated layout of the source tree (binary alert WAVs listed by pattern only).
 
 ```
 flexi-pomodoro/
@@ -10,8 +10,12 @@ flexi-pomodoro/
 ├── docker-compose.yml           # Single service + /data volume stub
 ├── .dockerignore
 ├── .gitignore
+├── .prettierrc
+├── .prettierignore
+├── .git-blame-ignore-revs        # Skip the Prettier format commit in git blame
 ├── .cursor/plans/
-│   └── m1_timer_core.plan.md    # M1 implementation plan notes
+│   ├── m1_timer_core.plan.md    # M1 implementation plan notes
+│   └── m2_pause_modules.plan.md # M2 pause plugin plan notes
 ├── docs/
 │   └── product/                 # Product docs (PRD, roadmap) — not generated tech reference
 ├── packages/
@@ -35,6 +39,11 @@ flexi-pomodoro/
 │   │       ├── index.ts         # listen entry
 │   │       ├── app.ts           # composition root
 │   │       ├── scheduler.ts
+│   │       ├── pause/
+│   │       │   ├── index.ts         # Barrel: registry, soft strategy, types
+│   │       │   ├── types.ts         # WorkPauseStrategy plugin contract
+│   │       │   ├── registry.ts      # PauseStrategyRegistry + defaultPauseRegistry
+│   │       │   └── softPause.ts     # Soft pause plugin (FR-PAUSE-S6/S7)
 │   │       ├── routes/
 │   │       │   ├── index.ts
 │   │       │   ├── health.routes.ts
@@ -44,7 +53,8 @@ flexi-pomodoro/
 │   │       │   ├── settings.service.ts
 │   │       │   └── session.service.ts
 │   │       ├── utils/
-│   │       │   └── errorReply.ts  # HTTP mapping for SettingsError / SessionError
+│   │       │   ├── errorReply.ts  # HTTP mapping for SettingsError / SessionError
+│   │       │   └── iso.ts         # msToIso / parseIso helpers
 │   │       └── tests/services/
 │   │           ├── settings.service.test.ts
 │   │           └── session.service.test.ts
@@ -78,7 +88,7 @@ flexi-pomodoro/
 | `apps/web` | React UI |
 | `packages/shared` | Cross-cutting domain contract |
 | `docs/product` | Product PRD and roadmap |
-| `.cursor/plans` | Internal planning artifact for M1 |
+| `.cursor/plans` | Internal planning artifacts (M1 timer core, M2 pause modules) |
 
 ## Language composition (committed files)
 
@@ -99,6 +109,7 @@ flexi-pomodoro/
 | New REST endpoint | `apps/server/src/routes/<domain>.routes.ts`; register in `routes/index.ts`; add path to `SESSION_API` in shared if shared |
 | HTTP error mapping | `apps/server/src/utils/errorReply.ts` (shared by session and settings routes) |
 | Session transition / alert | `SessionService` + shared `AlertIdSchema` / phase types; extend tests under `apps/server/src/tests/services/` |
+| Work-pause strategy | New plugin under `apps/server/src/pause/`; register in `defaultPauseRegistry()`; keep engine on `WorkPauseStrategy` hooks only |
 | Settings field | Shared Zod schemas + `DEFAULT_SETTINGS` + `SettingsService` + Settings UI |
 | Debug feature | New folder under `packages/shared/src/debug/features/`; register in `DEBUG_FEATURES` |
 | UI tab / panel | `apps/web/src/components/`; wire in `App.tsx` + `Nav.tsx` |

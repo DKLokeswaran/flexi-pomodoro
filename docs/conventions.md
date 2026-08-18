@@ -9,7 +9,7 @@ Derived from committed patterns (not aspirational rules).
 | Packages | `@flexi-pomodoro/<name>` | `shared`, `server`, `web` |
 | Server route files | `<domain>.routes.ts` | `session.routes.ts` |
 | Services | `<domain>.service.ts` | `session.service.ts` |
-| Tests | `<domain>.service.test.ts` under `tests/services/` | |
+| Tests | `<domain>.service.test.ts` under `tests/services/`; pause plugins under `tests/pause/*.test.ts` | |
 | Pause plugins | `pause/<id>Pause.ts` plus `types.ts` / `registry.ts` | `softPause.ts`, `hardPause.ts` |
 | React components | PascalCase file matching export | `ActiveTimer.tsx` |
 | CSS modules | `<Component>.module.css` | `AboutTab.module.css` |

@@ -42,7 +42,9 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | Continue | Extended `startedAt` = click time |
 | Soft pause mid-work | `plannedEndAt` unchanged; `pausedSec` accumulates; `timerFrozenAt` stays null |
 | Soft-paused through end | Auto rest; skip decision |
-| Hard pause (not yet in test suite) | Freeze countdown; shift `plannedEndAt` on resume; planned end → decision |
+| Hard pause 3s with 10s left | Remaining time unchanged; `plannedEndAt` shifted +3s |
+| Hard-paused past original end | Stays in planned work while frozen |
+| Pause/resume outside planned work (FR-PAUSE-S6) | `INVALID_PHASE` in decision, extended, short rest, long rest |
 | N=1 | Long rest after first work path |
 | Tick catch-up | Past work+decision → extended in one snapshot |
 | shortDurations debug | Allows 1s params |
@@ -56,6 +58,27 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | `parseSettingsPatch` | Rejects sub-minute work |
 | `SettingsService` | Accepts `workPauseStrategy: "hard"`; rejects non-int cycles; rejects 1s work in settings |
 
+### `apps/server/src/tests/pause/softPause.test.ts`
+
+Isolated `softPauseStrategy` unit tests (no `SessionService`):
+
+| Case | Asserts |
+|------|---------|
+| `onPause` | Sets flags; `timerFrozenAt` null; `plannedEndAt` unchanged |
+| `onResume` | Accumulates `pausedSec`; `plannedEndAt` unchanged |
+| `onPlannedEnd` while paused | → `"rest"`; closes slice through planned end |
+| `onPlannedEnd` while running | → `"decision"` |
+
+### `apps/server/src/tests/pause/hardPause.test.ts`
+
+Isolated `hardPauseStrategy` unit tests:
+
+| Case | Asserts |
+|------|---------|
+| `onPause` | Sets `timerFrozenAt`; `isCountdownFrozen` true |
+| `onResume` | Remaining time unchanged; `plannedEndAt` shifted by paused duration |
+| `onPlannedEnd` | → `"decision"` when unfrozen |
+
 ---
 
 ## Mocking patterns
@@ -68,7 +91,7 @@ Inline constants and helper factories only — no fixture files.
 
 ## Conventions
 
-- File naming: `*.service.test.ts` under `src/tests/services/`
+- File naming: `*.service.test.ts` under `src/tests/services/`; pause plugins under `src/tests/pause/*.test.ts`
 - Blocks: `describe("ClassOrFn", () => { it("behavior…", …) })`
 - Style: strict assert (`assert.equal`, `assert.ok`, `assert.throws`, `assert.deepEqual`)
 - Phase checks often narrow with `if (snap.status !== "active") throw …` after assert for TypeScript narrowing

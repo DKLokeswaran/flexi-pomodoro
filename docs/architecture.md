@@ -128,7 +128,7 @@ Pause behavior lives under `apps/server/src/pause/`, not inline in the session e
 | Piece | Role |
 |-------|------|
 | `WorkPauseStrategy` | Plugin contract: `id`, `onPause`, `onResume`, `isCountdownFrozen`, `onPlannedEnd` |
-| `PauseStrategyRegistry` | Lookup by strategy id; inject a subset of plugins for delete-ability tests |
+| `PauseStrategyRegistry` | Lookup by strategy id; constructor registers plugins for this process |
 | `defaultPauseRegistry()` | Production table: `softPauseStrategy` + `hardPauseStrategy` |
 | `softPauseStrategy` | Countdown keeps running; `plannedEndAt` unchanged; still-paused at planned end → auto-rest |
 | `hardPauseStrategy` | Countdown frozen via `timerFrozenAt`; `plannedEndAt` shifts on resume; planned end → decision |

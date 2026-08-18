@@ -234,7 +234,7 @@ Unknown errors are rethrown.
 
 ### Tests
 
-`src/tests/services/session.service.test.ts`, `settings.service.test.ts` — no production exports (see [testing.md](./testing.md)).
+`src/tests/services/session.service.test.ts`, `settings.service.test.ts`, `src/tests/pause/softPause.test.ts`, `hardPause.test.ts` — no production exports (see [testing.md](./testing.md)).
 
 ---
 

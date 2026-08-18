@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 29 |
+| Total commits | 30 |
 | First commit date | 2026-07-12 |
 | Latest commit date | 2026-08-18 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (29) |
+| Most active contributor | Lokeswaran DK (30) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4` |
 
@@ -19,7 +19,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | Month | Commits |
 |-------|--------:|
 | 2026-07 | 23 |
-| 2026-08 | 6 |
+| 2026-08 | 7 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -104,11 +104,12 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Reformat existing source; no behavior changes.
 - Ignore the format commit in git blame.
 
-### 2026-08-18 — M2 pause plugin foundation
+### 2026-08-18 — M2 pause modules
 
-- Extract soft pause into `WorkPauseStrategy` plugins under `apps/server/src/pause/`.
-- Generalize planned-work pause fields; unify HTTP to `POST /api/session/pause` and `/resume`.
-- Widen settings schema to accept `workPauseStrategy: "hard"`.
+- Extract soft pause into `WorkPauseStrategy` plugins; unify HTTP to `/pause` and `/resume`.
+- Add hard pause plugin (frozen countdown, shifted `plannedEndAt` on resume).
+- Settings experimental gate + hard pause toggle; session start locks strategy from settings.
+- Timer UI: strategy-aware labels, `timerFrozenAt` clock freeze, About marks hard pause available.
 
 ## Breaking changes
 
@@ -123,6 +124,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| b639f4f | Lokeswaran DK | 2026-08-18 | Add hard pause strategy with Settings toggle and session-start wiring. |
 | c2863b4 | Lokeswaran DK | 2026-08-18 | Extract soft pause into a WorkPauseStrategy plugin with strategy-agnostic pause and resume APIs. |
 | c5413fa | Lokeswaran DK | 2026-08-17 | chore: ignore the Prettier format commit in git blame |
 | 473d4b5 | Lokeswaran DK | 2026-08-17 | style: apply Prettier formatting |
@@ -153,4 +155,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: c2863b47194c987179085a19202fcf6e275ea68d
+Last Synced Commit: b639f4f2f5e3ce6a7a8ea98cccbcd74ab4e7be0d

@@ -15,8 +15,8 @@ todos:
     content: Settings Experimental features — Enable hard pause (experimental) checkbox (off=soft, on=hard); lock at start; timer labels/clock freeze; About available
     status: completed
   - id: tests
-    content: Isolated soft/hard tests, S6 phase rejection, hard remaining-time shift, registry-only delete-ability (FR-PAUSE-M3); manual smoke both strategies
-    status: pending
+    content: Isolated soft/hard tests, S6 phase rejection, hard remaining-time shift; manual smoke both strategies
+    status: completed
 isProject: true
 ---
 
@@ -40,7 +40,7 @@ Five separate todos. Run them in order; **3 and 4 in the same execution** (hard 
 2. Soft extract — `WorkPauseStrategy` + registry; move inline soft pause (including FR-PAUSE-S7) into `pause/softPause.ts`; engine calls strategy hooks only.
 3. Hard module — freeze countdown while paused; shift `plannedEndAt` on resume; skip planned-end ticks while frozen; `start()` reads settings.
 4. Settings + timer UI — Experimental features checkbox; timer labels and `timerFrozenAt` clock; About.
-5. Tests — isolated strategy tests, FR-PAUSE-S6, hard remaining-time, delete-ability, manual smoke.
+5. Tests — isolated strategy tests, FR-PAUSE-S6, hard remaining-time, manual smoke.
 
 ## Technical approach
 
@@ -144,6 +144,5 @@ Keep M1 cases; add:
 - Isolated soft/hard module tests (pause, resume, planned-end policy).
 - Hard: pause 3s with 10s left → resume still 10s left, `plannedEndAt` +3s; tick past original end while paused stays in planned work.
 - FR-PAUSE-S6: pause/resume rejected in decision, extended, short rest, long rest (`INVALID_PHASE`).
-- Engine with `{ soft }` only: start as soft works; `pauseStrategy: "hard"` fails closed without importing the hard module.
 
 Manual smoke (ticket acceptance): Enable hard pause unchecked → Save → start work → Soft pause, planned end → decision (or auto-rest if still paused). Check Enable hard pause → Save → start work → pause (clock frozen) → resume (deadline shifted) → planned end → decision. Uncheck → Save → next session is soft again.

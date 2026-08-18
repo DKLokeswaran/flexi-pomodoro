@@ -2,7 +2,7 @@ import { hardPauseStrategy } from "./hardPause.js";
 import { softPauseStrategy } from "./softPause.js";
 import type { WorkPauseStrategy, WorkPauseStrategyId } from "./types.js";
 
-/** Lookup table of pause plugins; inject a subset to prove delete-ability. */
+/** Lookup table of pause plugins registered for this process. */
 export class PauseStrategyRegistry {
   private readonly byId: ReadonlyMap<WorkPauseStrategyId, WorkPauseStrategy>;
 

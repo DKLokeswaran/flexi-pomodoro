@@ -56,9 +56,13 @@ flexi-pomodoro/
 │   │       ├── utils/
 │   │       │   ├── errorReply.ts  # HTTP mapping for SettingsError / SessionError
 │   │       │   └── iso.ts         # msToIso / parseIso helpers
-│   │       └── tests/services/
-│   │           ├── settings.service.test.ts
-│   │           └── session.service.test.ts
+│   │       └── tests/
+│   │           ├── pause/
+│   │           │   ├── softPause.test.ts
+│   │           │   └── hardPause.test.ts
+│   │           └── services/
+│   │               ├── settings.service.test.ts
+│   │               └── session.service.test.ts
 │   └── web/                     # @flexi-pomodoro/web
 │       ├── index.html
 │       ├── package.json
@@ -110,7 +114,7 @@ flexi-pomodoro/
 | New REST endpoint | `apps/server/src/routes/<domain>.routes.ts`; register in `routes/index.ts`; add path to `SESSION_API` in shared if shared |
 | HTTP error mapping | `apps/server/src/utils/errorReply.ts` (shared by session and settings routes) |
 | Session transition / alert | `SessionService` + shared `AlertIdSchema` / phase types; extend tests under `apps/server/src/tests/services/` |
-| Work-pause strategy | New plugin under `apps/server/src/pause/`; register in `defaultPauseRegistry()`; keep engine on `WorkPauseStrategy` hooks only |
+| Work-pause strategy | New plugin under `apps/server/src/pause/`; register in `defaultPauseRegistry()`; add isolated tests under `apps/server/src/tests/pause/` |
 | Settings field | Shared Zod schemas + `DEFAULT_SETTINGS` + `SettingsService` + Settings UI |
 | Debug feature | New folder under `packages/shared/src/debug/features/`; register in `DEBUG_FEATURES` |
 | UI tab / panel | `apps/web/src/components/`; wire in `App.tsx` + `Nav.tsx` |
@@ -119,7 +123,7 @@ flexi-pomodoro/
 
 ## Test location convention
 
-Server tests mirror services: `src/tests/services/<name>.service.test.ts`. Web has **no** committed unit/e2e tests.
+Server tests: service integration under `src/tests/services/`; pause plugin unit tests under `src/tests/pause/`. Web has **no** committed unit/e2e tests.
 
 ## Config & build artifacts (ignored / not committed)
 

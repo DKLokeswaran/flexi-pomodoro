@@ -4,7 +4,10 @@ import {
   SettingsError,
   SettingsService,
 } from "../../services/settings.service.js";
-import { SessionService } from "../../services/session.service.js";
+import {
+  SessionError,
+  SessionService,
+} from "../../services/session.service.js";
 
 const SESSION_START_MS = Date.parse("2026-07-12T10:00:00.000Z");
 
@@ -275,6 +278,89 @@ describe("SessionService", () => {
     if (snapshot.status !== "active") throw new Error("expected active");
     assert.equal(snapshot.session.params.workDurationSec, 1);
     assert.equal(snapshot.session.params.decisionWindowSec, 1);
+  });
+
+  it("hard pause 3s with 10s left keeps remaining time and shifts planned end", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    settings.update({ workPauseStrategy: "hard" });
+    startSession(settings, session, SESSION_START_MS);
+    const originalEnd = (
+      activePhase(session, SESSION_START_MS) as { plannedEndAt: string }
+    ).plannedEndAt;
+
+    const pauseAt = SESSION_START_MS + 50_000;
+    session.pause(pauseAt);
+    let phase = activePhase(session, pauseAt);
+    assert.equal(phase.kind, "planned_work");
+    if (phase.kind !== "planned_work") throw new Error("expected planned_work");
+    assert.equal(phase.paused, true);
+    assert.equal(phase.timerFrozenAt, new Date(pauseAt).toISOString());
+
+    const resumeAt = pauseAt + 3_000;
+    session.resume(resumeAt);
+    phase = activePhase(session, resumeAt);
+    assert.equal(phase.kind, "planned_work");
+    if (phase.kind !== "planned_work") throw new Error("expected planned_work");
+    assert.equal(phase.paused, false);
+    assert.equal(phase.pausedSec, 3);
+    assert.equal(
+      phase.plannedEndAt,
+      new Date(Date.parse(originalEnd) + 3_000).toISOString(),
+    );
+    const remainingSec = Math.floor(
+      (Date.parse(phase.plannedEndAt) - resumeAt) / 1000,
+    );
+    assert.equal(remainingSec, 10);
+  });
+
+  it("hard-paused past original planned end stays in planned work", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    settings.update({ workPauseStrategy: "hard" });
+    startSession(settings, session, SESSION_START_MS);
+    const originalEnd = (
+      activePhase(session, SESSION_START_MS) as { plannedEndAt: string }
+    ).plannedEndAt;
+    session.pause(SESSION_START_MS + 50_000);
+    const phase = activePhase(session, SESSION_START_MS + 61_000);
+    assert.equal(phase.kind, "planned_work");
+    if (phase.kind !== "planned_work") throw new Error("expected planned_work");
+    assert.equal(phase.paused, true);
+    assert.equal(phase.plannedEndAt, originalEnd);
+  });
+
+  it("pause and resume rejected outside planned work (FR-PAUSE-S6)", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    startSession(settings, session, SESSION_START_MS);
+
+    const assertInvalidPhase = (run: () => void) => {
+      assert.throws(run, (error: unknown) => {
+        assert.ok(error instanceof SessionError);
+        assert.equal(error.code, "INVALID_PHASE");
+        return true;
+      });
+    };
+
+    const afterWork = SESSION_START_MS + 60_000;
+    activePhase(session, afterWork);
+    assertInvalidPhase(() => session.pause(afterWork));
+    assertInvalidPhase(() => session.resume(afterWork));
+
+    session.continueExtended(afterWork + 1_000);
+    assertInvalidPhase(() => session.pause(afterWork + 1_000));
+    assertInvalidPhase(() => session.resume(afterWork + 1_000));
+
+    session.startRest(afterWork + 2_000);
+    assertInvalidPhase(() => session.pause(afterWork + 2_000));
+    assertInvalidPhase(() => session.resume(afterWork + 2_000));
+
+    const { settings: longSettings, session: longSession } =
+      servicesWithShortTimers(1);
+    startSession(longSettings, longSession, SESSION_START_MS);
+    longSession.getSnapshot(afterWork, longSession.getAlertSeq());
+    longSession.ackRest(afterWork + 500);
+    assert.equal(activePhase(longSession, afterWork + 500).kind, "long_rest");
+    assertInvalidPhase(() => longSession.pause(afterWork + 500));
+    assertInvalidPhase(() => longSession.resume(afterWork + 500));
   });
 
   it("rejects 1s durations without shortDurations flag", () => {

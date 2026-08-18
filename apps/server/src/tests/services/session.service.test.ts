@@ -33,7 +33,7 @@ function startSession(
   debug?: Parameters<SettingsService["resolveSessionParams"]>[1],
 ) {
   const params = settings.resolveSessionParams(overrides, debug);
-  return session.start(params, nowMs);
+  return session.start(params, nowMs, settings.get().workPauseStrategy);
 }
 
 /** Tick to nowMs and return the active phase (asserting the session is running). */

@@ -26,7 +26,7 @@ export const FEATURES: AboutFeature[] = [
   { label: "Real-time session updates (SSE)", status: "available" },
   { label: "Docker self-host image", status: "available" },
   { label: "API health check", status: "available" },
-  { label: "Hard pause (experimental)", status: "soon" },
+  { label: "Hard pause (experimental)", status: "available" },
   { label: "SQLite persistence & crash recovery", status: "soon" },
   { label: "Analytics dashboard", status: "soon" },
   { label: "Curated alert sounds & mute", status: "soon" },

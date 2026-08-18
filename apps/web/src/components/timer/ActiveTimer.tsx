@@ -3,6 +3,7 @@ import type {
   PhaseKind,
   SessionParams,
   SessionSnapshot,
+  WorkPauseStrategy,
 } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
 import {
@@ -44,11 +45,13 @@ function displayClock(
   if (phase.kind === "decision") {
     return formatMmSs(remainingSecFromIso(phase.decisionEndsAt, nowMs));
   }
-  if (
-    phase.kind === "planned_work" ||
-    phase.kind === "short_rest" ||
-    phase.kind === "long_rest"
-  ) {
+  if (phase.kind === "planned_work") {
+    const clockMs = phase.timerFrozenAt
+      ? Date.parse(phase.timerFrozenAt)
+      : nowMs;
+    return formatMmSs(remainingSecFromIso(phase.plannedEndAt, clockMs));
+  }
+  if (phase.kind === "short_rest" || phase.kind === "long_rest") {
     return formatMmSs(remainingSecFromIso(phase.plannedEndAt, nowMs));
   }
   return "00:00";
@@ -60,12 +63,27 @@ type PhaseAction = {
   primary?: boolean;
 };
 
+/** Pause button label for the locked session strategy. */
+function pauseButtonLabel(pauseStrategy: WorkPauseStrategy): string {
+  return pauseStrategy === "hard" ? "Hard pause (experimental)" : "Soft pause";
+}
+
+/** Phase suffix while planned work is paused. */
+function pausedPhaseLabel(pauseStrategy: WorkPauseStrategy): string {
+  return pauseStrategy === "hard"
+    ? " · hard-paused (experimental)"
+    : " · soft-paused";
+}
+
 /** Buttons allowed for the current phase (empty for short rest). */
-function actionsForPhase(phase: Phase): PhaseAction[] {
+function actionsForPhase(
+  phase: Phase,
+  pauseStrategy: WorkPauseStrategy,
+): PhaseAction[] {
   if (phase.kind === "planned_work") {
     return phase.paused
       ? [{ label: "Resume", path: SESSION_API.resume, primary: true }]
-      : [{ label: "Soft pause", path: SESSION_API.pause }];
+      : [{ label: pauseButtonLabel(pauseStrategy), path: SESSION_API.pause }];
   }
   if (phase.kind === "decision") {
     return [
@@ -116,10 +134,14 @@ export function ActiveTimer({
   now: number;
   onAction: (path: string) => void;
 }) {
-  const actions = actionsForPhase(phase);
+  const pauseStrategy =
+    snapshot.status === "active" ? snapshot.session.pauseStrategy : "soft";
+  const actions = actionsForPhase(phase, pauseStrategy);
   const hint = phaseHint(phase, now);
   const pausedLabel =
-    phase.kind === "planned_work" && phase.paused ? " · soft-paused" : "";
+    phase.kind === "planned_work" && phase.paused
+      ? pausedPhaseLabel(pauseStrategy)
+      : "";
 
   return (
     <>

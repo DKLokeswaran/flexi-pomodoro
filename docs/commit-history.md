@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 28 |
+| Total commits | 29 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-08-17 |
+| Latest commit date | 2026-08-18 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (28) |
+| Most active contributor | Lokeswaran DK (29) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4` |
 
@@ -19,7 +19,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | Month | Commits |
 |-------|--------:|
 | 2026-07 | 23 |
-| 2026-08 | 5 |
+| 2026-08 | 6 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -104,6 +104,12 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Reformat existing source; no behavior changes.
 - Ignore the format commit in git blame.
 
+### 2026-08-18 — M2 pause plugin foundation
+
+- Extract soft pause into `WorkPauseStrategy` plugins under `apps/server/src/pause/`.
+- Generalize planned-work pause fields; unify HTTP to `POST /api/session/pause` and `/resume`.
+- Widen settings schema to accept `workPauseStrategy: "hard"`.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -111,11 +117,13 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 - Decision timeout attribution to extended work (affects analytics/persistence design).
 - Alert sequence reset on session end (clients must sync watermark).
 - Path/file renames (`engine` → `session.service`, `api.ts` split, docs move) — import path breaks for external consumers of old layout.
+- Session pause endpoints renamed from `/api/session/soft-pause` and `/soft-resume` to `/pause` and `/resume`; planned-work phase fields renamed from `softPaused*` to strategy-neutral `paused*`.
 
 ## Full commit log
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| c2863b4 | Lokeswaran DK | 2026-08-18 | Extract soft pause into a WorkPauseStrategy plugin with strategy-agnostic pause and resume APIs. |
 | c5413fa | Lokeswaran DK | 2026-08-17 | chore: ignore the Prettier format commit in git blame |
 | 473d4b5 | Lokeswaran DK | 2026-08-17 | style: apply Prettier formatting |
 | c7a7d79 | Lokeswaran DK | 2026-08-17 | chore: add Prettier with project config |
@@ -145,4 +153,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: c5413faed702088aa1860627659fff73c9786bf6
+Last Synced Commit: c2863b47194c987179085a19202fcf6e275ea68d

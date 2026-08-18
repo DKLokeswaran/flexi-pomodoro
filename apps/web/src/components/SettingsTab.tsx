@@ -16,6 +16,7 @@ type SettingsDraft = {
   longRestMinutes: number;
   cyclesBeforeLongRest: number;
   decisionWindowSec: number;
+  enableHardPause: boolean;
 };
 
 /** Convert persisted seconds into the minutes-based settings form draft. */
@@ -26,6 +27,7 @@ function draftFromSettings(settings: Settings): SettingsDraft {
     longRestMinutes: secToMinutes(settings.longRestDurationSec),
     cyclesBeforeLongRest: settings.cyclesBeforeLongRest,
     decisionWindowSec: settings.decisionWindowSec,
+    enableHardPause: settings.workPauseStrategy === "hard",
   };
 }
 
@@ -38,6 +40,7 @@ function settingsFromDraft(settings: Settings, draft: SettingsDraft): Settings {
     longRestDurationSec: minutesToSec(draft.longRestMinutes),
     cyclesBeforeLongRest: draft.cyclesBeforeLongRest,
     decisionWindowSec: draft.decisionWindowSec,
+    workPauseStrategy: draft.enableHardPause ? "hard" : "soft",
   };
 }
 
@@ -55,10 +58,25 @@ export function SettingsTab({
 }) {
   const { debugMode, setDebugMode, flags, setFlag } = useDebugFlags();
   const [draft, setDraft] = useState(draftFromSettings(settings));
+  /** Session-only UI gate; opens automatically when saved defaults use hard pause. */
+  const [experimentalMode, setExperimentalModeState] = useState(
+    () => settings.workPauseStrategy === "hard",
+  );
 
   useEffect(() => {
     setDraft(draftFromSettings(settings));
+    if (settings.workPauseStrategy === "hard") {
+      setExperimentalModeState(true);
+    }
   }, [settings]);
+
+  /** Show/hide experimental options; clearing the gate clears hard pause in the draft. */
+  const setExperimentalMode = (enabled: boolean) => {
+    setExperimentalModeState(enabled);
+    if (!enabled) {
+      setDraft((current) => ({ ...current, enableHardPause: false }));
+    }
+  };
 
   /** Update one numeric draft field, rounded to a whole number. */
   const setRoundedField = (key: keyof SettingsDraft, value: number) => {
@@ -110,6 +128,45 @@ export function SettingsTab({
           onChange={(value) => setRoundedField("decisionWindowSec", value)}
         />
       </div>
+
+      <p className="section-title">Experimental features</p>
+      <div className={styles.debugFlags}>
+        <label className={styles.debugFlag}>
+          <input
+            type="checkbox"
+            checked={experimentalMode}
+            onChange={(event) => setExperimentalMode(event.target.checked)}
+          />
+          <span>
+            Enable experimental features
+            <span className={styles.debugFlagDesc}>
+              Unlocks experimental options for this visit.
+            </span>
+          </span>
+        </label>
+        {experimentalMode ? (
+          <label className={`${styles.debugFlag} ${styles.debugFlagNested}`}>
+            <input
+              type="checkbox"
+              checked={draft.enableHardPause}
+              disabled={locked}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  enableHardPause: event.target.checked,
+                }))
+              }
+            />
+            <span>
+              Enable hard pause (experimental)
+              <span className={styles.debugFlagDesc}>
+                Off = soft pause (default). On = hard pause.
+              </span>
+            </span>
+          </label>
+        ) : null}
+      </div>
+
       <div className="actions" style={{ justifyContent: "flex-start" }}>
         <button
           type="button"

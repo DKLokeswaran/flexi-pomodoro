@@ -112,7 +112,7 @@ Transport (`connectSessionStream`):
 | Component | State |
 |-----------|-------|
 | `App` | `tab: Tab` |
-| `SettingsTab` | draft minutes/cycles/decision |
+| `SettingsTab` | draft minutes/cycles/decision; `enableHardPause`; session-only `experimentalMode` gate |
 | `IdleStartForm` | override draft (min or sec depending on shortDurations) |
 | `AboutAccordion` | `open` |
 | `ToastProvider` | current toast |
@@ -125,7 +125,7 @@ Transport (`connectSessionStream`):
 No dedicated selector library. Inline derivation examples:
 
 - `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`
-- `ActiveTimer`: `displayClock`, `actionsForPhase`, `phaseHint`
+- `ActiveTimer`: `displayClock` (uses `timerFrozenAt` for hard pause), `actionsForPhase`, `phaseHint`, strategy-aware pause labels
 - `AboutTab`: feature available/soon counts; health UI mapping
 
 ---

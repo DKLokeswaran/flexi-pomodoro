@@ -59,7 +59,7 @@ Discriminated by `status`:
 | `status` | `"active"` | |
 | `startedAt` | ISO string | |
 | `params` | `SessionParams` | Locked for session |
-| `pauseStrategy` | `"soft" \| "hard"` | Copied onto the session at start; runtime currently always starts `"soft"` |
+| `pauseStrategy` | `"soft" \| "hard"` | Copied from `settings.workPauseStrategy` at `POST /api/session/start`; locked for the session |
 | `phase` | `Phase` | See [data-model.md](./data-model.md) |
 | `pendingAlerts` | `AlertEvent[]` | Deltas since `sinceSeq` |
 | `alertSeq` | number | High-water |
@@ -85,7 +85,7 @@ Settings additionally:
 | Field | Type | Notes |
 |-------|------|-------|
 | `alertsMuted` | boolean | Present in schema; mute UX not fully wired in M1 UI |
-| `workPauseStrategy` | `"soft" \| "hard"` | Default `"soft"`; PUT accepts `"hard"`. Session start still always locks `"soft"` until the hard plugin is wired |
+| `workPauseStrategy` | `"soft" \| "hard"` | Default `"soft"`. PUT accepts either value. `POST /api/session/start` reads persisted settings and locks the chosen strategy on `ActiveSession.pauseStrategy` |
 
 Defaults (`DEFAULT_SETTINGS`): 25×60 / 5×60 / N=4 / 15×60 / decision 15 / `alertsMuted: false` / `workPauseStrategy: "soft"`.
 
@@ -160,6 +160,7 @@ Subscribe cursor advances per listener after each send. Client disconnect unsubs
 
 - `debug` parsed with **strict** `DebugFlagsSchema` (unknown keys fail).
 - Override bounds come from `getSettingsBounds(debug)` (e.g. mins of 1s when `shortDurations`).
+- Pause strategy is **not** in the start body; it comes from persisted `settings.workPauseStrategy` at request time.
 
 **Response** `200`: `SessionSnapshot` (active).
 

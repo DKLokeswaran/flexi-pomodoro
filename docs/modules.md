@@ -153,16 +153,24 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 
 **Deps:** shared `PlannedWorkPhase`, `msToIso` / `parseIso` from `../utils/iso.js`.
 
+### `src/pause/hardPause.ts`
+
+| Export | Kind | Notes |
+|--------|------|-------|
+| `hardPauseStrategy` | `WorkPauseStrategy` | `id: "hard"`; freezes countdown; shifts `plannedEndAt` on resume; planned end → `"decision"` |
+
+**Deps:** shared `PlannedWorkPhase`, `msToIso` / `parseIso` from `../utils/iso.js`.
+
 ### `src/pause/registry.ts`
 
 | Export | Kind | Notes |
 |--------|------|-------|
 | `PauseStrategyRegistry` | class | `get(id)` lookup; constructor takes a strategy list |
-| `defaultPauseRegistry()` | fn | Registers `softPauseStrategy` only |
+| `defaultPauseRegistry()` | fn | Registers `softPauseStrategy` and `hardPauseStrategy` |
 
 ### `src/pause/index.ts`
 
-Barrel: `defaultPauseRegistry`, `PauseStrategyRegistry`, `softPauseStrategy`, pause types.
+Barrel: `defaultPauseRegistry`, `PauseStrategyRegistry`, `softPauseStrategy`, `hardPauseStrategy`, pause types.
 
 ### `src/utils/errorReply.ts`
 
@@ -213,7 +221,7 @@ Unknown errors are rethrown.
 | `subscribe(listener, sinceSeq?)` | → unsubscribe |
 | `getAlertSeq()` | number |
 | `getSnapshot(nowMs?, sinceSeq?)` | SessionSnapshot |
-| `start(params, nowMs?)` | SessionSnapshot — locks `"soft"` and resolves `pausePlugin` |
+| `start(params, nowMs?, pauseStrategy?)` | SessionSnapshot — resolves `pausePlugin` from registry (default `"soft"`; start route passes `settings.workPauseStrategy`) |
 | `pause(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onPause` |
 | `resume(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onResume` |
 | `ackRest(nowMs?)` | SessionSnapshot |
@@ -259,7 +267,7 @@ Declares `__APP_VERSION__: string`.
 
 ### `src/constants/about.ts`
 
-Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, `BrandSlug`, `UiIconName`, `LinkIcon`, `LiveLinkCard`, `SoonLinkCard`, `CreditItem`), and data arrays `IMPORTANT_NOTES`, `FEATURES`, `LINKS_LIVE`, `LINKS_COMING_SOON`, `LEGAL_NOTES`, `FONT_CREDITS`, `CREDITS`, `INSTANCE_COMING_SOON`.
+Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, …), and data arrays including `FEATURES` (Hard pause (experimental) → `available`).
 
 ---
 
@@ -363,7 +371,7 @@ Uses `useEffectEvent` for snapshot/idle handlers.
 
 `settingsQueryKey`, `useSettingsQuery()`, `useSaveSettingsMutation()`, `useSessionActionMutation(onSnapshot)`
 
-**Side effects:** toasts; query cache updates; alert playback on action success.
+**Side effects:** toasts (pause/resume copy follows locked session strategy); query cache updates; alert playback on action success.
 
 ---
 
@@ -436,6 +444,8 @@ Uses `useEffectEvent` for snapshot/idle handlers.
 | `now` | number |
 | `onAction` | `(path: string) => void` |
 
+Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button label and phase suffix follow `snapshot.session.pauseStrategy`.
+
 ### `src/components/SettingsTab.tsx`
 
 | Props | Type |
@@ -444,6 +454,8 @@ Uses `useEffectEvent` for snapshot/idle handlers.
 | `onSave` | `(s: Settings) => void` |
 | `locked` | boolean |
 | `saving?` | boolean |
+
+Draft includes timing fields plus `enableHardPause` (maps to `workPauseStrategy`). **Experimental features** gate reveals **Enable hard pause (experimental)**; auto-opens when saved defaults use `"hard"`.
 
 ### `src/components/AboutTab.tsx`
 

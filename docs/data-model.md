@@ -48,7 +48,7 @@ Holds a single `Settings` object, initialized from `DEFAULT_SETTINGS`.
 | `pauseStartedAt` | ISO string \| null |
 | `timerFrozenAt` | ISO string \| null (hard: freeze clock at pause start; soft: always null) |
 
-Soft pause does **not** extend `plannedEndAt`; it accumulates `pausedSec` for analytics (M3). Paused at planned end → auto rest, skip decision. `timerFrozenAt` is reserved for hard pause; the soft plugin leaves it null.
+Soft pause does **not** extend `plannedEndAt`; it accumulates `pausedSec` for analytics (M3). Soft-paused at planned end → auto rest, skip decision. Hard pause sets `timerFrozenAt` while paused, shifts `plannedEndAt` on resume, and skips planned-end ticks until unpaused.
 
 #### `DecisionPhase`
 

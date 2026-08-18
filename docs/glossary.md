@@ -8,7 +8,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 |------|---------|
 | **Flexi Pomodoro** | Self-hosted, flow-aware Pomodoro variant with decision window, extended work, and soft pause |
 | **M1** | Milestone 1 — timer core (in-memory, no SQLite) |
-| **M2** | Pause modules — `WorkPauseStrategy` plugins; hard pause still experimental / not wired at session start |
+| **M2** | Pause modules — soft and hard `WorkPauseStrategy` plugins; hard pause experimental via Settings |
 | **M3** | Persistence & analytics milestone (SQLite, decision segments, recovery) |
 | **Alpha** | Current release channel (`0.0.1-alpha.*`) |
 | **N / cyclesBeforeLongRest** | Number of work cycles before a long rest |
@@ -27,7 +27,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **Long rest** | Rest when `cycleIndex >= N`; ending it completes the session |
 | **Cycle index** | 1-based work cycle counter within a session |
 | **Soft pause** | Pause during planned work that does **not** move `plannedEndAt`; accumulates `pausedSec`; `timerFrozenAt` stays null |
-| **Hard pause** | Experimental strategy (`workPauseStrategy: "hard"`). Settings PUT accepts it; session start still always locks `"soft"` and the default registry has no hard plugin yet |
+| **Hard pause** | Experimental strategy (`workPauseStrategy: "hard"`). Freezes countdown via `timerFrozenAt`; shifts `plannedEndAt` on resume. Selected in Settings → Experimental features; locked at session start |
 | **Wall-clock catch-up** | `tick` advances through all due phase boundaries based on real time (recovery policy) |
 | **Params locked** | Session uses resolved `SessionParams` for its lifetime; settings edits apply to future sessions |
 
@@ -54,6 +54,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **Defaults / settings** | Persistent-in-process preferences used when starting without overrides |
 | **Overrides** | Per-start session param fields on POST start |
 | **Debug mode** | Client gate unlocking per-feature debug flags (localStorage) |
+| **Experimental features** | Settings UI gate; when enabled, shows **Enable hard pause (experimental)** (maps to `workPauseStrategy`) |
 | **shortDurations** | Debug feature allowing ≥1s work/rest/decision on **start** only |
 | **alertsMuted** | Settings boolean (schema); curated mute UX still “soon” |
 

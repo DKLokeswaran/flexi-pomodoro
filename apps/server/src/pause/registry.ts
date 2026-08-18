@@ -1,3 +1,4 @@
+import { hardPauseStrategy } from "./hardPause.js";
 import { softPauseStrategy } from "./softPause.js";
 import type { WorkPauseStrategy, WorkPauseStrategyId } from "./types.js";
 
@@ -15,7 +16,7 @@ export class PauseStrategyRegistry {
   }
 }
 
-/** Production registry: soft only until the hard module lands. */
+/** Production registry: soft (default) and hard (experimental). */
 export function defaultPauseRegistry(): PauseStrategyRegistry {
-  return new PauseStrategyRegistry([softPauseStrategy]);
+  return new PauseStrategyRegistry([softPauseStrategy, hardPauseStrategy]);
 }

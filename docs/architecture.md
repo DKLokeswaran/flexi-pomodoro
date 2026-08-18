@@ -55,7 +55,7 @@ flowchart TB
 | **Service layer** | `SettingsService`, `SessionService` | Business rules and state; routes stay thin |
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
 | **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later |
-| **Strategy (pause plugins)** | `PauseStrategyRegistry` + `WorkPauseStrategy` | Engine calls `onPause` / `onResume` / `isCountdownFrozen` / `onPlannedEnd`; default registry registers `soft` only |
+| **Strategy (pause plugins)** | `PauseStrategyRegistry` + `WorkPauseStrategy` | Engine calls `onPause` / `onResume` / `isCountdownFrozen` / `onPlannedEnd`; default registry registers `soft` and `hard` |
 | **Catalog / plugin registration** | `DEBUG_FEATURES` in `packages/shared/src/debug/catalog.ts` | Debug features register id, meta, optional `applyBounds` |
 | **Schema-driven validation** | Zod schemas in shared | Shared between server routes and client start body |
 | **Watermark / cursor** | Server `listenerCursors` + client `AlertSeqStore` | Alert delivery is delta-only via `sinceSeq` |
@@ -68,7 +68,7 @@ No DI container. Wiring is explicit:
 ```typescript
 // apps/server/src/app.ts (committed pattern)
 const settings = new SettingsService();
-const session = new SessionService(); // PauseStrategyRegistry defaults to soft only
+const session = new SessionService(); // defaultPauseRegistry: soft + hard
 await registerRoutes(app, { settings, session });
 const scheduler = new IntervalScheduler({
   intervalMs: 250,
@@ -129,10 +129,11 @@ Pause behavior lives under `apps/server/src/pause/`, not inline in the session e
 |-------|------|
 | `WorkPauseStrategy` | Plugin contract: `id`, `onPause`, `onResume`, `isCountdownFrozen`, `onPlannedEnd` |
 | `PauseStrategyRegistry` | Lookup by strategy id; inject a subset of plugins for delete-ability tests |
-| `defaultPauseRegistry()` | Production table: `softPauseStrategy` only |
+| `defaultPauseRegistry()` | Production table: `softPauseStrategy` + `hardPauseStrategy` |
 | `softPauseStrategy` | Countdown keeps running; `plannedEndAt` unchanged; still-paused at planned end → auto-rest |
+| `hardPauseStrategy` | Countdown frozen via `timerFrozenAt`; `plannedEndAt` shifts on resume; planned end → decision |
 
-`SessionService` resolves `pausePlugin` at `start` from the registry (`"soft"` today) and clears it when the session completes. HTTP is strategy-agnostic: `POST /api/session/pause` and `POST /api/session/resume`.
+`SessionService` resolves `pausePlugin` at `start` from the registry using `settings.workPauseStrategy` (passed from the start route) and clears it when the session completes. HTTP is strategy-agnostic: `POST /api/session/pause` and `POST /api/session/resume`.
 
 ## Frontend architecture
 
@@ -164,8 +165,9 @@ No React Router. `App` holds `tab: "timer" | "settings" | "analytics" | "about"`
 ### Real-time / countdown
 
 - **Authoritative phase changes**: SSE (`/api/session/events`) + hybrid poll fallback (`sessionStream.sse.ts`).
-- **UI countdown**: local `useNow` (250ms) computes remaining/overtime from ISO anchors on the snapshot — no sub-second API polling.
-- **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`; the label remains "Soft pause" because session start still always locks `"soft"`.
+- **UI countdown**: local `useNow` (250ms) computes remaining/overtime from ISO anchors on the snapshot — no sub-second API polling. Hard pause uses `timerFrozenAt` as the clock anchor while paused.
+- **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`. Label and phase suffix follow the locked session strategy (`Soft pause` vs `Hard pause (experimental)`). Toasts mirror the same strategy.
+- **Settings**: Experimental features gate exposes **Enable hard pause (experimental)**; unchecked maps to `workPauseStrategy: "soft"`, checked to `"hard"`. Saved with **Save defaults**; locked while a session is active.
 
 ### Code splitting
 

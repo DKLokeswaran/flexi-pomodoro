@@ -43,7 +43,8 @@ flexi-pomodoro/
 │   │       │   ├── index.ts         # Barrel: registry, soft strategy, types
 │   │       │   ├── types.ts         # WorkPauseStrategy plugin contract
 │   │       │   ├── registry.ts      # PauseStrategyRegistry + defaultPauseRegistry
-│   │       │   └── softPause.ts     # Soft pause plugin (FR-PAUSE-S6/S7)
+│   │       │   ├── softPause.ts     # Soft pause plugin (FR-PAUSE-S6/S7)
+│   │       │   └── hardPause.ts     # Hard pause plugin (FR-PAUSE-H2)
 │   │       ├── routes/
 │   │       │   ├── index.ts
 │   │       │   ├── health.routes.ts

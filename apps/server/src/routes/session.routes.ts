@@ -107,7 +107,11 @@ export function registerSessionRoutes(
       try {
         const { debug, overrides } = parseStartSessionBody(req.body ?? {});
         const params = settings.resolveSessionParams(overrides, debug);
-        return session.start(params, Date.now());
+        return session.start(
+          params,
+          Date.now(),
+          settings.get().workPauseStrategy,
+        );
       } catch (error) {
         const { statusCode, body } = errorReply(error);
         return reply.code(statusCode).send(body);

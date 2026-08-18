@@ -10,10 +10,10 @@ todos:
     status: completed
   - id: hard-module
     content: "Implement hard pause: freeze countdown while paused, shift plannedEndAt on resume; skip planned-end ticks while frozen"
-    status: pending
+    status: completed
   - id: settings-ui
     content: Settings Experimental features — Enable hard pause (experimental) checkbox (off=soft, on=hard); lock at start; timer labels/clock freeze; About available
-    status: pending
+    status: completed
   - id: tests
     content: Isolated soft/hard tests, S6 phase rejection, hard remaining-time shift, registry-only delete-ability (FR-PAUSE-M3); manual smoke both strategies
     status: pending

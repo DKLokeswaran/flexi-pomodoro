@@ -10,6 +10,7 @@ import {
   type RestPhase,
   type SessionParams,
   type SessionSnapshot,
+  type WorkPauseStrategy as PauseStrategyId,
 } from "@flexi-pomodoro/shared";
 import { randomUUID } from "node:crypto";
 import {
@@ -196,12 +197,15 @@ export class SessionService {
   }
 
   /** Start a new session in planned work; fails if one is already active. */
-  start(params: SessionParams, nowMs: number = Date.now()): SessionSnapshot {
+  start(
+    params: SessionParams,
+    nowMs: number = Date.now(),
+    pauseStrategy: PauseStrategyId = "soft",
+  ): SessionSnapshot {
     if (this.session) {
       throw new SessionError("A session is already active", "SESSION_ACTIVE");
     }
     const seqAtStart = this.alertSeq;
-    const pauseStrategy = "soft";
     this.pausePlugin = this.pauseRegistry.get(pauseStrategy)!;
     this.session = {
       id: randomUUID(),

@@ -42,6 +42,7 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | Continue | Extended `startedAt` = click time |
 | Soft pause mid-work | `plannedEndAt` unchanged; `pausedSec` accumulates; `timerFrozenAt` stays null |
 | Soft-paused through end | Auto rest; skip decision |
+| Hard pause (not yet in test suite) | Freeze countdown; shift `plannedEndAt` on resume; planned end → decision |
 | N=1 | Long rest after first work path |
 | Tick catch-up | Past work+decision → extended in one snapshot |
 | shortDurations debug | Allows 1s params |

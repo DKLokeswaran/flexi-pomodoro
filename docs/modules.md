@@ -71,6 +71,7 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 | `parseSettingsPatch(current, patch)` | → Settings |
 | `PhaseKind`, phase interfaces, `Phase`, `RestKind` | types |
 | `SessionStatus` | `"idle"\|"active"\|"completed"` |
+| `SessionLiveStats` | type |
 | `AlertEvent`, `ActiveSession` | types |
 | `IdleSnapshot`, `ActiveSnapshot`, `SessionSnapshot` | types |
 
@@ -225,6 +226,7 @@ Unknown errors are rethrown.
 | `pause(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onPause` |
 | `resume(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onResume` |
 | `ackRest(nowMs?)` | SessionSnapshot |
+| `ackWork(nowMs?)` | SessionSnapshot — short-rest ack (M2.5; requires `short_rest_ack` phase) |
 | `continueExtended(nowMs?)` | SessionSnapshot |
 | `startRest(nowMs?)` | SessionSnapshot |
 | `endLongRest(nowMs?)` | SessionSnapshot |

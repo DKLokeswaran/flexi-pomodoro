@@ -6,9 +6,9 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 31 |
+| Total commits | 33 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-08-18 |
+| Latest commit date | 2026-08-19 |
 | Active contributors | 1 |
 | Most active contributor | Lokeswaran DK (31) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
@@ -19,7 +19,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | Month | Commits |
 |-------|--------:|
 | 2026-07 | 23 |
-| 2026-08 | 7 |
+| 2026-08 | 9 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -112,6 +112,11 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Timer UI: strategy-aware labels, `timerFrozenAt` clock freeze, About marks hard pause available.
 - Isolated soft/hard pause plugin tests; hard-pause engine cases; FR-PAUSE-S6 phase rejection; tag `v0.0.2-alpha.0`.
 
+### 2026-08-19 — Pause cleanup & Docker port
+
+- Remove unreachable min/max guards from soft/hard pause slice math; `SessionService` already enforces ordering.
+- Docker Compose maps host port **4000** → container **3847** (in-container `PORT` unchanged).
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -125,6 +130,8 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 5748abb | Lokeswaran DK | 2026-08-19 | Fix docker-compose port mapping to use host port 4000. |
+| 339c084 | Lokeswaran DK | 2026-08-19 | Simplify pause slice math and sync commit-history to trunk HEAD. |
 | 700b290 | Lokeswaran DK | 2026-08-18 | Add pause strategy tests and tag v0.0.2-alpha.0. |
 | b639f4f | Lokeswaran DK | 2026-08-18 | Add hard pause strategy with Settings toggle and session-start wiring. |
 | c2863b4 | Lokeswaran DK | 2026-08-18 | Extract soft pause into a WorkPauseStrategy plugin with strategy-agnostic pause and resume APIs. |
@@ -157,4 +164,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: 700b29022919ef642dc92f611472852903db19c2
+Last Synced Commit: 5748abb1722d1a3a32ba363661a160728304825c

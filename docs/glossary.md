@@ -24,7 +24,9 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **Decision window** | Short interval after planned work (default 15s, bounds 10–20) to choose rest vs continue |
 | **Extended work** | Overtime after decision (timeout or explicit continue); open-ended until Start rest |
 | **Short rest** | Rest after a cycle when `cycleIndex < N` |
+| **Short-rest acknowledgement (`short_rest_ack`)** | Brief window after short rest ends (same duration as work decision window). User ack → next work running; timeout → next work immediately paused (active pause strategy). Not used after long rest |
 | **Long rest** | Rest when `cycleIndex >= N`; ending it completes the session |
+| **Live session stats** | In-memory `SessionLiveStats` on active snapshots: `workedSec`, `deliberationSec`, `restSec` (M2.5) |
 | **Cycle index** | 1-based work cycle counter within a session |
 | **Soft pause** | Pause during planned work that does **not** move `plannedEndAt`; accumulates `pausedSec`; `timerFrozenAt` stays null |
 | **Hard pause** | Experimental strategy (`workPauseStrategy: "hard"`). Freezes countdown via `timerFrozenAt`; shifts `plannedEndAt` on resume. Selected in Settings → Experimental features; locked at session start |
@@ -40,6 +42,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | `short_rest_start` / `long_rest_start` | Entering rest |
 | `short_rest_end` / `long_rest_end` | Rest completed |
 | `extended_work_auto_start` | Decision window timed out into extended work |
+| `short_rest_ack_expired` | Short-rest ack window timed out; work starts paused (M2.5) |
 
 | Term | Meaning |
 |------|---------|
@@ -71,7 +74,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | Enum / union | Values |
 |--------------|--------|
 | Snapshot `status` | `idle`, `active` |
-| Phase `kind` | `planned_work`, `decision`, `extended_work`, `short_rest`, `long_rest` |
+| Phase `kind` | `planned_work`, `decision`, `short_rest_ack`, `extended_work`, `short_rest`, `long_rest` |
 | Feature status (About) | `available`, `soon` |
 | Toast `kind` | `success`, `error` |
 | Tab ids | `timer`, `settings`, `analytics`, `about` |

@@ -113,11 +113,14 @@ stateDiagram-v2
   decision --> extended_work: continue (from click) OR timeout (backdated)
   extended_work --> short_rest: startRest, cycle < N
   extended_work --> long_rest: startRest, cycle >= N
-  short_rest --> planned_work: plannedEnd → next cycle
+  short_rest --> short_rest_ack: plannedEnd (M2.5 target; engine wiring in progress)
+  short_rest_ack --> planned_work: ackWork (running) OR timeout (paused)
   long_rest --> [*]: plannedEnd OR endLongRest
 ```
 
 `N` is `cyclesBeforeLongRest`. Rest kind is chosen by `cycleIndex >= N` → long rest, else short rest.
+
+**M2.5 note:** Shared types, `POST /api/session/ack-work`, `SessionLiveStats`, and `short_rest_ack_expired` alert are in the tree. `advanceRest` still transitions short rest directly to `planned_work` until engine-wiring lands; `ackWork` validates phase but full transition and stat attribution are pending.
 
 Decision timeout attributes elapsed decision time to **extended work** (`startedAt` = decision start). Explicit **continue** starts extended work at the click time (decision elapsed excluded). Soft pause through planned end **skips decision** and enters rest at planned end (`onPlannedEnd` → `"rest"`). While a strategy reports `isCountdownFrozen`, planned-end ticks are skipped.
 

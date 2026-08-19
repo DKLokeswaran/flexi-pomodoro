@@ -30,7 +30,9 @@ Holds a single `Settings` object, initialized from `DEFAULT_SETTINGS`.
 
 ### `PhaseKind`
 
-`"planned_work" | "decision" | "extended_work" | "short_rest" | "long_rest"`
+`"planned_work" | "decision" | "short_rest_ack" | "extended_work" | "short_rest" | "long_rest"`
+
+`short_rest_ack` shares the `DecisionPhase` shape (ack window after short rest only). Long rest never enters this phase.
 
 ### Phase shapes
 
@@ -54,11 +56,23 @@ Soft pause does **not** extend `plannedEndAt`; it accumulates `pausedSec` for an
 
 | Field | Type |
 |-------|------|
-| `kind` | `"decision"` |
+| `kind` | `"decision" \| "short_rest_ack"` |
 | `cycleIndex` | number |
-| `startedAt` | ISO (planned work end) |
+| `startedAt` | ISO (planned work end, or short rest end for ack) |
 | `decisionEndsAt` | ISO |
 | `decisionWindowSec` | number |
+
+Work decision (`kind: "decision"`) follows planned work. Short-rest ack (`kind: "short_rest_ack"`) follows short rest only (FR-ACK; M2.5).
+
+#### `SessionLiveStats` (on `ActiveSession`)
+
+| Field | Type | Role |
+|-------|------|------|
+| `workedSec` | number | Planned focus + extended work; soft-paused time excluded |
+| `deliberationSec` | number | Work-decision elapsed (explicit act only) + ack elapsed (always) |
+| `restSec` | number | Short rest + long rest time |
+
+Present on every active session snapshot; initialized to zeros at start. Stat attribution during ticks and transitions is M2.5 engine work in progress.
 
 #### `ExtendedWorkPhase`
 

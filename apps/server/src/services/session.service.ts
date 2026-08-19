@@ -214,6 +214,7 @@ export class SessionService {
       params,
       pauseStrategy,
       phase: startPlannedWork(params, 1, nowMs),
+      liveStats: { workedSec: 0, deliberationSec: 0, restSec: 0 },
       pendingAlerts: [],
       alertSeq: this.alertSeq,
     };
@@ -265,17 +266,29 @@ export class SessionService {
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
 
+  /** Short-rest ack: user acknowledges; planned work starts running. Implemented in Group B. */
+  ackWork(nowMs: number = Date.now()): SessionSnapshot {
+    const { session, seqAtStart } = this.beginActiveCommand(nowMs);
+    this.requirePhase(
+      session,
+      "short_rest_ack",
+      "Acknowledge work is only valid in short-rest ack",
+    );
+    // Full stat attribution and transition wired in engine-wiring (Group B).
+    return this.notifyAndSnapshot(nowMs, seqAtStart);
+  }
+
   /** Decision: user continues; extended work starts at the click, not at decision. */
   continueExtended(nowMs: number = Date.now()): SessionSnapshot {
     const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    const decision = this.requirePhase(
+    this.requirePhase(
       session,
       "decision",
       "Continue is only valid in decision",
     );
     session.phase = {
       kind: "extended_work",
-      cycleIndex: decision.cycleIndex,
+      cycleIndex: session.phase.cycleIndex,
       startedAt: msToIso(nowMs),
     } satisfies ExtendedWorkPhase;
     return this.notifyAndSnapshot(nowMs, seqAtStart);
@@ -353,6 +366,8 @@ export class SessionService {
         return this.advancePlannedWork(session, phase, nowMs);
       case "decision":
         return this.advanceDecision(session, phase, nowMs);
+      case "short_rest_ack":
+        return false; // Full ack-window timeout wired in Group B (engine-wiring).
       case "extended_work":
         return false;
       case "short_rest":

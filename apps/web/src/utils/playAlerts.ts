@@ -13,6 +13,7 @@ const ALERT_FILES: Record<AlertId, string> = {
   short_rest_end: "/alerts/placeholder-short_rest_end.wav",
   long_rest_end: "/alerts/placeholder-long_rest_end.wav",
   extended_work_auto_start: "/alerts/placeholder-extended_work_auto_start.wav",
+  short_rest_ack_expired: "/alerts/placeholder-short_rest_ack_expired.wav",
 };
 
 /**

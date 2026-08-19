@@ -23,7 +23,7 @@ Docker:
 
 ```bash
 docker compose up --build
-# http://localhost:3847
+# http://localhost:4000 (maps host 4000 → container 3847)
 ```
 
 ## Tech stack

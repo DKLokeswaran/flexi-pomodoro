@@ -124,6 +124,10 @@ export function registerSessionRoutes(
     sessionAction(() => session.ackRest()),
   );
   app.post(
+    SESSION_API.ackWork,
+    sessionAction(() => session.ackWork()),
+  );
+  app.post(
     SESSION_API.continue,
     sessionAction(() => session.continueExtended()),
   );

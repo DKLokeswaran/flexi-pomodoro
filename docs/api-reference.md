@@ -18,6 +18,7 @@ Base URL (dev): Vite proxies `/api` → `http://127.0.0.1:3847`. Production: sam
 | GET | `/api/session/events` | SSE stream of snapshots |
 | POST | `/api/session/start` | Start session |
 | POST | `/api/session/ack-rest` | Decision → rest |
+| POST | `/api/session/ack-work` | Short-rest ack → planned work (M2.5; engine transition in progress) |
 | POST | `/api/session/continue` | Decision → extended work |
 | POST | `/api/session/start-rest` | Extended work → rest |
 | POST | `/api/session/pause` | Pause planned work (active pause strategy) |
@@ -61,12 +62,15 @@ Discriminated by `status`:
 | `params` | `SessionParams` | Locked for session |
 | `pauseStrategy` | `"soft" \| "hard"` | Copied from `settings.workPauseStrategy` at `POST /api/session/start`; locked for the session |
 | `phase` | `Phase` | See [data-model.md](./data-model.md) |
+| `liveStats` | `SessionLiveStats` | In-memory session totals (M2.5); initialized at start; attribution wired incrementally |
 | `pendingAlerts` | `AlertEvent[]` | Deltas since `sinceSeq` |
 | `alertSeq` | number | High-water |
 
+`SessionLiveStats`: `{ workedSec: number; deliberationSec: number; restSec: number }` — planned focus + extended (excl. soft-paused), decision + ack windows, rest time respectively.
+
 `AlertEvent`: `{ seq: number; id: AlertId }`.
 
-`AlertId` enum: `work_planned_end`, `rest_ack`, `short_rest_start`, `long_rest_start`, `short_rest_end`, `long_rest_end`, `extended_work_auto_start`.
+`AlertId` enum: `work_planned_end`, `rest_ack`, `short_rest_start`, `long_rest_start`, `short_rest_end`, `long_rest_end`, `extended_work_auto_start`, `short_rest_ack_expired`.
 
 ---
 
@@ -179,6 +183,7 @@ All return `SessionSnapshot` on success. Mapped via `errorReply` (`apps/server/s
 | Path | Service method | Typical error codes |
 |------|----------------|---------------------|
 | `/api/session/ack-rest` | `ackRest` | `NO_SESSION` 409, `INVALID_PHASE` 400 |
+| `/api/session/ack-work` | `ackWork` | `NO_SESSION` 409, `INVALID_PHASE` 400 (requires `short_rest_ack` phase) |
 | `/api/session/continue` | `continueExtended` | same |
 | `/api/session/start-rest` | `startRest` | same |
 | `/api/session/pause` | `pause` | `ALREADY_PAUSED`, `INVALID_PHASE`, `NO_SESSION` |

@@ -24,6 +24,8 @@ function phaseTitle(kind: PhaseKind): string {
       return "Extended work";
     case "short_rest":
       return "Short rest";
+    case "short_rest_ack":
+      return "Start work?";
     case "long_rest":
       return "Long rest";
   }

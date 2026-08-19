@@ -27,6 +27,7 @@ export const AlertIdSchema = z.enum([
   "short_rest_end",
   "long_rest_end",
   "extended_work_auto_start",
+  "short_rest_ack_expired",
 ]);
 export type AlertId = z.infer<typeof AlertIdSchema>;
 
@@ -39,6 +40,7 @@ export const SESSION_API = {
   events: "/api/session/events",
   start: "/api/session/start",
   ackRest: "/api/session/ack-rest",
+  ackWork: "/api/session/ack-work",
   continue: "/api/session/continue",
   startRest: "/api/session/start-rest",
   pause: "/api/session/pause",
@@ -164,7 +166,12 @@ export function parseSettingsPatch(
 }
 
 export type PhaseKind =
-  "planned_work" | "decision" | "extended_work" | "short_rest" | "long_rest";
+  | "planned_work"
+  | "decision"
+  | "short_rest_ack"
+  | "extended_work"
+  | "short_rest"
+  | "long_rest";
 
 export interface PlannedWorkPhase {
   kind: "planned_work";
@@ -180,7 +187,7 @@ export interface PlannedWorkPhase {
 }
 
 export interface DecisionPhase {
-  kind: "decision";
+  kind: "decision" | "short_rest_ack";
   cycleIndex: number;
   startedAt: string;
   decisionEndsAt: string;
@@ -208,6 +215,15 @@ export type Phase =
 
 export type SessionStatus = "idle" | "active" | "completed";
 
+export interface SessionLiveStats {
+  /** Planned focus + extended work time; soft-paused time excluded. */
+  workedSec: number;
+  /** Work-decision elapsed (explicit act only) + ack elapsed (always). */
+  deliberationSec: number;
+  /** Short rest + long rest time. */
+  restSec: number;
+}
+
 export interface AlertEvent {
   seq: number;
   id: AlertId;
@@ -220,6 +236,7 @@ export interface ActiveSession {
   params: SessionParams;
   pauseStrategy: WorkPauseStrategy;
   phase: Phase;
+  liveStats: SessionLiveStats;
   /** New alerts since the client's watermark (delta only). */
   pendingAlerts: AlertEvent[];
   alertSeq: number;

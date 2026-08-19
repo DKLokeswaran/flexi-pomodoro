@@ -69,7 +69,7 @@
 
 | Service | Ports | Env | Volumes |
 |---------|-------|-----|---------|
-| `flexi-pomodoro` | `3847:3847` | `TZ=Asia/Kolkata`, `PORT=3847` | `flexi-pomodoro-data:/data` (stub) |
+| `flexi-pomodoro` | `4000:3847` (host:container) | `TZ=Asia/Kolkata`, `PORT=3847` | `flexi-pomodoro-data:/data` (stub) |
 
 `restart: unless-stopped`.
 

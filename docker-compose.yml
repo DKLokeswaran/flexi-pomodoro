@@ -2,7 +2,7 @@ services:
   flexi-pomodoro:
     build: .
     ports:
-      - "3847:3847"
+      - "4000:3847"
     environment:
       TZ: Asia/Kolkata
       PORT: "3847"

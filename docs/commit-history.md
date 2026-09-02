@@ -6,9 +6,9 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 33 |
+| Total commits | 34 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-08-19 |
+| Latest commit date | 2026-08-20 |
 | Active contributors | 1 |
 | Most active contributor | Lokeswaran DK (31) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
@@ -19,7 +19,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | Month | Commits |
 |-------|--------:|
 | 2026-07 | 23 |
-| 2026-08 | 9 |
+| 2026-08 | 10 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -117,6 +117,12 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Remove unreachable min/max guards from soft/hard pause slice math; `SessionService` already enforces ordering.
 - Docker Compose maps host port **4000** → container **3847** (in-container `PORT` unchanged).
 
+### 2026-08-20 — M2.5 short-rest ack scaffold
+
+- Widen `DecisionPhase.kind` with `short_rest_ack`; add `SessionLiveStats` on `ActiveSession`.
+- Add `POST /api/session/ack-work` route stub and `short_rest_ack_expired` alert id.
+- M2.5 implementation plan; technical docs updated for scaffold state.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -130,6 +136,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 715cbaf | Lokeswaran DK | 2026-08-20 | Add M2.5 short-rest ack scaffold and sync technical docs. |
 | 5748abb | Lokeswaran DK | 2026-08-19 | Fix docker-compose port mapping to use host port 4000. |
 | 339c084 | Lokeswaran DK | 2026-08-19 | Simplify pause slice math and sync commit-history to trunk HEAD. |
 | 700b290 | Lokeswaran DK | 2026-08-18 | Add pause strategy tests and tag v0.0.2-alpha.0. |
@@ -164,4 +171,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: 5748abb1722d1a3a32ba363661a160728304825c
+Last Synced Commit: 715cbaf4eaeda5860efed5ac8dc03675339db86b

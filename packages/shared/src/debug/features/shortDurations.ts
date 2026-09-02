@@ -1,5 +1,5 @@
-import type { SettingsBounds } from "../../../bounds.js";
-import type { DebugFeatureDef } from "../../types.js";
+import type { SettingsBounds } from "../../bounds.js";
+import type { ServerFeatureDef } from "../types.js";
 
 /** Overlay mins (seconds) applied when the short-durations debug feature is on. */
 export const SHORT_DURATIONS_MIN_OVERLAY = {
@@ -32,11 +32,7 @@ function applyShortDurationsBounds(bounds: SettingsBounds): SettingsBounds {
   };
 }
 
-export const shortDurationsFeature = {
+export const shortDurationsServerFeature = {
   id: "shortDurations",
-  meta: {
-    label: "Short durations",
-    description: "Allow work/rest/decision lengths of 1 second or more",
-  },
   applyBounds: applyShortDurationsBounds,
-} as const satisfies DebugFeatureDef<"shortDurations">;
+} as const satisfies ServerFeatureDef<"shortDurations">;

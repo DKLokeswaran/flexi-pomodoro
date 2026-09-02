@@ -1,23 +1,18 @@
 import { z } from "zod";
 import { SETTINGS_BOUNDS, type SettingsBounds } from "./bounds.js";
-import { DebugFlagsSchema, type DebugFlags } from "./debug/catalog.js";
+import { parseDebugFlags, type DebugFlags } from "./debug/catalog.js";
 import { getSettingsBounds } from "./debug/getSettingsBounds.js";
 
 export { SETTINGS_BOUNDS, type SettingsBounds } from "./bounds.js";
 export {
-  DEBUG_FEATURES,
   DEBUG_FEATURE_IDS,
-  DEBUG_FEATURE_META,
-  DebugFlagsSchema,
-  getDebugFeature,
-  isDebugFeatureEnabled,
-  type DebugFeatureDef,
+  parseDebugFlags,
   type DebugFeatureId,
-  type DebugFeatureMeta,
   type DebugFlags,
+  type ServerFeatureDef,
 } from "./debug/catalog.js";
 export { getSettingsBounds } from "./debug/getSettingsBounds.js";
-export { SHORT_DURATIONS_MIN_OVERLAY } from "./debug/features/shortDurations/index.js";
+export { SHORT_DURATIONS_MIN_OVERLAY, shortDurationsServerFeature } from "./debug/features/shortDurations.js";
 
 export const AlertIdSchema = z.enum([
   "work_planned_end",
@@ -149,7 +144,7 @@ export function parseStartSessionBody(body: unknown): {
     .parse(body ?? {}) as Record<string, unknown>;
   const { debug: debugRaw, ...overrideRaw } = rawBody;
   const debug =
-    debugRaw === undefined ? undefined : DebugFlagsSchema.parse(debugRaw);
+    debugRaw === undefined ? undefined : parseDebugFlags(debugRaw);
   const overrides = sessionParamsSchemaForBounds(getSettingsBounds(debug))
     .partial()
     .parse(overrideRaw);

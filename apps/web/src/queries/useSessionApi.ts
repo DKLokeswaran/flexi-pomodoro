@@ -17,6 +17,7 @@ export const settingsQueryKey = ["settings"] as const;
 const ACTION_SUCCESS: Record<string, string> = {
   [SESSION_API.start]: "Session started",
   [SESSION_API.ackRest]: "Rest started",
+  [SESSION_API.ackWork]: "Work started",
   [SESSION_API.continue]: "Extended work started",
   [SESSION_API.startRest]: "Rest started",
   [SESSION_API.endLongRest]: "Session complete",

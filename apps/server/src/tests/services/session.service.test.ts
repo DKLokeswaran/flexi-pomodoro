@@ -61,7 +61,7 @@ function alertsSince(
 }
 
 describe("SessionService", () => {
-  it("happy path N=2: ack → short rest → auto work → long rest → idle", () => {
+  it("happy path N=2: ack → short rest → ack work → long rest → idle", () => {
     const { settings, session } = servicesWithShortTimers(2);
     startSession(settings, session, SESSION_START_MS);
 
@@ -95,15 +95,23 @@ describe("SessionService", () => {
     const seqBeforeShortEnd = session.getAlertSeq();
     const afterShort = afterWork + 1_000 + 60_000;
     phase = activePhase(session, afterShort);
-    assert.equal(phase.kind, "planned_work");
-    assert.equal(phase.cycleIndex, 2);
+    assert.equal(phase.kind, "short_rest_ack");
+    assert.equal(phase.cycleIndex, 1);
     assert.ok(
       alertsSince(session, afterShort, seqBeforeShortEnd).includes(
         "short_rest_end",
       ),
     );
 
-    const afterWork2 = afterShort + 60_000;
+    session.ackWork(afterShort + 1_000);
+    phase = activePhase(session, afterShort + 1_000);
+    assert.equal(phase.kind, "planned_work");
+    assert.equal(phase.cycleIndex, 2);
+    if (phase.kind === "planned_work") {
+      assert.equal(phase.paused, false);
+    }
+
+    const afterWork2 = afterShort + 1_000 + 60_000;
     phase = activePhase(session, afterWork2);
     assert.equal(phase.kind, "decision");
     session.ackRest(afterWork2 + 500);

@@ -17,7 +17,7 @@ Derived from committed patterns (not aspirational rules).
 | Hooks | `use*` | `useSessionStream`, `useNow` |
 | API modules | `<domain>.api.ts` | `session.api.ts` |
 | Constants / labels | camelCase exports | `DECISION_WINDOW_LABEL` |
-| localStorage keys | `flexi-pomodoro:<name>` | `debugFlags`, `lastPlayedAlertSeq` |
+| localStorage keys | `flexi-pomodoro:<name>` | `debugFlags`, `uiFlags`, `lastPlayedAlertSeq` |
 | Alert assets | `placeholder-<alertId>.wav` | |
 | Types | PascalCase | `SessionSnapshot`, `Phase` |
 | Zod schemas | `*Schema` | `SettingsPatchSchema` |

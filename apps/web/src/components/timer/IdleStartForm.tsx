@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { StartSessionBody } from "@flexi-pomodoro/shared";
-import { useDebugFlags } from "../../providers/DebugFlagsProvider";
+import { useDebugFlags } from "../../browserFlags/debug";
 import { DECISION_WINDOW_LABEL } from "../../constants/labels";
 import { minutesToSec, secToMinutes } from "../../utils/time";
 import { NumberField } from "../NumberField";

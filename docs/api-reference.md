@@ -18,7 +18,7 @@ Base URL (dev): Vite proxies `/api` → `http://127.0.0.1:3847`. Production: sam
 | GET | `/api/session/events` | SSE stream of snapshots |
 | POST | `/api/session/start` | Start session |
 | POST | `/api/session/ack-rest` | Decision → rest |
-| POST | `/api/session/ack-work` | Short-rest ack → planned work (M2.5; engine transition in progress) |
+| POST | `/api/session/ack-work` | Short-rest ack → next-cycle planned work (running) |
 | POST | `/api/session/continue` | Decision → extended work |
 | POST | `/api/session/start-rest` | Extended work → rest |
 | POST | `/api/session/pause` | Pause planned work (active pause strategy) |
@@ -62,7 +62,7 @@ Discriminated by `status`:
 | `params` | `SessionParams` | Locked for session |
 | `pauseStrategy` | `"soft" \| "hard"` | Copied from `settings.workPauseStrategy` at `POST /api/session/start`; locked for the session |
 | `phase` | `Phase` | See [data-model.md](./data-model.md) |
-| `liveStats` | `SessionLiveStats` | In-memory session totals (M2.5); initialized at start; attribution wired incrementally |
+| `liveStats` | `SessionLiveStats` | In-memory session totals; snapshots include in-phase progress at `serverNow` |
 | `pendingAlerts` | `AlertEvent[]` | Deltas since `sinceSeq` |
 | `alertSeq` | number | High-water |
 
@@ -162,7 +162,7 @@ Subscribe cursor advances per listener after each send. Client disconnect unsubs
 }
 ```
 
-- `debug` parsed with **strict** `DebugFlagsSchema` (unknown keys fail).
+- `debug` parsed with **strict** `parseDebugFlags` (unknown keys fail).
 - Override bounds come from `getSettingsBounds(debug)` (e.g. mins of 1s when `shortDurations`).
 - Pause strategy is **not** in the start body; it comes from persisted `settings.workPauseStrategy` at request time.
 

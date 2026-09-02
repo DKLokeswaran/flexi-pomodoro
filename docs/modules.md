@@ -19,15 +19,14 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 
 | Export | Kind |
 |--------|------|
-| `DebugFeatureMeta` | type `{ label; description? }` |
-| `DebugFeatureDef<Id>` | type `{ id; meta; applyBounds? }` |
+| `ServerFeatureDef<Id>` | type `{ id; applyBounds? }` — server-side debug feature (no UI meta) |
 
-### `src/debug/features/shortDurations/index.ts`
+### `src/debug/features/shortDurations.ts`
 
 | Export | Kind |
 |--------|------|
 | `SHORT_DURATIONS_MIN_OVERLAY` | const mins = 1 for durations |
-| `shortDurationsFeature` | `DebugFeatureDef<"shortDurations">` |
+| `shortDurationsServerFeature` | `ServerFeatureDef<"shortDurations">` |
 
 **Side effects:** none (pure).
 
@@ -35,25 +34,22 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 
 | Export | Kind |
 |--------|------|
-| `DEBUG_FEATURES` | readonly feature list |
+| `DEBUG_SERVER_FEATURES` | readonly server feature list |
 | `DebugFeatureId` | type |
 | `DEBUG_FEATURE_IDS` | readonly ids |
 | `DebugFlags` | type |
-| `DebugFlagsSchema` | Zod strict object |
-| `isDebugFeatureEnabled(flags, id)` | fn → boolean |
-| `DEBUG_FEATURE_META` | Record id → meta |
-| `getDebugFeature(id)` | fn → def (throws if missing) |
-| re-exports | `DebugFeatureDef`, `DebugFeatureMeta` |
+| `parseDebugFlags(raw)` | fn → strict Zod parse |
+| re-exports | `ServerFeatureDef` |
 
 ### `src/debug/getSettingsBounds.ts`
 
 | Export | Kind |
 |--------|------|
-| `getSettingsBounds(flags?)` | applies enabled features’ `applyBounds` |
+| `getSettingsBounds(flags?)` | applies enabled server features' `applyBounds` |
 
 ### `src/index.ts`
 
-**Re-exports:** bounds, debug catalog, `getSettingsBounds`, `SHORT_DURATIONS_MIN_OVERLAY`.
+**Re-exports:** bounds, debug catalog, `getSettingsBounds`, `SHORT_DURATIONS_MIN_OVERLAY`, `shortDurationsServerFeature`.
 
 | Export | Kind |
 |--------|------|
@@ -187,6 +183,7 @@ Unknown errors are rethrown.
 |--------|------|
 | `msToIso(ms)` | millisecond timestamp → ISO-8601 string |
 | `parseIso(value)` | ISO-8601 string → milliseconds since epoch |
+| `elapsedSecFromIso(startedAt, nowMs)` | whole seconds elapsed between ISO start and `nowMs` |
 
 **Imports:** none.
 
@@ -226,13 +223,15 @@ Unknown errors are rethrown.
 | `pause(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onPause` |
 | `resume(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onResume` |
 | `ackRest(nowMs?)` | SessionSnapshot |
-| `ackWork(nowMs?)` | SessionSnapshot — short-rest ack (M2.5; requires `short_rest_ack` phase) |
+| `ackWork(nowMs?)` | SessionSnapshot — short-rest ack → next-cycle planned work running |
 | `continueExtended(nowMs?)` | SessionSnapshot |
 | `startRest(nowMs?)` | SessionSnapshot |
 | `endLongRest(nowMs?)` | SessionSnapshot |
 | `tick(nowMs?, notify?)` | void — wall-clock catch-up |
 
-**Side effects:** mutates in-memory session/alerts; notifies listeners; `randomUUID` on start.
+**Side effects:** mutates in-memory session/alerts/liveStats; notifies listeners; `randomUUID` on start.
+
+**Private helpers (not exported):** `addDeliberation`, `plannedWorkSecAt`, `restSecAt`, `liveStatsWithProgress`, `advanceWorkDecision`, `advanceShortRestAck`, `enterShortRestAckPhase`, `commitPlannedWork`, `commitRest`.
 
 ### Tests
 
@@ -244,7 +243,7 @@ Unknown errors are rethrown.
 
 ### `src/main.tsx`
 
-No exports. **Side effects:** mounts React root; providers; imports `styles.css`.
+No exports. **Side effects:** mounts React root; `UiFlagsProvider` + `DebugFlagsProvider` + `ToastProvider`; imports `styles.css`.
 
 ### `src/App.tsx`
 
@@ -269,7 +268,7 @@ Declares `__APP_VERSION__: string`.
 
 ### `src/constants/about.ts`
 
-Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, …), and data arrays including `FEATURES` (Hard pause (experimental) → `available`).
+Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, …), and data arrays including `FEATURES` (Hard pause, Short-rest acknowledgement, Live session stats → `available`).
 
 ---
 
@@ -312,6 +311,12 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 | Export | Purpose |
 |--------|---------|
 | `syncAlertSeq()` | fetch server seq → store |
+
+### `src/utils/liveStats.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `liveStatsAt(snapshot, nowMs)` | Client-side live stats with in-phase extrapolation (mirrors server formulas) |
 
 ### `src/utils/playAlerts.ts`
 
@@ -373,20 +378,59 @@ Uses `useEffectEvent` for snapshot/idle handlers.
 
 `settingsQueryKey`, `useSettingsQuery()`, `useSaveSettingsMutation()`, `useSessionActionMutation(onSnapshot)`
 
-**Side effects:** toasts (pause/resume copy follows locked session strategy); query cache updates; alert playback on action success.
+**Side effects:** toasts (pause/resume copy follows locked session strategy; includes `ackWork`); query cache updates; alert playback on action success.
+
+---
+
+## Browser flag stores (`src/browserFlags/`)
+
+### `createFlagCatalog.ts`
+
+| Export | Kind |
+|--------|------|
+| `FeatureMeta`, `FeatureDef`, `FlagMap` | types |
+| `createFlagCatalog(features)` | → `{ features, ids, meta, isEnabled, getFeature }` |
+
+### `createFlagStore.tsx`
+
+| Export | Kind |
+|--------|------|
+| `FlagStoreState`, `FlagStoreApi` | types |
+| `createFlagStore(options)` | → `{ Provider, useFlagStore }` — localStorage + cross-tab sync |
+
+### `persistedState.ts` / `readStoredRecord.ts`
+
+Persistence helpers for flag stores (quota/private-mode safe).
+
+### `debug/catalog.ts` + `debug/features/shortDurations.ts`
+
+Web debug feature labels; ids must match shared `DebugFeatureId`.
+
+Exports: `DEBUG_FEATURE_IDS`, `DEBUG_FEATURE_META`, re-exported types.
+
+### `debug/provider.tsx`
+
+| Export | Kind |
+|--------|------|
+| `DebugFlagsProvider` | provider (`hasGate: true`, key `flexi-pomodoro:debugFlags`) |
+| `useDebugFlags()` | `{ debugMode, setDebugMode, flags, setFlag, isEnabled }` |
+
+### `ui/catalog.ts` + `ui/features/hideContinueButton.ts`
+
+Web UI preference catalog (plain TS, no Zod).
+
+Exports: `UI_FEATURE_IDS`, `UI_FEATURE_META`, `UiFeatureId`, `UiFlags`.
+
+### `ui/provider.tsx`
+
+| Export | Kind |
+|--------|------|
+| `UiFlagsProvider` | provider (`hasGate: false`, key `flexi-pomodoro:uiFlags`) |
+| `useUiFlags()` | `{ flags, setFlag, isEnabled }` |
 
 ---
 
 ## Providers
-
-### `src/providers/DebugFlagsProvider.tsx`
-
-| Export | Kind |
-|--------|------|
-| `DebugFlagsProvider({ children })` | provider |
-| `useDebugFlags()` | context hook |
-
-### `src/providers/ToastProvider.tsx`
 
 | Export | Kind |
 |--------|------|
@@ -440,11 +484,11 @@ Uses `useEffectEvent` for snapshot/idle handlers.
 
 | Props | Type |
 |-------|------|
-| `snapshot` | SessionSnapshot |
-| `phase` | Phase |
-| `params` | SessionParams |
+| `snapshot` | `ActiveSnapshot` |
 | `now` | number |
 | `onAction` | `(path: string) => void` |
+
+Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Renders phase label, countdown, cycle, hint, actions, and live-stats HUD (`liveStatsAt`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
 
 Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button label and phase suffix follow `snapshot.session.pauseStrategy`.
 
@@ -457,7 +501,7 @@ Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button labe
 | `locked` | boolean |
 | `saving?` | boolean |
 
-Draft includes timing fields plus `enableHardPause` (maps to `workPauseStrategy`). **Experimental features** gate reveals **Enable hard pause (experimental)**; auto-opens when saved defaults use `"hard"`.
+Draft includes timing fields plus `enableHardPause` (maps to `workPauseStrategy`). Sections: **Save defaults**, **Browser preferences** (UI flags), **Debug** (gated debug flags). **Experimental features** gate reveals **Enable hard pause (experimental)**; auto-opens when saved defaults use `"hard"`.
 
 ### `src/components/AboutTab.tsx`
 

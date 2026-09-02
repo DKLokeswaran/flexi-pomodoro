@@ -45,7 +45,7 @@ Session live state is **not** stored in the query cache; mutations push into the
 
 ## Context providers
 
-### `DebugFlagsProvider`
+### `DebugFlagsProvider` (`browserFlags/debug`)
 
 **Storage key:** `flexi-pomodoro:debugFlags`
 
@@ -61,9 +61,28 @@ Session live state is **not** stored in the query cache; mutations push into the
 }
 ```
 
+- Built with `createFlagStore({ hasGate: true })`; server contract validated via shared `parseDebugFlags`.
 - Disabling debug mode clears flags.
 - Cross-tab sync via `storage` event.
 - Consumed by `SettingsTab`, `IdleStartForm`.
+
+### `UiFlagsProvider` (`browserFlags/ui`)
+
+**Storage key:** `flexi-pomodoro:uiFlags` (shape `{ flags: { … } }`)
+
+**Value shape:**
+
+```ts
+{
+  flags: UiFlags;              // e.g. { hideContinueButton?: boolean }
+  setFlag: (id, enabled) => void;
+  isEnabled: (id) => boolean;  // always gate-on (hasGate: false)
+}
+```
+
+- Plain TypeScript catalog (no Zod). Preferences always visible in Settings → **Browser preferences**.
+- `hideContinueButton` omits Continue during the work-decision phase in `ActiveTimer`.
+- Consumed by `SettingsTab`, `ActiveTimer`.
 
 ### `ToastProvider`
 
@@ -101,7 +120,8 @@ Transport (`connectSessionStream`):
 | Key | Module | Data |
 |-----|--------|------|
 | `flexi-pomodoro:lastPlayedAlertSeq` | `AlertSeqStore` | number watermark |
-| `flexi-pomodoro:debugFlags` | `DebugFlagsProvider` | `{ debugMode, flags }` |
+| `flexi-pomodoro:debugFlags` | `browserFlags/debug` | `{ debugMode, flags }` |
+| `flexi-pomodoro:uiFlags` | `browserFlags/ui` | `{ flags }` |
 
 `AlertSeqStore` methods: `get()`, `set(seq)` (may decrease on sync), `advance(seq)` (monotonic).
 
@@ -112,7 +132,7 @@ Transport (`connectSessionStream`):
 | Component | State |
 |-----------|-------|
 | `App` | `tab: Tab` |
-| `SettingsTab` | draft minutes/cycles/decision; `enableHardPause`; session-only `experimentalMode` gate |
+| `SettingsTab` | draft minutes/cycles/decision; `enableHardPause`; session-only `experimentalMode` gate; UI + debug flag toggles |
 | `IdleStartForm` | override draft (min or sec depending on shortDurations) |
 | `AboutAccordion` | `open` |
 | `ToastProvider` | current toast |
@@ -125,7 +145,7 @@ Transport (`connectSessionStream`):
 No dedicated selector library. Inline derivation examples:
 
 - `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`
-- `ActiveTimer`: `displayClock` (uses `timerFrozenAt` for hard pause), `actionsForPhase`, `phaseHint`, strategy-aware pause labels
+- `ActiveTimer`: `displayClock`, `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`), `phaseHint`, `liveStatsAt` HUD, strategy-aware pause labels
 - `AboutTab`: feature available/soon counts; health UI mapping
 
 ---
@@ -136,7 +156,8 @@ No dedicated selector library. Inline derivation examples:
 |------|--------|---------|
 | `useNow(isTicking)` | boolean | `number` (Date.now, 250ms) |
 | `useSessionStream()` | — | `{ snapshot, setSnapshot }` |
-| `useDebugFlags()` | — | context value (throws if missing) |
+| `useDebugFlags()` | — | debug flag store (throws if missing) |
+| `useUiFlags()` | — | UI preference store (throws if missing) |
 | `useToast()` | — | `{ pushToast }` |
 | `useSettingsQuery` / mutations | — | React Query results |
 | `useHealthQuery` | — | React Query result |

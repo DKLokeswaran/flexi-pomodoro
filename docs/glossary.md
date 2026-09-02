@@ -9,6 +9,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **Flexi Pomodoro** | Self-hosted, flow-aware Pomodoro variant with decision window, extended work, and soft pause |
 | **M1** | Milestone 1 — timer core (in-memory, no SQLite) |
 | **M2** | Pause modules — soft and hard `WorkPauseStrategy` plugins; hard pause experimental via Settings |
+| **M2.5** | Short-rest acknowledgement + in-memory live session stats on the active timer surface |
 | **M3** | Persistence & analytics milestone (SQLite, decision segments, recovery) |
 | **Alpha** | Current release channel (`0.0.1-alpha.*`) |
 | **N / cyclesBeforeLongRest** | Number of work cycles before a long rest |
@@ -56,7 +57,9 @@ Terms from shared types, APIs, UI copy, and commit messages.
 |------|---------|
 | **Defaults / settings** | Persistent-in-process preferences used when starting without overrides |
 | **Overrides** | Per-start session param fields on POST start |
-| **Debug mode** | Client gate unlocking per-feature debug flags (localStorage) |
+| **Debug mode** | Client gate unlocking per-feature debug flags (localStorage `flexi-pomodoro:debugFlags`) |
+| **Browser preferences / UI flags** | Client-only toggles in Settings → Browser preferences (localStorage `flexi-pomodoro:uiFlags`); not sent to the server |
+| **hideContinueButton** | UI flag that removes the Continue action during the work-decision phase |
 | **Experimental features** | Settings UI gate; when enabled, shows **Enable hard pause (experimental)** (maps to `workPauseStrategy`) |
 | **shortDurations** | Debug feature allowing ≥1s work/rest/decision on **start** only |
 | **alertsMuted** | Settings boolean (schema); curated mute UX still “soon” |

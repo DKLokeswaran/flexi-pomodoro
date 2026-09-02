@@ -36,7 +36,7 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 
 | Case | Asserts |
 |------|---------|
-| Happy path N=2 | work → decision → ack short rest → work → long rest → idle; alerts; alertSeq reset |
+| Happy path N=2 | work → decision → ack short rest → short_rest_ack → ackWork → work → long rest → idle; alerts; alertSeq reset |
 | Alert seq reset | New session alerts restart at seq 1 |
 | Decision timeout | → extended with backdated `startedAt`; startRest without replaying auto-start in pending |
 | Continue | Extended `startedAt` = click time |
@@ -44,7 +44,7 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | Soft-paused through end | Auto rest; skip decision |
 | Hard pause 3s with 10s left | Remaining time unchanged; `plannedEndAt` shifted +3s |
 | Hard-paused past original end | Stays in planned work while frozen |
-| Pause/resume outside planned work (FR-PAUSE-S6) | `INVALID_PHASE` in decision, extended, short rest, long rest |
+| Pause/resume outside planned work (FR-PAUSE-S6) | `INVALID_PHASE` in decision, short_rest_ack, extended, short rest, long rest |
 | N=1 | Long rest after first work path |
 | Tick catch-up | Past work+decision → extended in one snapshot |
 | shortDurations debug | Allows 1s params |
@@ -83,7 +83,7 @@ Isolated `hardPauseStrategy` unit tests:
 
 ## Mocking patterns
 
-Not found. Tests use real `SettingsService` + `SessionService` and inject deterministic `nowMs` into service methods (`start`, `pause`, `resume`, `getSnapshot`, `ackRest`, etc.). Scheduler is not exercised in these unit tests.
+Not found. Tests use real `SettingsService` + `SessionService` and inject deterministic `nowMs` into service methods (`start`, `pause`, `resume`, `getSnapshot`, `ackRest`, `ackWork`, etc.). Scheduler is not exercised in these unit tests.
 
 ## Fixtures
 

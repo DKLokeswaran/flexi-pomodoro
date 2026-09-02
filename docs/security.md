@@ -40,6 +40,7 @@ No password hashing, crypto secrets, or `.env` samples committed. `.gitignore` e
 | Key | Sensitivity |
 |-----|-------------|
 | `flexi-pomodoro:debugFlags` | UX preference only |
+| `flexi-pomodoro:uiFlags` | UX preference only |
 | `flexi-pomodoro:lastPlayedAlertSeq` | Client watermark; not a secret |
 
 ## CSRF / rate limiting / XSS

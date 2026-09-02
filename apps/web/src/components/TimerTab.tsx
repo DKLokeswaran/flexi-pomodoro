@@ -18,23 +18,20 @@ export function TimerTab({
   onAction: (path: string, body?: StartSessionBody) => void;
   defaults: SessionTimingDefaults;
 }) {
-  const sessionIsActive = snapshot?.status === "active";
-  const now = useNow(Boolean(sessionIsActive));
-  const phase = snapshot?.status === "active" ? snapshot.session.phase : null;
-  const params = snapshot?.status === "active" ? snapshot.session.params : null;
+  const activeSnapshot =
+    snapshot?.status === "active" ? snapshot : null;
+  const now = useNow(Boolean(activeSnapshot));
 
   return (
     <section className={styles.timerShell} aria-live="polite">
-      {!sessionIsActive || !phase || !params || !snapshot ? (
+      {!activeSnapshot ? (
         <IdleStartForm
           defaults={defaults}
           onStart={(body) => onAction(SESSION_API.start, body)}
         />
       ) : (
         <ActiveTimer
-          snapshot={snapshot}
-          phase={phase}
-          params={params}
+          snapshot={activeSnapshot}
           now={now}
           onAction={(path) => onAction(path)}
         />

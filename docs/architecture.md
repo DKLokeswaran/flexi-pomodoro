@@ -20,7 +20,7 @@ Frontend style is **feature-oriented folders** under `apps/web/src`: components 
 flowchart TB
   subgraph web ["apps/web"]
     UI["Components / tabs"]
-    Prov["Providers: DebugFlags, Toast"]
+    Prov["Providers: UiFlags, DebugFlags, Toast"]
     Q["queries/* + React Query"]
     SSE["sessionStream.sse + useSessionStream"]
     UI --> Prov
@@ -56,7 +56,8 @@ flowchart TB
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
 | **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later |
 | **Strategy (pause plugins)** | `PauseStrategyRegistry` + `WorkPauseStrategy` | Engine calls `onPause` / `onResume` / `isCountdownFrozen` / `onPlannedEnd`; default registry registers `soft` and `hard` |
-| **Catalog / plugin registration** | `DEBUG_FEATURES` in `packages/shared/src/debug/catalog.ts` | Debug features register id, meta, optional `applyBounds` |
+| **Catalog / plugin registration** | `DEBUG_SERVER_FEATURES` in `packages/shared/src/debug/catalog.ts` | Server debug features register id + optional `applyBounds`; web labels live in `browserFlags/debug/` |
+| **Browser flag stores** | `createFlagCatalog` + `createFlagStore` in `apps/web/src/browserFlags/` | Shared localStorage-backed stores for debug flags (gated) and UI preferences (ungated) |
 | **Schema-driven validation** | Zod schemas in shared | Shared between server routes and client start body |
 | **Watermark / cursor** | Server `listenerCursors` + client `AlertSeqStore` | Alert delivery is delta-only via `sinceSeq` |
 | **SPA fallback** | `app.setNotFoundHandler` | Non-API 404s serve `index.html` when `WEB_DIST` exists |
@@ -76,14 +77,14 @@ const scheduler = new IntervalScheduler({
 });
 ```
 
-On the web, React Context provides `DebugFlagsProvider` and `ToastProvider`; TanStack `QueryClientProvider` wraps the tree in `main.tsx`.
+On the web, React Context provides `UiFlagsProvider`, `DebugFlagsProvider` (both from `browserFlags/`), and `ToastProvider`; TanStack `QueryClientProvider` wraps the tree in `main.tsx`.
 
 ## Cross-cutting concerns
 
 | Concern | Implementation |
 |---------|----------------|
 | Logging | Fastify `{ logger: true }` |
-| Validation | Zod (`SessionParamsSchema`, `SettingsPatchSchema`, `parseStartSessionBody`, `DebugFlagsSchema`) |
+| Validation | Zod (`SessionParamsSchema`, `SettingsPatchSchema`, `parseStartSessionBody`, `parseDebugFlags`) |
 | Error mapping | Shared `errorReply` in `apps/server/src/utils/errorReply.ts` → HTTP 400/403/409 + `{ error, code }` |
 | Auth / rate limit / tracing | Not found in committed history |
 | Static assets | `@fastify/static` when web dist is discoverable |
@@ -113,14 +114,14 @@ stateDiagram-v2
   decision --> extended_work: continue (from click) OR timeout (backdated)
   extended_work --> short_rest: startRest, cycle < N
   extended_work --> long_rest: startRest, cycle >= N
-  short_rest --> short_rest_ack: plannedEnd (M2.5 target; engine wiring in progress)
+  short_rest --> short_rest_ack: plannedEnd
   short_rest_ack --> planned_work: ackWork (running) OR timeout (paused)
   long_rest --> [*]: plannedEnd OR endLongRest
 ```
 
 `N` is `cyclesBeforeLongRest`. Rest kind is chosen by `cycleIndex >= N` → long rest, else short rest.
 
-**M2.5 note:** Shared types, `POST /api/session/ack-work`, `SessionLiveStats`, and `short_rest_ack_expired` alert are in the tree. `advanceRest` still transitions short rest directly to `planned_work` until engine-wiring lands; `ackWork` validates phase but full transition and stat attribution are pending.
+Short rest ends enter `short_rest_ack` (not running work). Explicit `ackWork` starts the next cycle running; ack timeout emits `short_rest_ack_expired` and starts the next cycle immediately paused via the active pause strategy. Snapshots include `liveStats` with in-phase progress at `serverNow`; the web HUD extrapolates locally via `liveStatsAt()` and `useNow()`.
 
 Decision timeout attributes elapsed decision time to **extended work** (`startedAt` = decision start). Explicit **continue** starts extended work at the click time (decision elapsed excluded). Soft pause through planned end **skips decision** and enters rest at planned end (`onPlannedEnd` → `"rest"`). While a strategy reports `isCountdownFrozen`, planned-end ticks are skipped.
 
@@ -145,9 +146,10 @@ Pause behavior lives under `apps/server/src/pause/`, not inline in the session e
 ```
 main.tsx
   QueryClientProvider
-    DebugFlagsProvider
-      ToastProvider
-        App
+    UiFlagsProvider
+      DebugFlagsProvider
+        ToastProvider
+          App
           Nav
           TimerTab | SettingsTab | AnalyticsStub | AboutTab
             TimerTab → IdleStartForm | ActiveTimer
@@ -158,8 +160,8 @@ main.tsx
 
 | Kind | Examples |
 |------|----------|
-| Container / smart | `App` (queries + stream + mutations), `SettingsTab` (draft + debug), `AboutTab` (health + clipboard), `useSessionStream` |
-| Presentational | `Nav`, `NumberField`, `LinkCard`, `AboutAccordion`, `ActiveTimer` (receives snapshot/phase/now) |
+| Container / smart | `App` (queries + stream + mutations), `SettingsTab` (draft + browser prefs + debug), `AboutTab` (health + clipboard), `useSessionStream` |
+| Presentational | `Nav`, `NumberField`, `LinkCard`, `AboutAccordion`, `ActiveTimer` (receives `ActiveSnapshot` + `now`) |
 
 ### Routing
 
@@ -169,6 +171,8 @@ No React Router. `App` holds `tab: "timer" | "settings" | "analytics" | "about"`
 
 - **Authoritative phase changes**: SSE (`/api/session/events`) + hybrid poll fallback (`sessionStream.sse.ts`).
 - **UI countdown**: local `useNow` (250ms) computes remaining/overtime from ISO anchors on the snapshot — no sub-second API polling. Hard pause uses `timerFrozenAt` as the clock anchor while paused.
+- **Live stats HUD**: `ActiveTimer` shows Worked / Deliberation / Rest counters. `liveStatsAt(snapshot, now)` strips in-phase progress at `serverNow` and re-adds at local `now`, mirroring server `liveStatsWithProgress` formulas.
+- **Browser preferences**: `hideContinueButton` UI flag (localStorage `flexi-pomodoro:uiFlags`) omits the Continue action during the work-decision phase.
 - **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`. Label and phase suffix follow the locked session strategy (`Soft pause` vs `Hard pause (experimental)`). Toasts mirror the same strategy.
 - **Settings**: Experimental features gate exposes **Enable hard pause (experimental)**; unchecked maps to `workPauseStrategy: "soft"`, checked to `"hard"`. Saved with **Save defaults**; locked while a session is active.
 
@@ -189,6 +193,7 @@ Not found in committed history (no `React.lazy` / dynamic import of routes).
 |------|----------------|---------|
 | Settings | In-memory `SettingsService` (lost on restart) | SQLite (M3) |
 | Session | In-memory `SessionService` | SQLite + crash recovery |
-| Debug prefs | Browser `localStorage` | Client-only |
+| Debug prefs | Browser `localStorage` (`flexi-pomodoro:debugFlags`) | Client-only |
+| UI prefs | Browser `localStorage` (`flexi-pomodoro:uiFlags`) | Client-only |
 | Alert watermark | Browser `localStorage` | Client-only |
 | Docker volume `/data` | Mounted stub; unused | Persistence target |

@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
+import { type Settings } from "@flexi-pomodoro/shared";
 import {
   DEBUG_FEATURE_IDS,
   DEBUG_FEATURE_META,
-  type Settings,
-} from "@flexi-pomodoro/shared";
-import { useDebugFlags } from "../providers/DebugFlagsProvider";
+  useDebugFlags,
+} from "../browserFlags/debug";
+import {
+  UI_FEATURE_IDS,
+  UI_FEATURE_META,
+  useUiFlags,
+} from "../browserFlags/ui";
 import { DECISION_WINDOW_LABEL } from "../constants/labels";
 import { minutesToSec, secToMinutes } from "../utils/time";
 import { NumberField } from "./NumberField";
@@ -44,7 +49,7 @@ function settingsFromDraft(settings: Settings, draft: SettingsDraft): Settings {
   };
 }
 
-/** Persistent defaults plus browser-local debug feature flags. */
+/** Persistent defaults, browser UI prefs, and browser-local debug flags. */
 export function SettingsTab({
   settings,
   onSave,
@@ -57,6 +62,7 @@ export function SettingsTab({
   saving?: boolean;
 }) {
   const { debugMode, setDebugMode, flags, setFlag } = useDebugFlags();
+  const { flags: uiFlags, setFlag: setUiFlag } = useUiFlags();
   const [draft, setDraft] = useState(draftFromSettings(settings));
   /** Session-only UI gate; opens automatically when saved defaults use hard pause. */
   const [experimentalMode, setExperimentalModeState] = useState(
@@ -176,6 +182,30 @@ export function SettingsTab({
         >
           Save defaults
         </button>
+      </div>
+
+      <p className="section-title">Browser preferences</p>
+      <div className={styles.debugFlags}>
+        {UI_FEATURE_IDS.map((featureId) => {
+          const meta = UI_FEATURE_META[featureId];
+          return (
+            <label key={featureId} className={styles.debugFlag}>
+              <input
+                type="checkbox"
+                checked={Boolean(uiFlags[featureId])}
+                onChange={(event) => setUiFlag(featureId, event.target.checked)}
+              />
+              <span>
+                {meta.label}
+                {meta.description ? (
+                  <span className={styles.debugFlagDesc}>
+                    {meta.description}
+                  </span>
+                ) : null}
+              </span>
+            </label>
+          );
+        })}
       </div>
 
       <p className="section-title">Debug</p>

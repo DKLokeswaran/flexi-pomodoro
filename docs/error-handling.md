@@ -49,7 +49,7 @@
 - `errorMessage(error, fallback)` (`apps/web/src/utils/errorMessage.ts`) prefers `Error.message` for toasts and settings-load failures.
 - Mutations show toast via `ToastProvider`.
 - SSE/poll errors are mostly swallowed (transient reconnect).
-- `DebugFlagsProvider` / `AlertSeqStore`: localStorage failures caught; in-memory continues.
+- Browser flag stores (`browserFlags/debug`, `browserFlags/ui`) / `AlertSeqStore`: localStorage failures caught; in-memory continues.
 - React Error Boundaries: **not found** in committed history.
 
 ---
@@ -63,7 +63,7 @@
 | `SessionParamsSchema` | Defaults / merge | Integer bounds from `SETTINGS_BOUNDS` |
 | `SettingsSchema` / `SettingsPatchSchema` | PUT settings | Params + `alertsMuted` + `workPauseStrategy: "soft" \| "hard"` |
 | `parseStartSessionBody` | POST start | Strict `debug`; overrides against debug-aware bounds |
-| `DebugFlagsSchema` | start body + localStorage restore | Strict; unknown keys fail |
+| `parseDebugFlags` | POST start `debug` + debug localStorage restore | Strict; unknown keys fail |
 | `mergeSessionParams` | SettingsService | Parses merged settings+overrides |
 | `AlertIdSchema` | shared enum | Alert ids |
 

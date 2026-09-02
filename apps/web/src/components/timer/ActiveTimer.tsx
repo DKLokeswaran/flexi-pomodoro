@@ -1,16 +1,18 @@
 import type {
+  ActiveSnapshot,
   Phase,
   PhaseKind,
-  SessionParams,
-  SessionSnapshot,
+  SessionLiveStats,
   WorkPauseStrategy,
 } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
+import { useUiFlags } from "../../browserFlags/ui";
 import {
   elapsedFromIso,
   formatMmSs,
   remainingSecFromIso,
 } from "../../utils/time";
+import { liveStatsAt } from "../../utils/liveStats";
 import displayStyles from "./timerDisplay.module.css";
 
 /** Short UI title for the current phase kind. */
@@ -32,19 +34,14 @@ function phaseTitle(kind: PhaseKind): string {
 }
 
 /** Primary countdown (or planned + overtime) based on phase wall-clock anchors. */
-function displayClock(
-  snapshot: SessionSnapshot,
-  params: SessionParams,
-  nowMs: number,
-): string {
-  if (snapshot.status !== "active") return "00:00";
-  const { phase } = snapshot.session;
+function displayClock(snapshot: ActiveSnapshot, nowMs: number): string {
+  const { phase, params } = snapshot.session;
   if (phase.kind === "extended_work") {
     const planned = formatMmSs(params.workDurationSec);
     const extended = formatMmSs(elapsedFromIso(phase.startedAt, nowMs));
     return `${planned} + ${extended}`;
   }
-  if (phase.kind === "decision") {
+  if (phase.kind === "decision" || phase.kind === "short_rest_ack") {
     return formatMmSs(remainingSecFromIso(phase.decisionEndsAt, nowMs));
   }
   if (phase.kind === "planned_work") {
@@ -79,22 +76,37 @@ function pausedPhaseLabel(pauseStrategy: WorkPauseStrategy): string {
 
 /** Buttons allowed for the current phase (empty for short rest). */
 function actionsForPhase(
-  phase: Phase,
-  pauseStrategy: WorkPauseStrategy,
+  snapshot: ActiveSnapshot,
+  hideContinueButton: boolean,
 ): PhaseAction[] {
+  const { phase, pauseStrategy } = snapshot.session;
   if (phase.kind === "planned_work") {
     return phase.paused
       ? [{ label: "Resume", path: SESSION_API.resume, primary: true }]
       : [{ label: pauseButtonLabel(pauseStrategy), path: SESSION_API.pause }];
   }
   if (phase.kind === "decision") {
-    return [
-      {
+    const actions: PhaseAction[] = [
+      { label: "Acknowledge rest", path: SESSION_API.ackRest },
+    ];
+    if (!hideContinueButton) {
+      actions.unshift({
         label: "Continue working",
         path: SESSION_API.continue,
         primary: true,
+      });
+    } else {
+      actions[0].primary = true;
+    }
+    return actions;
+  }
+  if (phase.kind === "short_rest_ack") {
+    return [
+      {
+        label: "Acknowledge",
+        path: SESSION_API.ackWork,
+        primary: true,
       },
-      { label: "Acknowledge rest", path: SESSION_API.ackRest },
     ];
   }
   if (phase.kind === "extended_work") {
@@ -108,7 +120,7 @@ function actionsForPhase(
   return [];
 }
 
-/** Contextual hint under the clock for decision and overtime. */
+/** Contextual hint under the clock for decision, ack, and overtime. */
 function phaseHint(phase: Phase, nowMs: number): string | null {
   if (phase.kind === "decision") {
     const remaining = formatMmSs(
@@ -116,29 +128,46 @@ function phaseHint(phase: Phase, nowMs: number): string | null {
     );
     return `Keep working — or rest in ${remaining}`;
   }
+  if (phase.kind === "short_rest_ack") {
+    return "Acknowledge to start work — or work starts paused";
+  }
   if (phase.kind === "extended_work") {
     return "Overtime — start rest when ready";
   }
   return null;
 }
 
-/** Running-session display: phase, clock, cycle, hints, and phase actions. */
+/** Live session counters below the phase actions. */
+function LiveStatsRow({ liveStats }: { liveStats: SessionLiveStats }) {
+  return (
+    <p className={displayStyles.liveStats}>
+      <span>
+        Worked <strong>{formatMmSs(liveStats.workedSec)}</strong>
+      </span>
+      <span>
+        Deliberation <strong>{formatMmSs(liveStats.deliberationSec)}</strong>
+      </span>
+      <span>
+        Rest <strong>{formatMmSs(liveStats.restSec)}</strong>
+      </span>
+    </p>
+  );
+}
+
+/** Running-session display: phase, clock, cycle, stats, hints, and phase actions. */
 export function ActiveTimer({
   snapshot,
-  phase,
-  params,
   now,
   onAction,
 }: {
-  snapshot: SessionSnapshot;
-  phase: Phase;
-  params: SessionParams;
+  snapshot: ActiveSnapshot;
   now: number;
   onAction: (path: string) => void;
 }) {
-  const pauseStrategy =
-    snapshot.status === "active" ? snapshot.session.pauseStrategy : "soft";
-  const actions = actionsForPhase(phase, pauseStrategy);
+  const { phase, params, pauseStrategy } = snapshot.session;
+  const { isEnabled } = useUiFlags();
+  const liveStats = liveStatsAt(snapshot, now);
+  const actions = actionsForPhase(snapshot, isEnabled("hideContinueButton"));
   const hint = phaseHint(phase, now);
   const pausedLabel =
     phase.kind === "planned_work" && phase.paused
@@ -152,7 +181,7 @@ export function ActiveTimer({
         {pausedLabel}
       </p>
       <div className={displayStyles.clock}>
-        {displayClock(snapshot, params, now)}
+        {displayClock(snapshot, now)}
       </div>
       <p className={displayStyles.cycle}>
         Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
@@ -170,6 +199,7 @@ export function ActiveTimer({
           </button>
         ))}
       </div>
+      <LiveStatsRow liveStats={liveStats} />
     </>
   );
 }

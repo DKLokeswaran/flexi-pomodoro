@@ -3,11 +3,11 @@ import {
   type AlertEvent,
   type AlertId,
   type DecisionPhase,
-  type ExtendedWorkPhase,
   type Phase,
   type PlannedWorkPhase,
   type RestKind,
   type RestPhase,
+  type SessionLiveStats,
   type SessionParams,
   type SessionSnapshot,
   type WorkPauseStrategy as PauseStrategyId,
@@ -18,7 +18,7 @@ import {
   PauseStrategyRegistry,
   type WorkPauseStrategy,
 } from "../pause/index.js";
-import { msToIso, parseIso } from "../utils/iso.js";
+import { elapsedSecFromIso, msToIso, parseIso } from "../utils/iso.js";
 
 /** Domain error from session commands (wrong phase, no session, etc.). */
 export class SessionError extends Error {
@@ -84,6 +84,49 @@ function startRest(
     startedAt: msToIso(nowMs),
     plannedDurationSec,
     plannedEndAt: msToIso(nowMs + plannedDurationSec * 1000),
+  };
+}
+
+/** Rest seconds accumulated in a rest phase up to endMs. */
+function restSecAt(phase: RestPhase, endMs: number): number {
+  const clockMs = Math.min(endMs, parseIso(phase.plannedEndAt));
+  return elapsedSecFromIso(phase.startedAt, clockMs);
+}
+
+/**
+ * Focus seconds in planned work up to endMs.
+ * Wall elapsed minus total paused time (closed + open) — same for soft and hard.
+ */
+function plannedWorkSecAt(phase: PlannedWorkPhase, endMs: number): number {
+  let pauseSec = phase.pausedSec;
+  if (phase.paused && phase.pauseStartedAt) {
+    pauseSec += elapsedSecFromIso(phase.pauseStartedAt, endMs);
+  }
+  return elapsedSecFromIso(phase.startedAt, endMs) - pauseSec;
+}
+
+/** Attribute decision/ack elapsed so far to deliberation. */
+function addDeliberation(
+  session: ActiveSession,
+  phase: DecisionPhase,
+  nowMs: number,
+): void {
+  session.liveStats.deliberationSec += elapsedSecFromIso(
+    phase.startedAt,
+    nowMs,
+  );
+}
+
+/** Enter extended work; startedAtMs is click time or decision start (timeout). */
+function enterExtendedWork(
+  session: ActiveSession,
+  cycleIndex: number,
+  startedAtMs: number,
+): void {
+  session.phase = {
+    kind: "extended_work",
+    cycleIndex,
+    startedAt: msToIso(startedAtMs),
   };
 }
 
@@ -162,6 +205,32 @@ export class SessionService {
     return this.alertSeq;
   }
 
+  /** Live stats including elapsed time in the current phase (for HUD). */
+  private liveStatsWithProgress(
+    session: ActiveSession,
+    nowMs: number,
+  ): SessionLiveStats {
+    const stats = { ...session.liveStats };
+    const phase = session.phase;
+    switch (phase.kind) {
+      case "planned_work":
+        stats.workedSec += plannedWorkSecAt(phase, nowMs);
+        break;
+      case "decision":
+      case "short_rest_ack":
+        stats.deliberationSec += elapsedSecFromIso(phase.startedAt, nowMs);
+        break;
+      case "extended_work":
+        stats.workedSec += elapsedSecFromIso(phase.startedAt, nowMs);
+        break;
+      case "short_rest":
+      case "long_rest":
+        stats.restSec += restSecAt(phase, nowMs);
+        break;
+    }
+    return stats;
+  }
+
   /** Build idle or active snapshot, cloning session fields and attaching alert deltas. */
   private buildSnapshot(nowMs: number, sinceSeq: number): SessionSnapshot {
     const pendingAlerts = this.alertsSince(sinceSeq);
@@ -180,6 +249,7 @@ export class SessionService {
         ...this.session,
         params: { ...this.session.params },
         phase: structuredClone(this.session.phase),
+        liveStats: this.liveStatsWithProgress(this.session, nowMs),
         pendingAlerts,
         alertSeq: this.alertSeq,
       },
@@ -254,7 +324,7 @@ export class SessionService {
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
 
-  /** Decision: user chooses rest; enter rest and emit rest-start alerts. */
+  /** Work decision: user chooses rest. */
   ackRest(nowMs: number = Date.now()): SessionSnapshot {
     const { session, seqAtStart } = this.beginActiveCommand(nowMs);
     this.requirePhase(
@@ -262,11 +332,12 @@ export class SessionService {
       "decision",
       "Acknowledge rest is only valid in decision",
     );
+    addDeliberation(session, session.phase as DecisionPhase, nowMs);
     this.enterRestFromWork(session, nowMs, ["rest_ack"]);
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
 
-  /** Short-rest ack: user acknowledges; planned work starts running. Implemented in Group B. */
+  /** Short-rest ack: user acknowledges; next cycle starts running. */
   ackWork(nowMs: number = Date.now()): SessionSnapshot {
     const { session, seqAtStart } = this.beginActiveCommand(nowMs);
     this.requirePhase(
@@ -274,11 +345,17 @@ export class SessionService {
       "short_rest_ack",
       "Acknowledge work is only valid in short-rest ack",
     );
-    // Full stat attribution and transition wired in engine-wiring (Group B).
+    const phase = session.phase as DecisionPhase;
+    addDeliberation(session, phase, nowMs);
+    session.phase = startPlannedWork(
+      session.params,
+      phase.cycleIndex + 1,
+      nowMs,
+    );
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
 
-  /** Decision: user continues; extended work starts at the click, not at decision. */
+  /** Work decision: user continues; extended work starts at the click. */
   continueExtended(nowMs: number = Date.now()): SessionSnapshot {
     const { session, seqAtStart } = this.beginActiveCommand(nowMs);
     this.requirePhase(
@@ -286,22 +363,21 @@ export class SessionService {
       "decision",
       "Continue is only valid in decision",
     );
-    session.phase = {
-      kind: "extended_work",
-      cycleIndex: session.phase.cycleIndex,
-      startedAt: msToIso(nowMs),
-    } satisfies ExtendedWorkPhase;
+    const phase = session.phase as DecisionPhase;
+    addDeliberation(session, phase, nowMs);
+    enterExtendedWork(session, phase.cycleIndex, nowMs);
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
 
   /** Extended work: user starts rest (no extra end-of-extended alert). */
   startRest(nowMs: number = Date.now()): SessionSnapshot {
     const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    this.requirePhase(
+    const phase = this.requirePhase(
       session,
       "extended_work",
       "Start rest is only valid during extended work",
     );
+    session.liveStats.workedSec += elapsedSecFromIso(phase.startedAt, nowMs);
     this.enterRestFromWork(session, nowMs, []);
     return this.notifyAndSnapshot(nowMs, seqAtStart);
   }
@@ -358,6 +434,22 @@ export class SessionService {
     this.emitAlerts(...alerts, restEntryAlert);
   }
 
+  private commitPlannedWork(
+    session: ActiveSession,
+    phase: PlannedWorkPhase,
+    endMs: number,
+  ): void {
+    session.liveStats.workedSec += plannedWorkSecAt(phase, endMs);
+  }
+
+  private commitRest(
+    session: ActiveSession,
+    phase: RestPhase,
+    endMs: number,
+  ): void {
+    session.liveStats.restSec += restSecAt(phase, endMs);
+  }
+
   /** Apply at most one due phase transition; false if nothing is due. */
   private advanceOnce(session: ActiveSession, nowMs: number): boolean {
     const phase = session.phase;
@@ -365,9 +457,9 @@ export class SessionService {
       case "planned_work":
         return this.advancePlannedWork(session, phase, nowMs);
       case "decision":
-        return this.advanceDecision(session, phase, nowMs);
+        return this.advanceWorkDecision(session, phase, nowMs);
       case "short_rest_ack":
-        return false; // Full ack-window timeout wired in Group B (engine-wiring).
+        return this.advanceShortRestAck(session, phase, nowMs);
       case "extended_work":
         return false;
       case "short_rest":
@@ -376,7 +468,7 @@ export class SessionService {
     }
   }
 
-  /** Planned end: skip ticks while frozen; otherwise apply strategy policy. */
+  /** Planned end: skip ticks while frozen; otherwise apply pause-strategy policy. */
   private advancePlannedWork(
     session: ActiveSession,
     phase: PlannedWorkPhase,
@@ -386,6 +478,7 @@ export class SessionService {
     if (isBeforeDeadline(phase.plannedEndAt, nowMs)) return false;
     const plannedEndMs = parseIso(phase.plannedEndAt);
     const action = this.pausePlugin!.onPlannedEnd(phase, plannedEndMs);
+    this.commitPlannedWork(session, phase, plannedEndMs);
     if (action === "rest") {
       this.enterRestFromWork(session, plannedEndMs, ["work_planned_end"]);
       return true;
@@ -394,7 +487,7 @@ export class SessionService {
     return true;
   }
 
-  /** Open the decision window starting at planned work's end. */
+  /** Open the work-decision window starting at planned work's end. */
   private enterDecisionPhase(
     session: ActiveSession,
     plannedWork: PlannedWorkPhase,
@@ -412,23 +505,61 @@ export class SessionService {
     this.emitAlerts("work_planned_end");
   }
 
-  /** Decision timeout: auto-start extended work backdated to decision start. */
-  private advanceDecision(
+  /**
+   * Work-decision timeout: full window folds into extended work (FR-FLOW-11).
+   */
+  private advanceWorkDecision(
     session: ActiveSession,
     phase: DecisionPhase,
     nowMs: number,
   ): boolean {
     if (isBeforeDeadline(phase.decisionEndsAt, nowMs)) return false;
-    session.phase = {
-      kind: "extended_work",
-      cycleIndex: phase.cycleIndex,
-      startedAt: phase.startedAt,
-    };
+    session.liveStats.workedSec += phase.decisionWindowSec;
+    enterExtendedWork(session, phase.cycleIndex, parseIso(phase.startedAt));
     this.emitAlerts("extended_work_auto_start");
     return true;
   }
 
-  /** Rest end → next planned work, or session complete after long rest. */
+  /** Open short-rest ack window after short rest ends. */
+  private enterShortRestAckPhase(
+    session: ActiveSession,
+    restPhase: RestPhase,
+    restEndedAtMs: number,
+  ): void {
+    session.phase = {
+      kind: "short_rest_ack",
+      cycleIndex: restPhase.cycleIndex,
+      startedAt: msToIso(restEndedAtMs),
+      decisionEndsAt: msToIso(
+        restEndedAtMs + session.params.decisionWindowSec * 1000,
+      ),
+      decisionWindowSec: session.params.decisionWindowSec,
+    };
+  }
+
+  /**
+   * Short-rest ack timeout: deliberation for the window, then next work paused.
+   */
+  private advanceShortRestAck(
+    session: ActiveSession,
+    phase: DecisionPhase,
+    nowMs: number,
+  ): boolean {
+    if (isBeforeDeadline(phase.decisionEndsAt, nowMs)) return false;
+    const timeoutMs = parseIso(phase.decisionEndsAt);
+    session.liveStats.deliberationSec += phase.decisionWindowSec;
+    this.emitAlerts("short_rest_ack_expired");
+    const work = startPlannedWork(
+      session.params,
+      phase.cycleIndex + 1,
+      timeoutMs,
+    );
+    session.phase = work;
+    this.pausePlugin!.onPause(work, timeoutMs);
+    return true;
+  }
+
+  /** Rest end → short-rest ack, or session complete after long rest. */
   private advanceRest(
     session: ActiveSession,
     phase: RestPhase,
@@ -436,13 +567,10 @@ export class SessionService {
   ): boolean {
     if (isBeforeDeadline(phase.plannedEndAt, nowMs)) return false;
     const restEndedAtMs = parseIso(phase.plannedEndAt);
+    this.commitRest(session, phase, restEndedAtMs);
     if (phase.kind === "short_rest") {
       this.emitAlerts("short_rest_end");
-      session.phase = startPlannedWork(
-        session.params,
-        phase.cycleIndex + 1,
-        restEndedAtMs,
-      );
+      this.enterShortRestAckPhase(session, phase, restEndedAtMs);
       return true;
     }
     this.emitAlerts("long_rest_end");

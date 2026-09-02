@@ -10,7 +10,8 @@
   color: var(--accent);
 }
 
-.phaseLabel[data-phase="decision"] {
+.phaseLabel[data-phase="decision"],
+.phaseLabel[data-phase="short_rest_ack"] {
   color: var(--decision);
 }
 
@@ -25,7 +26,7 @@
 
 .clock {
   font-family: var(--font-display);
-  font-size: clamp(4rem, 16vw, 6.5rem);
+  font-size: clamp(5.25rem, 22vw, 8.75rem);
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -35,6 +36,32 @@
 .cycle {
   color: var(--muted);
   font-size: 1rem;
+}
+
+.liveStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.liveStats strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--font-body);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .decisionHint {

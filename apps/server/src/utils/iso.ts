@@ -7,3 +7,8 @@ export function msToIso(ms: number): string {
 export function parseIso(value: string): number {
   return Date.parse(value);
 }
+
+/** Whole seconds elapsed from an ISO start timestamp to nowMs. */
+export function elapsedSecFromIso(startedAt: string, nowMs: number): number {
+  return Math.floor((nowMs - parseIso(startedAt)) / 1000);
+}

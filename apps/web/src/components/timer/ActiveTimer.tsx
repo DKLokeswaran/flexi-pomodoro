@@ -7,11 +7,14 @@ import type {
 } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
 import { useUiFlags } from "../../browserFlags/ui";
+import { ACTIVE_UI_TICK_MS, useNow } from "../../hooks/useNow";
 import {
   elapsedFromIso,
+  formatLocalTime,
   formatMmSs,
   remainingSecFromIso,
 } from "../../utils/time";
+import { activeEstimatedSessionEndMs } from "../../utils/activeSessionProjection";
 import { liveStatsAt } from "../../utils/liveStats";
 import displayStyles from "./timerDisplay.module.css";
 
@@ -157,18 +160,20 @@ function LiveStatsRow({ liveStats }: { liveStats: SessionLiveStats }) {
 /** Running-session display: phase, clock, cycle, stats, hints, and phase actions. */
 export function ActiveTimer({
   snapshot,
-  now,
   onAction,
 }: {
   snapshot: ActiveSnapshot;
-  now: number;
   onAction: (path: string) => void;
 }) {
+  const now = useNow(ACTIVE_UI_TICK_MS);
   const { phase, params, pauseStrategy } = snapshot.session;
   const { isEnabled } = useUiFlags();
   const liveStats = liveStatsAt(snapshot, now);
   const actions = actionsForPhase(snapshot, isEnabled("hideContinueButton"));
   const hint = phaseHint(phase, now);
+  const estimatedEnd = formatLocalTime(
+    activeEstimatedSessionEndMs(snapshot, now),
+  );
   const pausedLabel =
     phase.kind === "planned_work" && phase.paused
       ? pausedPhaseLabel(pauseStrategy)
@@ -186,6 +191,11 @@ export function ActiveTimer({
       <p className={displayStyles.cycle}>
         Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
       </p>
+      <div className={displayStyles.estimatedEnd}>
+        <p>
+          Estimated end <strong>{estimatedEnd}</strong>
+        </p>
+      </div>
       {hint ? <p className={displayStyles.decisionHint}>{hint}</p> : null}
       <div className="actions">
         {actions.map((action) => (

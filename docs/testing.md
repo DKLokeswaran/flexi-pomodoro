@@ -79,6 +79,30 @@ Isolated `hardPauseStrategy` unit tests:
 | `onResume` | Remaining time unchanged; `plannedEndAt` shifted by paused duration |
 | `onPlannedEnd` | → `"decision"` when unfrozen |
 
+### `apps/server/src/tests/shared/sessionProjection.test.ts`
+
+Imports web `sessionProjection` helpers (tsx path into `apps/web`).
+
+| Case | Asserts |
+|------|---------|
+| Nominal duration N=2 / N=1 | Work + short rests + long rest arithmetic |
+| `estimatedSessionEndMs` | Equals start + nominal duration |
+| DEFAULT_SETTINGS | Matches formula for default cycle count |
+| Instant-ack happy path | `SessionService` goes idle at projected end |
+
+### `apps/server/src/tests/shared/activeSessionProjection.test.ts`
+
+Imports web `activeSessionProjection` helpers.
+
+| Case | Asserts |
+|------|---------|
+| Planned work happy path | Matches idle nominal end |
+| Decision / extended | End advances with wall clock |
+| Extended → rest | Slip persists via rest anchors |
+| Hard pause open / resume | Open pause adds time; shifted `plannedEndAt` keeps it after resume |
+| Short rest after deliberation | Anchor slip reflected |
+| SessionService extended → rest | Projection stable across transition |
+
 ---
 
 ## Mocking patterns
@@ -91,7 +115,7 @@ Inline constants and helper factories only — no fixture files.
 
 ## Conventions
 
-- File naming: `*.service.test.ts` under `src/tests/services/`; pause plugins under `src/tests/pause/*.test.ts`
+- File naming: `*.service.test.ts` under `src/tests/services/`; pause plugins under `src/tests/pause/*.test.ts`; web projection helpers under `src/tests/shared/*.test.ts`
 - Blocks: `describe("ClassOrFn", () => { it("behavior…", …) })`
 - Style: strict assert (`assert.equal`, `assert.ok`, `assert.throws`, `assert.deepEqual`)
 - Phase checks often narrow with `if (snap.status !== "active") throw …` after assert for TypeScript narrowing

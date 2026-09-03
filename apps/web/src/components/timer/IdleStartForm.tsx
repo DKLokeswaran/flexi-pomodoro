@@ -2,7 +2,18 @@ import { useEffect, useState } from "react";
 import type { StartSessionBody } from "@flexi-pomodoro/shared";
 import { useDebugFlags } from "../../browserFlags/debug";
 import { DECISION_WINDOW_LABEL } from "../../constants/labels";
-import { minutesToSec, secToMinutes } from "../../utils/time";
+import { IDLE_ESTIMATE_TICK_MS, useNow } from "../../hooks/useNow";
+import {
+  estimatedSessionEndMs,
+  nominalSessionDurationSec,
+  type SessionDurationParams,
+} from "../../utils/sessionProjection";
+import {
+  formatApproxDuration,
+  formatLocalTime,
+  minutesToSec,
+  secToMinutes,
+} from "../../utils/time";
 import { NumberField } from "../NumberField";
 import displayStyles from "./timerDisplay.module.css";
 
@@ -52,22 +63,30 @@ function draftFromDefaults(
   };
 }
 
+/** Map the start-form draft to duration params for projection and the start API. */
+function durationParamsFromDraft(
+  draft: OverrideDraft,
+  useSeconds: boolean,
+): SessionDurationParams {
+  return {
+    workDurationSec: durationForApi(draft.workDuration, useSeconds),
+    shortRestDurationSec: durationForApi(draft.shortRestDuration, useSeconds),
+    longRestDurationSec: durationForApi(draft.longRestDuration, useSeconds),
+    cyclesBeforeLongRest: Math.round(draft.cyclesBeforeLongRest),
+  };
+}
+
 /** Build POST /start body from the draft, attaching debug flags when needed. */
 function toStartBody(
   draft: OverrideDraft,
   useSeconds: boolean,
 ): StartSessionBody {
-  const overrides: StartSessionBody = {
-    workDurationSec: durationForApi(draft.workDuration, useSeconds),
-    shortRestDurationSec: durationForApi(draft.shortRestDuration, useSeconds),
-    longRestDurationSec: durationForApi(draft.longRestDuration, useSeconds),
-    cyclesBeforeLongRest: Math.round(draft.cyclesBeforeLongRest),
+  const params = durationParamsFromDraft(draft, useSeconds);
+  return {
+    ...params,
     decisionWindowSec: Math.round(draft.decisionWindowSec),
+    ...(useSeconds ? { debug: { shortDurations: true } } : {}),
   };
-  if (useSeconds) {
-    overrides.debug = { shortDurations: true };
-  }
-  return overrides;
 }
 
 /** Idle timer: Ready clock plus per-session duration overrides and Start. */
@@ -80,6 +99,7 @@ export function IdleStartForm({
 }) {
   const { isEnabled } = useDebugFlags();
   const shortDurations = isEnabled("shortDurations");
+  const now = useNow(IDLE_ESTIMATE_TICK_MS);
   const [overrides, setOverrides] = useState(() =>
     draftFromDefaults(defaults, shortDurations),
   );
@@ -88,7 +108,14 @@ export function IdleStartForm({
     setOverrides(draftFromDefaults(defaults, shortDurations));
   }, [defaults, shortDurations]);
 
+  const durationParams = durationParamsFromDraft(overrides, shortDurations);
   const durationUnit = shortDurations ? "sec" : "min";
+  const estimatedEnd = formatLocalTime(
+    estimatedSessionEndMs(durationParams, now),
+  );
+  const endsIn = formatApproxDuration(
+    nominalSessionDurationSec(durationParams),
+  );
   const fields: { key: keyof OverrideDraft; label: string }[] = [
     { key: "workDuration", label: `Work (${durationUnit})` },
     { key: "shortRestDuration", label: `Short rest (${durationUnit})` },
@@ -102,6 +129,14 @@ export function IdleStartForm({
       <p className={displayStyles.phaseLabel}>Ready</p>
       <div className={displayStyles.clock}>00:00</div>
       <p className={displayStyles.cycle}>Start a committed session</p>
+      <div className={displayStyles.estimatedEnd}>
+        <p>
+          Estimated end <strong>{estimatedEnd}</strong>
+        </p>
+        <p>
+          Ends in <strong>{endsIn}</strong> if you start now
+        </p>
+      </div>
       <div className="panel" style={{ width: "100%" }}>
         <p className="section-title">This session</p>
         <div className="form-grid">

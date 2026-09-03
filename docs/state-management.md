@@ -133,10 +133,10 @@ Transport (`connectSessionStream`):
 |-----------|-------|
 | `App` | `tab: Tab` |
 | `SettingsTab` | draft minutes/cycles/decision; `enableHardPause`; session-only `experimentalMode` gate; UI + debug flag toggles |
-| `IdleStartForm` | override draft (min or sec depending on shortDurations) |
+| `IdleStartForm` | override draft (min or sec depending on shortDurations); own `useNow(IDLE_ESTIMATE_TICK_MS)` for estimated end |
+| `ActiveTimer` | own `useNow(ACTIVE_UI_TICK_MS)` for countdown, live stats, and estimated end |
 | `AboutAccordion` | `open` |
 | `ToastProvider` | current toast |
-| `useNow` | `now` ms ticker when active |
 
 ---
 
@@ -145,7 +145,8 @@ Transport (`connectSessionStream`):
 No dedicated selector library. Inline derivation examples:
 
 - `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`
-- `ActiveTimer`: `displayClock`, `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`), `phaseHint`, `liveStatsAt` HUD, strategy-aware pause labels
+- `ActiveTimer`: `displayClock`, `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`), `phaseHint`, `liveStatsAt` HUD, `activeEstimatedSessionEndMs`, strategy-aware pause labels
+- `IdleStartForm`: `estimatedSessionEndMs` / `nominalSessionDurationSec` from override draft
 - `AboutTab`: feature available/soon counts; health UI mapping
 
 ---
@@ -154,7 +155,7 @@ No dedicated selector library. Inline derivation examples:
 
 | Hook | Inputs | Outputs |
 |------|--------|---------|
-| `useNow(isTicking)` | boolean | `number` (Date.now, 250ms) |
+| `useNow(intervalMs)` | `number \| null` (`ACTIVE_UI_TICK_MS` / `IDLE_ESTIMATE_TICK_MS` / `null`) | `number` (Date.now at that cadence; frozen when `null`) |
 | `useSessionStream()` | — | `{ snapshot, setSnapshot }` |
 | `useDebugFlags()` | — | debug flag store (throws if missing) |
 | `useUiFlags()` | — | UI preference store (throws if missing) |

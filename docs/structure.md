@@ -83,7 +83,7 @@ flexi-pomodoro/
 │           ├── browserFlags/    # createFlagCatalog, createFlagStore, debug/, ui/
 │           ├── providers/       # Toast
 │           ├── queries/         # fetch helpers + React Query hooks
-│           └── utils/           # time, liveStats, fetchJson, alerts, errorMessage
+│           └── utils/           # time, liveStats, sessionProjection, activeSessionProjection, fetchJson, alerts, errorMessage
 ```
 
 ## Top-level folder roles

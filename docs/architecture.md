@@ -121,7 +121,7 @@ stateDiagram-v2
 
 `N` is `cyclesBeforeLongRest`. Rest kind is chosen by `cycleIndex >= N` → long rest, else short rest.
 
-Short rest ends enter `short_rest_ack` (not running work). Explicit `ackWork` starts the next cycle running; ack timeout emits `short_rest_ack_expired` and starts the next cycle immediately paused via the active pause strategy. Snapshots include `liveStats` with in-phase progress at `serverNow`; the web HUD extrapolates locally via `liveStatsAt()` and `useNow()`.
+Short rest ends enter `short_rest_ack` (not running work). Explicit `ackWork` starts the next cycle running; ack timeout emits `short_rest_ack_expired` and starts the next cycle immediately paused via the active pause strategy. Snapshots include `liveStats` with in-phase progress at `serverNow`; the web HUD extrapolates locally via `liveStatsAt()` and `ActiveTimer`'s `useNow` tick.
 
 Decision timeout attributes elapsed decision time to **extended work** (`startedAt` = decision start). Explicit **continue** starts extended work at the click time (decision elapsed excluded). Soft pause through planned end **skips decision** and enters rest at planned end (`onPlannedEnd` → `"rest"`). While a strategy reports `isCountdownFrozen`, planned-end ticks are skipped.
 
@@ -161,7 +161,7 @@ main.tsx
 | Kind | Examples |
 |------|----------|
 | Container / smart | `App` (queries + stream + mutations), `SettingsTab` (draft + browser prefs + debug), `AboutTab` (health + clipboard), `useSessionStream` |
-| Presentational | `Nav`, `NumberField`, `LinkCard`, `AboutAccordion`, `ActiveTimer` (receives `ActiveSnapshot` + `now`) |
+| Presentational | `Nav`, `NumberField`, `LinkCard`, `AboutAccordion`, `ActiveTimer` (receives `ActiveSnapshot`; owns its own `useNow` tick) |
 
 ### Routing
 
@@ -170,7 +170,8 @@ No React Router. `App` holds `tab: "timer" | "settings" | "analytics" | "about"`
 ### Real-time / countdown
 
 - **Authoritative phase changes**: SSE (`/api/session/events`) + hybrid poll fallback (`sessionStream.sse.ts`).
-- **UI countdown**: local `useNow` (250ms) computes remaining/overtime from ISO anchors on the snapshot — no sub-second API polling. Hard pause uses `timerFrozenAt` as the clock anchor while paused.
+- **UI countdown**: each leaf owns its clock. `ActiveTimer` uses `useNow(ACTIVE_UI_TICK_MS)` (250ms) for remaining/overtime from ISO anchors — no sub-second API polling. Hard pause uses `timerFrozenAt` as the clock anchor while paused. `IdleStartForm` uses `useNow(IDLE_ESTIMATE_TICK_MS)` (60s) only for the absolute estimated-end label.
+- **Estimated session end**: idle shows locale wall-clock end plus approximate duration (`sessionProjection` — nominal path: `N×work + (N−1)×short rest + long rest`, no decision windows). Active shows a live end time via `activeEstimatedSessionEndMs` (forward remainder from current phase anchors; deliberation, extended work, and hard-pause slip shift the projection).
 - **Live stats HUD**: `ActiveTimer` shows Worked / Deliberation / Rest counters. `liveStatsAt(snapshot, now)` strips in-phase progress at `serverNow` and re-adds at local `now`, mirroring server `liveStatsWithProgress` formulas.
 - **Browser preferences**: `hideContinueButton` UI flag (localStorage `flexi-pomodoro:uiFlags`) omits the Continue action during the work-decision phase.
 - **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`. Label and phase suffix follow the locked session strategy (`Soft pause` vs `Hard pause (experimental)`). Toasts mirror the same strategy.

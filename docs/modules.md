@@ -283,6 +283,23 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 | `elapsedFromIso(iso, nowMs)` | non-negative elapsed |
 | `minutesToSec` / `secToMinutes` | conversions |
 | `remainingSecFromIso(iso, nowMs)` | non-negative countdown seconds |
+| `formatLocalTime(ms)` | locale wall-clock label (hour + minute) |
+| `formatApproxDuration(totalSec)` | approximate duration (`~2h 15m`) |
+
+### `src/utils/sessionProjection.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `SessionDurationParams` | work / short rest / long rest / cycles |
+| `nominalSessionDurationSec(params)` | happy-path length (no decision windows) |
+| `estimatedSessionEndMs(params, startMs)` | wall-clock end from a start instant |
+
+### `src/utils/activeSessionProjection.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `remainingActiveSessionSec(snapshot, nowMs)` | happy-path remainder from current phase anchors |
+| `activeEstimatedSessionEndMs(snapshot, nowMs)` | projected session end during an active session |
 
 ### `src/utils/fetchJson.ts`
 
@@ -335,7 +352,9 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 
 | Export | I/O |
 |--------|-----|
-| `useNow(isTicking: boolean): number` | 250ms ticker when ticking |
+| `ACTIVE_UI_TICK_MS` | `250` — active countdown / live stats |
+| `IDLE_ESTIMATE_TICK_MS` | `60_000` — idle estimated-end label |
+| `useNow(intervalMs: number \| null): number` | ticks at `intervalMs`; frozen when `null` |
 
 ### `src/hooks/sessionStream.sse.ts`
 
@@ -480,15 +499,16 @@ Exports: `UI_FEATURE_IDS`, `UI_FEATURE_META`, `UiFeatureId`, `UiFlags`.
 | `SessionTimingDefaults` | type (duration fields) |
 | `IdleStartForm` | props `{ defaults, onStart }` |
 
+Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and approximate duration from per-session overrides via `sessionProjection`.
+
 ### `src/components/timer/ActiveTimer.tsx`
 
 | Props | Type |
 |-------|------|
 | `snapshot` | `ActiveSnapshot` |
-| `now` | number |
 | `onAction` | `(path: string) => void` |
 
-Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Renders phase label, countdown, cycle, hint, actions, and live-stats HUD (`liveStatsAt`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
+Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Renders phase label, countdown, cycle, estimated end (`activeEstimatedSessionEndMs`), hint, actions, and live-stats HUD (`liveStatsAt`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
 
 Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button label and phase suffix follow `snapshot.session.pauseStrategy`.
 

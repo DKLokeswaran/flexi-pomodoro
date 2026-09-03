@@ -1,6 +1,5 @@
 import type { SessionSnapshot, StartSessionBody } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
-import { useNow } from "../hooks/useNow";
 import { ActiveTimer } from "./timer/ActiveTimer";
 import {
   IdleStartForm,
@@ -20,7 +19,6 @@ export function TimerTab({
 }) {
   const activeSnapshot =
     snapshot?.status === "active" ? snapshot : null;
-  const now = useNow(Boolean(activeSnapshot));
 
   return (
     <section className={styles.timerShell} aria-live="polite">
@@ -32,7 +30,6 @@ export function TimerTab({
       ) : (
         <ActiveTimer
           snapshot={activeSnapshot}
-          now={now}
           onAction={(path) => onAction(path)}
         />
       )}

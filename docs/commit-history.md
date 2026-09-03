@@ -6,20 +6,21 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 34 |
+| Total commits | 35 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-08-20 |
+| Latest commit date | 2026-09-02 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (31) |
+| Most active contributor | Lokeswaran DK (35) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
-| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` |
+| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0`, `v0.0.2-alpha.1` |
 
 ## Commit velocity
 
 | Month | Commits |
 |-------|--------:|
 | 2026-07 | 23 |
-| 2026-08 | 10 |
+| 2026-08 | 11 |
+| 2026-09 | 1 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -123,6 +124,13 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Add `POST /api/session/ack-work` route stub and `short_rest_ack_expired` alert id.
 - M2.5 implementation plan; technical docs updated for scaffold state.
 
+### 2026-09-02 — M2.5 release (`v0.0.2-alpha.1`)
+
+- Wire short-rest ack engine paths (ack → running work; timeout → paused work via active pause strategy).
+- Live session stats on active snapshots; client HUD extrapolation via `liveStatsAt`.
+- Shared browser flag stores (`browserFlags/`) for debug + UI prefs; Settings **hide Continue** preference.
+- Tag `v0.0.2-alpha.1`.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -136,6 +144,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 907ea9d | Lokeswaran DK | 2026-09-02 | Release v0.0.2-alpha.1 — M2.5 short-rest ack + live session stats. |
 | 715cbaf | Lokeswaran DK | 2026-08-20 | Add M2.5 short-rest ack scaffold and sync technical docs. |
 | 5748abb | Lokeswaran DK | 2026-08-19 | Fix docker-compose port mapping to use host port 4000. |
 | 339c084 | Lokeswaran DK | 2026-08-19 | Simplify pause slice math and sync commit-history to trunk HEAD. |
@@ -171,4 +180,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: 715cbaf4eaeda5860efed5ac8dc03675339db86b
+Last Synced Commit: 907ea9dd46ea7350a16137ddf842202101dbe4f0

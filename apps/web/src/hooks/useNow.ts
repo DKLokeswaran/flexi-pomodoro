@@ -1,12 +1,21 @@
 import { useEffect, useState } from "react";
 
-/** Local wall-clock ticker for rendering remaining/overtime from anchors. */
-export function useNow(isTicking: boolean): number {
+/** Countdown and live-stats refresh cadence while a session is active. */
+export const ACTIVE_UI_TICK_MS = 250;
+
+/** Estimated end-time refresh on the idle start screen (hour/minute display). */
+export const IDLE_ESTIMATE_TICK_MS = 60_000;
+
+/**
+ * Local wall-clock ms for UI extrapolation.
+ * Pass null to freeze at mount; otherwise re-render at intervalMs.
+ */
+export function useNow(intervalMs: number | null): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!isTicking) return;
-    const intervalId = window.setInterval(() => setNow(Date.now()), 250);
+    if (intervalMs == null) return;
+    const intervalId = window.setInterval(() => setNow(Date.now()), intervalMs);
     return () => window.clearInterval(intervalId);
-  }, [isTicking]);
+  }, [intervalMs]);
   return now;
 }

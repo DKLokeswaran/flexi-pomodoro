@@ -38,6 +38,26 @@
   font-size: 1rem;
 }
 
+.estimatedEnd {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  line-height: 1.35;
+}
+
+.estimatedEnd p {
+  margin: 0;
+}
+
+.estimatedEnd strong {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .liveStats {
   display: flex;
   flex-wrap: wrap;

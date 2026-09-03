@@ -31,3 +31,21 @@ export function secToMinutes(sec: number): number {
 export function remainingSecFromIso(iso: string, nowMs: number): number {
   return Math.max(0, secFromIso(iso, nowMs));
 }
+
+/** Local wall-clock time label (e.g. 3:45 PM) for a Unix timestamp. */
+export function formatLocalTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/** Human-readable approximate duration (e.g. 8100 → ~2h 15m). */
+export function formatApproxDuration(totalSec: number): string {
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  if (hours > 0 && minutes > 0) return `~${hours}h ${minutes}m`;
+  if (hours > 0) return `~${hours}h`;
+  if (minutes > 0) return `~${minutes}m`;
+  return `~${totalSec}s`;
+}

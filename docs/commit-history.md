@@ -6,13 +6,13 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 35 |
+| Total commits | 36 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-09-02 |
+| Latest commit date | 2026-09-03 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (35) |
+| Most active contributor | Lokeswaran DK (36) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
-| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0`, `v0.0.2-alpha.1` |
+| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0`, `v0.0.2-alpha.1`, `v0.0.2-alpha.2` |
 
 ## Commit velocity
 
@@ -20,7 +20,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 |-------|--------:|
 | 2026-07 | 23 |
 | 2026-08 | 11 |
-| 2026-09 | 1 |
+| 2026-09 | 2 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -131,6 +131,17 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Shared browser flag stores (`browserFlags/`) for debug + UI prefs; Settings **hide Continue** preference.
 - Tag `v0.0.2-alpha.1`.
 
+### 2026-09-03 — Estimated session end
+
+- Idle start form projects nominal session end from draft overrides (`sessionProjection`).
+- Active timer forward-projects end from phase anchors (`activeSessionProjection`) so deliberation, extended work, and hard-pause slip stay reflected.
+- Shared projection unit tests under `apps/server/src/tests/shared/`.
+
+### 2026-09-04 — Fix decision-timeout liveStats (`v0.0.2-alpha.2`)
+
+- Stop committing `decisionWindowSec` into `workedSec` on work-decision timeout; extended `startedAt` at decision start attributes the window once.
+- Regression test for single-count worked totals; data-model and testing docs updated.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -144,6 +155,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| e0bd52d | Lokeswaran DK | 2026-09-03 | Show estimated session end on idle and active timers. |
 | 907ea9d | Lokeswaran DK | 2026-09-02 | Release v0.0.2-alpha.1 — M2.5 short-rest ack + live session stats. |
 | 715cbaf | Lokeswaran DK | 2026-08-20 | Add M2.5 short-rest ack scaffold and sync technical docs. |
 | 5748abb | Lokeswaran DK | 2026-08-19 | Fix docker-compose port mapping to use host port 4000. |
@@ -180,4 +192,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: 907ea9dd46ea7350a16137ddf842202101dbe4f0
+Last Synced Commit: e0bd52ddb09dc9f4b19472e1019d4e78b7644187

@@ -72,7 +72,7 @@ Work decision (`kind: "decision"`) follows planned work. Short-rest ack (`kind: 
 | `deliberationSec` | number | Work-decision elapsed (explicit act only) + ack elapsed (always) |
 | `restSec` | number | Short rest + long rest time |
 
-Present on every active session snapshot; initialized to zeros at start. The engine commits phase totals on transitions and overlays in-phase progress in `buildSnapshot` via `liveStatsWithProgress`. Work-decision timeout folds into `workedSec`; explicit ack/continue and ack-window time go to `deliberationSec`; planned-work focus is wall elapsed minus total paused time.
+Present on every active session snapshot; initialized to zeros at start. The engine commits phase totals on transitions and overlays in-phase progress in `buildSnapshot` via `liveStatsWithProgress`. Work-decision timeout does not commit `decisionWindowSec` on its own: extended work starts at decision start (FR-FLOW-11), so the overlay (and later `startRest` commit) attributes the window once under `workedSec`. Explicit ack/continue and ack-window time go to `deliberationSec`; planned-work focus is wall elapsed minus total paused time.
 
 #### `ExtendedWorkPhase`
 

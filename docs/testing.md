@@ -39,6 +39,7 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | Happy path N=2 | work → decision → ack short rest → short_rest_ack → ackWork → work → long rest → idle; alerts; alertSeq reset |
 | Alert seq reset | New session alerts restart at seq 1 |
 | Decision timeout | → extended with backdated `startedAt`; startRest without replaying auto-start in pending |
+| Decision timeout liveStats | Folded window counted once under `workedSec` (at timeout and after further extended / startRest) |
 | Continue | Extended `startedAt` = click time |
 | Soft pause mid-work | `plannedEndAt` unchanged; `pausedSec` accumulates; `timerFrozenAt` stays null |
 | Soft-paused through end | Auto rest; skip decision |

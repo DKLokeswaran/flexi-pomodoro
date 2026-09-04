@@ -507,6 +507,7 @@ export class SessionService {
 
   /**
    * Work-decision timeout: full window folds into extended work (FR-FLOW-11).
+   * Keep startedAt at decision start; liveStats progress covers the window once.
    */
   private advanceWorkDecision(
     session: ActiveSession,
@@ -514,7 +515,6 @@ export class SessionService {
     nowMs: number,
   ): boolean {
     if (isBeforeDeadline(phase.decisionEndsAt, nowMs)) return false;
-    session.liveStats.workedSec += phase.decisionWindowSec;
     enterExtendedWork(session, phase.cycleIndex, parseIso(phase.startedAt));
     this.emitAlerts("extended_work_auto_start");
     return true;

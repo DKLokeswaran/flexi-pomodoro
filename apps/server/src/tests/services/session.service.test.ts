@@ -195,6 +195,42 @@ describe("SessionService", () => {
     );
   });
 
+  it("decision timeout folds window into worked once (no double-count)", () => {
+    const { settings, session } = servicesWithShortTimers(1);
+    startSession(settings, session, SESSION_START_MS);
+
+    const afterWork = SESSION_START_MS + 60_000;
+    const afterDecision = afterWork + 15_000;
+    const atTimeout = session.getSnapshot(afterDecision, 0);
+    assert.equal(atTimeout.status, "active");
+    if (atTimeout.status !== "active") throw new Error("expected active");
+    assert.equal(atTimeout.session.phase.kind, "extended_work");
+    // 60s planned + 15s folded window — not 90 (window committed and overlaid).
+    assert.deepEqual(atTimeout.session.liveStats, {
+      workedSec: 75,
+      deliberationSec: 0,
+      restSec: 0,
+    });
+
+    const afterExtended = session.getSnapshot(afterDecision + 5_000, 0);
+    assert.equal(afterExtended.status, "active");
+    if (afterExtended.status !== "active") throw new Error("expected active");
+    assert.deepEqual(afterExtended.session.liveStats, {
+      workedSec: 80,
+      deliberationSec: 0,
+      restSec: 0,
+    });
+
+    const restSnapshot = session.startRest(afterDecision + 5_000);
+    assert.equal(restSnapshot.status, "active");
+    if (restSnapshot.status !== "active") throw new Error("expected active");
+    assert.deepEqual(restSnapshot.session.liveStats, {
+      workedSec: 80,
+      deliberationSec: 0,
+      restSec: 0,
+    });
+  });
+
   it("continue from decision starts extended at click (decision time excluded)", () => {
     const { settings, session } = servicesWithShortTimers(1);
     startSession(settings, session, SESSION_START_MS);

@@ -365,7 +365,7 @@ User must Start again for a new session runtime
 | FR-AN-5 | Time-range filters: today / 7 days / 30 days / all | P1 |
 | FR-AN-6 | Simple charts (focus/day, extended/day, sessions/day) | P1 |
 | FR-AN-7 | Data local to instance (export JSON/CSV P2) | P0 / P2 |
-| FR-AN-8 | **Live session stats (M2.5):** While a session is active, the timer/session surface shows in-memory totals for the current session: total worked time (planned focus + extended; exclude soft-paused interruption from “worked” if tracked separately), decision time, and rest time. Short-rest acknowledgement elapsed may be shown with decision time or as its own line; it must not inflate worked or rest | P0 |
+| FR-AN-8 | **Live session stats (M2.5):** While a session is active, the timer/session surface shows in-memory totals for the current session: total worked time (planned focus + extended; pause interruption excluded from “worked”), decision time, rest time, and paused interruption time (soft/hard). Short-rest acknowledgement elapsed may be shown with decision time or as its own line; it must not inflate worked or rest | P0 |
 | FR-AN-9 | **Idle today stats (M3.5):** On the idle / idle-adjacent session surface (before Start), show aggregated stats for the **current local day** from persisted history (at minimum: worked, rest, and decision/ack deliberation totals consistent with FR-AN-4 exclusions). Full dashboard/charts remain M4 | P0 |
 
 **“Nice to know” stats (v1):**

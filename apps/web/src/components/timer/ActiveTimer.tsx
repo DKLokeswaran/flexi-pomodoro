@@ -153,6 +153,9 @@ function LiveStatsRow({ liveStats }: { liveStats: SessionLiveStats }) {
       <span>
         Rest <strong>{formatMmSs(liveStats.restSec)}</strong>
       </span>
+      <span>
+        Paused <strong>{formatMmSs(liveStats.pausedSec)}</strong>
+      </span>
     </p>
   );
 }

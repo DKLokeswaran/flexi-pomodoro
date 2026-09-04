@@ -210,6 +210,7 @@ describe("SessionService", () => {
       workedSec: 75,
       deliberationSec: 0,
       restSec: 0,
+      pausedSec: 0,
     });
 
     const afterExtended = session.getSnapshot(afterDecision + 5_000, 0);
@@ -219,6 +220,7 @@ describe("SessionService", () => {
       workedSec: 80,
       deliberationSec: 0,
       restSec: 0,
+      pausedSec: 0,
     });
 
     const restSnapshot = session.startRest(afterDecision + 5_000);
@@ -228,6 +230,7 @@ describe("SessionService", () => {
       workedSec: 80,
       deliberationSec: 0,
       restSec: 0,
+      pausedSec: 0,
     });
   });
 
@@ -370,6 +373,85 @@ describe("SessionService", () => {
     if (phase.kind !== "planned_work") throw new Error("expected planned_work");
     assert.equal(phase.paused, true);
     assert.equal(phase.plannedEndAt, originalEnd);
+  });
+
+  it("soft pause liveStats pausedSec grows during pause and commits after resume", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    startSession(settings, session, SESSION_START_MS);
+
+    const pauseAt = SESSION_START_MS + 20_000;
+    session.pause(pauseAt);
+
+    const duringPause = session.getSnapshot(pauseAt + 7_000, 0);
+    assert.equal(duringPause.status, "active");
+    if (duringPause.status !== "active") throw new Error("expected active");
+    assert.equal(duringPause.session.liveStats.pausedSec, 7);
+    assert.equal(duringPause.session.liveStats.workedSec, 20);
+
+    const laterPause = session.getSnapshot(pauseAt + 12_000, 0);
+    assert.equal(laterPause.status, "active");
+    if (laterPause.status !== "active") throw new Error("expected active");
+    assert.equal(laterPause.session.liveStats.pausedSec, 12);
+    assert.equal(laterPause.session.liveStats.workedSec, 20);
+
+    session.resume(pauseAt + 12_000);
+    const afterResume = session.getSnapshot(pauseAt + 12_000, 0);
+    assert.equal(afterResume.status, "active");
+    if (afterResume.status !== "active") throw new Error("expected active");
+    assert.equal(afterResume.session.liveStats.pausedSec, 12);
+    assert.equal(afterResume.session.liveStats.workedSec, 20);
+
+    const afterWork = session.getSnapshot(SESSION_START_MS + 60_000, 0);
+    assert.equal(afterWork.status, "active");
+    if (afterWork.status !== "active") throw new Error("expected active");
+    assert.equal(afterWork.session.phase.kind, "decision");
+    // 60s wall − 12s pause = 48 worked; pause committed across transition.
+    assert.deepEqual(afterWork.session.liveStats, {
+      workedSec: 48,
+      deliberationSec: 0,
+      restSec: 0,
+      pausedSec: 12,
+    });
+  });
+
+  it("hard pause liveStats pausedSec grows while frozen and commits after resume", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    settings.update({ workPauseStrategy: "hard" });
+    startSession(settings, session, SESSION_START_MS);
+
+    const pauseAt = SESSION_START_MS + 50_000;
+    session.pause(pauseAt);
+
+    const duringPause = session.getSnapshot(pauseAt + 3_000, 0);
+    assert.equal(duringPause.status, "active");
+    if (duringPause.status !== "active") throw new Error("expected active");
+    assert.equal(duringPause.session.liveStats.pausedSec, 3);
+    assert.equal(duringPause.session.liveStats.workedSec, 50);
+
+    const laterPause = session.getSnapshot(pauseAt + 8_000, 0);
+    assert.equal(laterPause.status, "active");
+    if (laterPause.status !== "active") throw new Error("expected active");
+    assert.equal(laterPause.session.liveStats.pausedSec, 8);
+    assert.equal(laterPause.session.liveStats.workedSec, 50);
+
+    session.resume(pauseAt + 8_000);
+    const afterResume = session.getSnapshot(pauseAt + 8_000, 0);
+    assert.equal(afterResume.status, "active");
+    if (afterResume.status !== "active") throw new Error("expected active");
+    assert.equal(afterResume.session.liveStats.pausedSec, 8);
+    assert.equal(afterResume.session.liveStats.workedSec, 50);
+
+    const afterWork = session.getSnapshot(pauseAt + 8_000 + 10_000, 0);
+    assert.equal(afterWork.status, "active");
+    if (afterWork.status !== "active") throw new Error("expected active");
+    assert.equal(afterWork.session.phase.kind, "decision");
+    // 50s focus before pause + 10s after resume; 8s pause committed.
+    assert.deepEqual(afterWork.session.liveStats, {
+      workedSec: 60,
+      deliberationSec: 0,
+      restSec: 0,
+      pausedSec: 8,
+    });
   });
 
   it("pause and resume rejected outside planned work (FR-PAUSE-S6)", () => {

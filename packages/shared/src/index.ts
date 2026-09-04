@@ -13,6 +13,11 @@ export {
 } from "./debug/catalog.js";
 export { getSettingsBounds } from "./debug/getSettingsBounds.js";
 export { SHORT_DURATIONS_MIN_OVERLAY, shortDurationsServerFeature } from "./debug/features/shortDurations.js";
+export {
+  pausedSecAt,
+  plannedWorkSecAt,
+  type PlannedWorkProgressPhase,
+} from "./liveStatsProgress.js";
 
 export const AlertIdSchema = z.enum([
   "work_planned_end",
@@ -217,6 +222,8 @@ export interface SessionLiveStats {
   deliberationSec: number;
   /** Short rest + long rest time. */
   restSec: number;
+  /** Soft/hard pause interruption time (closed slices + open pause elapsed). */
+  pausedSec: number;
 }
 
 export interface AlertEvent {

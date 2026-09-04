@@ -67,7 +67,8 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 | `parseSettingsPatch(current, patch)` | → Settings |
 | `PhaseKind`, phase interfaces, `Phase`, `RestKind` | types |
 | `SessionStatus` | `"idle"\|"active"\|"completed"` |
-| `SessionLiveStats` | type |
+| `SessionLiveStats` | type (`workedSec`, `deliberationSec`, `restSec`, `pausedSec`) |
+| `pausedSecAt`, `plannedWorkSecAt` | Planned-work progress helpers (`liveStatsProgress.ts`) |
 | `AlertEvent`, `ActiveSession` | types |
 | `IdleSnapshot`, `ActiveSnapshot`, `SessionSnapshot` | types |
 
@@ -231,7 +232,7 @@ Unknown errors are rethrown.
 
 **Side effects:** mutates in-memory session/alerts/liveStats; notifies listeners; `randomUUID` on start.
 
-**Private helpers (not exported):** `addDeliberation`, `plannedWorkSecAt`, `restSecAt`, `liveStatsWithProgress`, `advanceWorkDecision`, `advanceShortRestAck`, `enterShortRestAckPhase`, `commitPlannedWork`, `commitRest`.
+**Private helpers (not exported):** `addDeliberation`, `restSecAt`, `liveStatsWithProgress`, `advanceWorkDecision`, `advanceShortRestAck`, `enterShortRestAckPhase`, `commitPlannedWork`, `commitRest`. Uses shared `pausedSecAt` / `plannedWorkSecAt` for planned-work focus and pause totals.
 
 ### Tests
 
@@ -333,7 +334,7 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 
 | Export | Purpose |
 |--------|---------|
-| `liveStatsAt(snapshot, nowMs)` | Client-side live stats with in-phase extrapolation (mirrors server formulas) |
+| `liveStatsAt(snapshot, nowMs)` | Client-side live stats with in-phase extrapolation; uses shared `plannedWorkSecAt` / `pausedSecAt`; freezes worked while paused via local `plannedWorkProgressClockMs` |
 
 ### `src/utils/playAlerts.ts`
 
@@ -508,7 +509,7 @@ Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and appr
 | `snapshot` | `ActiveSnapshot` |
 | `onAction` | `(path: string) => void` |
 
-Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Renders phase label, countdown, cycle, estimated end (`activeEstimatedSessionEndMs`), hint, actions, and live-stats HUD (`liveStatsAt`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
+Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Renders phase label, countdown, cycle, estimated end (`activeEstimatedSessionEndMs`), hint, actions, and live-stats HUD (`liveStatsAt`: Worked / Deliberation / Rest / Paused). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
 
 Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button label and phase suffix follow `snapshot.session.pauseStrategy`.
 

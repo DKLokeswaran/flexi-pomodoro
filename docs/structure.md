@@ -26,6 +26,7 @@ flexi-pomodoro/
 │       └── src/
 │           ├── index.ts         # Schemas, SESSION_API, phase/session types
 │           ├── bounds.ts        # Production SETTINGS_BOUNDS
+│           ├── liveStatsProgress.ts  # pausedSecAt / plannedWorkSecAt
 │           └── debug/
 │               ├── catalog.ts   # DEBUG_SERVER_FEATURES + parseDebugFlags
 │               ├── types.ts
@@ -60,6 +61,10 @@ flexi-pomodoro/
 │   │           ├── pause/
 │   │           │   ├── softPause.test.ts
 │   │           │   └── hardPause.test.ts
+│   │           ├── shared/
+│   │           │   ├── sessionProjection.test.ts
+│   │           │   ├── activeSessionProjection.test.ts
+│   │           │   └── liveStats.test.ts
 │   │           └── services/
 │   │               ├── settings.service.test.ts
 │   │               └── session.service.test.ts

@@ -42,8 +42,10 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | Decision timeout liveStats | Folded window counted once under `workedSec` (at timeout and after further extended / startRest) |
 | Continue | Extended `startedAt` = click time |
 | Soft pause mid-work | `plannedEndAt` unchanged; `pausedSec` accumulates; `timerFrozenAt` stays null |
+| Soft pause liveStats | `pausedSec` grows during pause; commits after resume / planned-work end; worked holds at pause start |
 | Soft-paused through end | Auto rest; skip decision |
 | Hard pause 3s with 10s left | Remaining time unchanged; `plannedEndAt` shifted +3s |
+| Hard pause liveStats | `pausedSec` grows while countdown frozen; commits after resume; worked holds |
 | Hard-paused past original end | Stays in planned work while frozen |
 | Pause/resume outside planned work (FR-PAUSE-S6) | `INVALID_PHASE` in decision, short_rest_ack, extended, short rest, long rest |
 | N=1 | Long rest after first work path |
@@ -79,6 +81,15 @@ Isolated `hardPauseStrategy` unit tests:
 | `onPause` | Sets `timerFrozenAt`; `isCountdownFrozen` true |
 | `onResume` | Remaining time unchanged; `plannedEndAt` shifted by paused duration |
 | `onPlannedEnd` | → `"decision"` when unfrozen |
+
+### `apps/server/src/tests/shared/liveStats.test.ts`
+
+Imports web `liveStatsAt`.
+
+| Case | Asserts |
+|------|---------|
+| Soft pause | `pausedSec` grows with wall clock; `workedSec` holds at pause start |
+| Hard pause | Same paused growth; worked holds while `timerFrozenAt` set |
 
 ### `apps/server/src/tests/shared/sessionProjection.test.ts`
 

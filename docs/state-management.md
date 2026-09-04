@@ -145,7 +145,7 @@ Transport (`connectSessionStream`):
 No dedicated selector library. Inline derivation examples:
 
 - `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`
-- `ActiveTimer`: `displayClock`, `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`), `phaseHint`, `liveStatsAt` HUD, `activeEstimatedSessionEndMs`, strategy-aware pause labels
+- `ActiveTimer`: `displayClock`, `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`), `phaseHint`, `liveStatsAt` HUD (Worked / Deliberation / Rest / Paused), `activeEstimatedSessionEndMs`, strategy-aware pause labels
 - `IdleStartForm`: `estimatedSessionEndMs` / `nominalSessionDurationSec` from override draft
 - `AboutTab`: feature available/soon counts; health UI mapping
 

@@ -22,7 +22,7 @@ const PARAMS = {
 
 function activeSnapshot(
   phase: ActiveSnapshot["session"]["phase"],
-  liveStats = { workedSec: 0, deliberationSec: 0, restSec: 0 },
+  liveStats = { workedSec: 0, deliberationSec: 0, restSec: 0, pausedSec: 0 },
   pauseStrategy: ActiveSnapshot["session"]["pauseStrategy"] = "soft",
 ): ActiveSnapshot {
   return {
@@ -87,7 +87,7 @@ describe("activeSessionProjection", () => {
         cycleIndex: 1,
         startedAt: new Date(extendedStartMs).toISOString(),
       },
-      { workedSec: 60, deliberationSec: 0, restSec: 0 },
+      { workedSec: 60, deliberationSec: 0, restSec: 0, pausedSec: 0 },
     );
     assert.equal(
       activeEstimatedSessionEndMs(snapshot, nowMs),
@@ -107,7 +107,7 @@ describe("activeSessionProjection", () => {
         plannedDurationSec: 60,
         plannedEndAt: new Date(restStartMs + 60_000).toISOString(),
       },
-      { workedSec: 80, deliberationSec: 15, restSec: 0 },
+      { workedSec: 80, deliberationSec: 15, restSec: 0, pausedSec: 0 },
     );
     const duringExtended = activeEstimatedSessionEndMs(
       activeSnapshot(
@@ -116,7 +116,7 @@ describe("activeSessionProjection", () => {
           cycleIndex: 1,
           startedAt: new Date(extendedStartMs).toISOString(),
         },
-        { workedSec: 60, deliberationSec: 15, restSec: 0 },
+        { workedSec: 60, deliberationSec: 15, restSec: 0, pausedSec: 0 },
       ),
       restStartMs,
     );
@@ -200,7 +200,7 @@ describe("activeSessionProjection", () => {
         plannedDurationSec: 60,
         plannedEndAt: new Date(restStartMs + 60_000).toISOString(),
       },
-      { workedSec: 60, deliberationSec: 1, restSec: 0 },
+      { workedSec: 60, deliberationSec: 1, restSec: 0, pausedSec: 0 },
     );
     const nowMs = restStartMs + 30_000;
     assert.equal(

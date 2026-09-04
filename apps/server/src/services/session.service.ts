@@ -11,6 +11,8 @@ import {
   type SessionParams,
   type SessionSnapshot,
   type WorkPauseStrategy as PauseStrategyId,
+  pausedSecAt,
+  plannedWorkSecAt,
 } from "@flexi-pomodoro/shared";
 import { randomUUID } from "node:crypto";
 import {
@@ -91,18 +93,6 @@ function startRest(
 function restSecAt(phase: RestPhase, endMs: number): number {
   const clockMs = Math.min(endMs, parseIso(phase.plannedEndAt));
   return elapsedSecFromIso(phase.startedAt, clockMs);
-}
-
-/**
- * Focus seconds in planned work up to endMs.
- * Wall elapsed minus total paused time (closed + open) — same for soft and hard.
- */
-function plannedWorkSecAt(phase: PlannedWorkPhase, endMs: number): number {
-  let pauseSec = phase.pausedSec;
-  if (phase.paused && phase.pauseStartedAt) {
-    pauseSec += elapsedSecFromIso(phase.pauseStartedAt, endMs);
-  }
-  return elapsedSecFromIso(phase.startedAt, endMs) - pauseSec;
 }
 
 /** Attribute decision/ack elapsed so far to deliberation. */
@@ -215,6 +205,7 @@ export class SessionService {
     switch (phase.kind) {
       case "planned_work":
         stats.workedSec += plannedWorkSecAt(phase, nowMs);
+        stats.pausedSec += pausedSecAt(phase, nowMs);
         break;
       case "decision":
       case "short_rest_ack":
@@ -284,7 +275,12 @@ export class SessionService {
       params,
       pauseStrategy,
       phase: startPlannedWork(params, 1, nowMs),
-      liveStats: { workedSec: 0, deliberationSec: 0, restSec: 0 },
+      liveStats: {
+        workedSec: 0,
+        deliberationSec: 0,
+        restSec: 0,
+        pausedSec: 0,
+      },
       pendingAlerts: [],
       alertSeq: this.alertSeq,
     };
@@ -440,6 +436,7 @@ export class SessionService {
     endMs: number,
   ): void {
     session.liveStats.workedSec += plannedWorkSecAt(phase, endMs);
+    session.liveStats.pausedSec += pausedSecAt(phase, endMs);
   }
 
   private commitRest(

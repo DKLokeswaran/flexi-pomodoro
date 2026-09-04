@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 36 |
+| Total commits | 37 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-09-03 |
+| Latest commit date | 2026-09-04 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (36) |
+| Most active contributor | Lokeswaran DK (37) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0`, `v0.0.2-alpha.1`, `v0.0.2-alpha.2` |
 
@@ -20,7 +20,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 |-------|--------:|
 | 2026-07 | 23 |
 | 2026-08 | 11 |
-| 2026-09 | 2 |
+| 2026-09 | 3 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -155,6 +155,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| efa2cca | Lokeswaran DK | 2026-09-04 | Release v0.0.2-alpha.2 — Fix decision-timeout liveStats double-count. |
 | e0bd52d | Lokeswaran DK | 2026-09-03 | Show estimated session end on idle and active timers. |
 | 907ea9d | Lokeswaran DK | 2026-09-02 | Release v0.0.2-alpha.1 — M2.5 short-rest ack + live session stats. |
 | 715cbaf | Lokeswaran DK | 2026-08-20 | Add M2.5 short-rest ack scaffold and sync technical docs. |
@@ -192,4 +193,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: e0bd52ddb09dc9f4b19472e1019d4e78b7644187
+Last Synced Commit: efa2ccacb8e5c70db66568e149b919918758e486

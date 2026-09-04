@@ -27,7 +27,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **Short rest** | Rest after a cycle when `cycleIndex < N` |
 | **Short-rest acknowledgement (`short_rest_ack`)** | Brief window after short rest ends (same duration as work decision window). User ack → next work running; timeout → next work immediately paused (active pause strategy). Not used after long rest |
 | **Long rest** | Rest when `cycleIndex >= N`; ending it completes the session |
-| **Live session stats** | In-memory `SessionLiveStats` on active snapshots: `workedSec`, `deliberationSec`, `restSec` (M2.5) |
+| **Live session stats** | In-memory `SessionLiveStats` on active snapshots: `workedSec`, `deliberationSec`, `restSec`, `pausedSec` (M2.5+) |
 | **Estimated session end** | Client UI projection of when the session finishes. Idle: nominal path from current overrides (`N×work + (N−1)×short rest + long rest`). Active: forward remainder from phase anchors (instant acks; deliberation / extended / hard-pause slip included) |
 | **Cycle index** | 1-based work cycle counter within a session |
 | **Soft pause** | Pause during planned work that does **not** move `plannedEndAt`; accumulates `pausedSec`; `timerFrozenAt` stays null |

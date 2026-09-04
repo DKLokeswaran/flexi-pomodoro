@@ -68,11 +68,12 @@ Work decision (`kind: "decision"`) follows planned work. Short-rest ack (`kind: 
 
 | Field | Type | Role |
 |-------|------|------|
-| `workedSec` | number | Planned focus + extended work; soft-paused time excluded |
+| `workedSec` | number | Planned focus + extended work; pause interruption excluded |
 | `deliberationSec` | number | Work-decision elapsed (explicit act only) + ack elapsed (always) |
 | `restSec` | number | Short rest + long rest time |
+| `pausedSec` | number | Soft/hard pause interruption (committed closed slices + open pause elapsed) |
 
-Present on every active session snapshot; initialized to zeros at start. The engine commits phase totals on transitions and overlays in-phase progress in `buildSnapshot` via `liveStatsWithProgress`. Work-decision timeout does not commit `decisionWindowSec` on its own: extended work starts at decision start (FR-FLOW-11), so the overlay (and later `startRest` commit) attributes the window once under `workedSec`. Explicit ack/continue and ack-window time go to `deliberationSec`; planned-work focus is wall elapsed minus total paused time.
+Present on every active session snapshot; initialized to zeros at start. The engine commits phase totals on transitions and overlays in-phase progress in `buildSnapshot` via `liveStatsWithProgress`. Work-decision timeout does not commit `decisionWindowSec` on its own: extended work starts at decision start (FR-FLOW-11), so the overlay (and later `startRest` commit) attributes the window once under `workedSec`. Explicit ack/continue and ack-window time go to `deliberationSec`. Planned-work focus is wall elapsed minus total paused time (`plannedWorkSecAt`); pause duration uses the same wall-clock open-slice math (`pausedSecAt`) for soft and hard. Both helpers live in `@flexi-pomodoro/shared` (`liveStatsProgress.ts`). On planned-work end, `commitPlannedWork` commits both `workedSec` and `pausedSec`.
 
 #### `ExtendedWorkPhase`
 

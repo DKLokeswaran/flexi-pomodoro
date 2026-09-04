@@ -66,7 +66,7 @@ Discriminated by `status`:
 | `pendingAlerts` | `AlertEvent[]` | Deltas since `sinceSeq` |
 | `alertSeq` | number | High-water |
 
-`SessionLiveStats`: `{ workedSec: number; deliberationSec: number; restSec: number }` — planned focus + extended (excl. soft-paused), decision + ack windows, rest time respectively.
+`SessionLiveStats`: `{ workedSec: number; deliberationSec: number; restSec: number; pausedSec: number }` — planned focus + extended (excl. pause interruption), decision + ack windows, rest time, and soft/hard pause interruption respectively.
 
 `AlertEvent`: `{ seq: number; id: AlertId }`.
 

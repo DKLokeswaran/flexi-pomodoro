@@ -1,23 +1,30 @@
-import type {
-  ActiveSnapshot,
-  Phase,
-  PlannedWorkPhase,
-  RestPhase,
-  SessionLiveStats,
+import {
+  pausedSecAt,
+  plannedWorkSecAt,
+  type ActiveSnapshot,
+  type Phase,
+  type PlannedWorkPhase,
+  type RestPhase,
+  type SessionLiveStats,
 } from "@flexi-pomodoro/shared";
 import { elapsedFromIso } from "./time";
-
-function plannedWorkSecAt(phase: PlannedWorkPhase, endMs: number): number {
-  let pauseSec = phase.pausedSec;
-  if (phase.paused && phase.pauseStartedAt) {
-    pauseSec += elapsedFromIso(phase.pauseStartedAt, endMs);
-  }
-  return elapsedFromIso(phase.startedAt, endMs) - pauseSec;
-}
 
 function restSecAt(phase: RestPhase, endMs: number): number {
   const clockMs = Math.min(endMs, Date.parse(phase.plannedEndAt));
   return elapsedFromIso(phase.startedAt, clockMs);
+}
+
+/**
+ * Clock for worked progress while paused: freeze at pause start.
+ * Soft has no timerFrozenAt; hard sets both. Paused totals still use wall clock.
+ */
+function plannedWorkProgressClockMs(
+  phase: PlannedWorkPhase,
+  nowMs: number,
+): number {
+  if (!phase.paused) return nowMs;
+  const frozenIso = phase.timerFrozenAt ?? phase.pauseStartedAt;
+  return frozenIso ? Date.parse(frozenIso) : nowMs;
 }
 
 /** Add or subtract in-phase progress (sign = 1 add, −1 subtract). */
@@ -28,9 +35,12 @@ function applyPhaseProgress(
   sign: 1 | -1,
 ): void {
   switch (phase.kind) {
-    case "planned_work":
-      stats.workedSec += sign * plannedWorkSecAt(phase, nowMs);
+    case "planned_work": {
+      const workClockMs = plannedWorkProgressClockMs(phase, nowMs);
+      stats.workedSec += sign * plannedWorkSecAt(phase, workClockMs);
+      stats.pausedSec += sign * pausedSecAt(phase, nowMs);
       break;
+    }
     case "decision":
     case "short_rest_ack":
       stats.deliberationSec += sign * elapsedFromIso(phase.startedAt, nowMs);

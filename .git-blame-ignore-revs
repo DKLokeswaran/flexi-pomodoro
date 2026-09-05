@@ -1,2 +1,5 @@
 # Apply Prettier to the whole project
 473d4b59cab1f982cab359a5663fc6c9fec5d3b3
+
+# Apply Prettier after package-boundary cleanup
+dbfb86cca4ff2d7e789e11f60deb80381e0910a3

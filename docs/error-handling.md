@@ -60,11 +60,12 @@
 
 | Schema / parser | Where applied | Rules |
 |-----------------|---------------|-------|
-| `SessionParamsSchema` | Defaults / merge | Integer bounds from `SETTINGS_BOUNDS` |
-| `SettingsSchema` / `SettingsPatchSchema` | PUT settings | Params + `alertsMuted` + `workPauseStrategy: "soft" \| "hard"` |
-| `parseStartSessionBody` | POST start | Strict `debug`; overrides against debug-aware bounds |
-| `parseDebugFlags` | POST start `debug` + debug localStorage restore | Strict; unknown keys fail |
-| `mergeSessionParams` | SettingsService | Parses merged settings+overrides |
+| `SessionParamsSchema` | Shared type source / production bounds | Integer bounds from `SETTINGS_BOUNDS` |
+| `SettingsSchema` | Shared type source; re-validated on settings patch | Params + `alertsMuted` + `workPauseStrategy: "soft" \| "hard"` |
+| `SettingsPatchSchema` | Server `settingsValidation.ts` — PUT settings | `SettingsSchema.partial()` |
+| `parseStartSessionBody` | Server `settingsValidation.ts` — POST start | Strict `debug`; overrides against debug-aware bounds |
+| `parseDebugFlags` | Shared — POST start `debug` + debug localStorage restore | Strict; unknown keys fail |
+| `mergeSessionParams` | Server `settingsValidation.ts` via SettingsService | Parses merged settings+overrides |
 | `AlertIdSchema` | shared enum | Alert ids |
 
 ### Bounds (production)

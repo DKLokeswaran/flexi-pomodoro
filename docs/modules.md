@@ -49,23 +49,21 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 
 ### `src/index.ts`
 
-**Re-exports:** bounds, debug catalog, `getSettingsBounds`, `SHORT_DURATIONS_MIN_OVERLAY`, `shortDurationsServerFeature`.
+**Re-exports:** bounds, debug catalog, `getSettingsBounds`, `SHORT_DURATIONS_MIN_OVERLAY`, `shortDurationsServerFeature`, `pausedSecAt` / `plannedWorkSecAt` / `PlannedWorkProgressPhase`.
 
 | Export | Kind |
 |--------|------|
 | `AlertIdSchema` / `AlertId` | Zod enum / type |
 | `SESSION_API` | path constants object |
 | `WorkPauseStrategySchema` / `WorkPauseStrategy` | `"soft" \| "hard"` |
-| `SessionParamsSchema` / `SessionParams` | Zod / type |
+| `sessionParamsSchemaForBounds(bounds)` | Zod object for session timing fields |
+| `SessionParamsSchema` / `SessionParams` | production-bounds Zod / type |
 | `SessionOverridesSchema` / `SessionOverrides` | partial params |
 | `SettingsSchema` / `Settings` | params + mute + strategy |
-| `SettingsPatchSchema` / `SettingsPatch` | partial settings |
+| `SettingsPatch` | `Partial<Settings>` |
 | `StartSessionBody` | type overrides + `debug?` |
 | `DEFAULT_SETTINGS` | Settings |
-| `mergeSessionParams(settings, overrides?, options?)` | → SessionParams |
-| `parseStartSessionBody(body)` | → `{ debug, overrides }` |
-| `parseSettingsPatch(current, patch)` | → Settings |
-| `PhaseKind`, phase interfaces, `Phase`, `RestKind` | types |
+| phase interfaces, `Phase` | types (`Phase["kind"]` for the kind union) |
 | `SessionStatus` | `"idle"\|"active"\|"completed"` |
 | `SessionLiveStats` | type (`workedSec`, `deliberationSec`, `restSec`, `pausedSec`) |
 | `pausedSecAt`, `plannedWorkSecAt` | Planned-work progress helpers (`liveStatsProgress.ts`) |
@@ -177,6 +175,17 @@ Barrel: `defaultPauseRegistry`, `PauseStrategyRegistry`, `softPauseStrategy`, `h
 | `errorReply(error)` | `{ statusCode, body }` for Zod / SettingsError / SessionError |
 
 Unknown errors are rethrown.
+
+### `src/utils/settingsValidation.ts`
+
+| Export | Kind |
+|--------|------|
+| `SettingsPatchSchema` | `SettingsSchema.partial()` for PUT body parse |
+| `mergeSessionParams(settings, overrides?, options?)` | → `SessionParams` under debug-aware bounds |
+| `parseStartSessionBody(body)` | → `{ debug, overrides }` |
+| `parseSettingsPatch(current, patch)` | → `Settings` |
+
+**Deps:** shared `SettingsSchema`, `sessionParamsSchemaForBounds`, `getSettingsBounds`, `parseDebugFlags`.
 
 ### `src/utils/iso.ts`
 

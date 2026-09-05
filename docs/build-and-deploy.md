@@ -11,7 +11,7 @@
 | `dev:web` | Vite for web workspace |
 | `build` | shared → web → server |
 | `start` | `PORT=3847 WEB_DIST=$PWD/apps/web/dist` server start |
-| `test` | Server tests |
+| `test` | Server tests, then web tests |
 | `typecheck` | shared + server + web |
 | `format` | `prettier --write .` |
 | `format:check` | `prettier --check .` |
@@ -33,6 +33,7 @@
 | `dev` | `vite` (port 5173, `/api` proxy) |
 | `build` | `tsc --noEmit && vite build` → `dist/` |
 | `preview` | `vite preview` |
+| `test` | `tsx --test src/tests/**/*.test.ts` |
 | `typecheck` | `tsc --noEmit` |
 
 ### `@flexi-pomodoro/shared`

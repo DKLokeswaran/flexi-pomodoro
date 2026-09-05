@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  parseStartSessionBody,
-  parseSettingsPatch,
-  DEFAULT_SETTINGS,
-} from "@flexi-pomodoro/shared";
+import { DEFAULT_SETTINGS } from "@flexi-pomodoro/shared";
 import { ZodError } from "zod";
 import {
   SettingsError,
   SettingsService,
 } from "../../services/settings.service.js";
+import {
+  parseSettingsPatch,
+  parseStartSessionBody,
+} from "../../utils/settingsValidation.js";
 
 describe("parseStartSessionBody", () => {
   it("accepts 1s overrides when shortDurations is set", () => {

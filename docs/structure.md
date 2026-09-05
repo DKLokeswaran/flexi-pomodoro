@@ -55,16 +55,13 @@ flexi-pomodoro/
 │   │       │   ├── settings.service.ts
 │   │       │   └── session.service.ts
 │   │       ├── utils/
-│   │       │   ├── errorReply.ts  # HTTP mapping for SettingsError / SessionError
-│   │       │   └── iso.ts         # msToIso / parseIso helpers
+│   │       │   ├── errorReply.ts         # HTTP mapping for SettingsError / SessionError
+│   │       │   ├── settingsValidation.ts # SettingsPatchSchema, parse/merge start+settings bodies
+│   │       │   └── iso.ts                # msToIso / parseIso helpers
 │   │       └── tests/
 │   │           ├── pause/
 │   │           │   ├── softPause.test.ts
 │   │           │   └── hardPause.test.ts
-│   │           ├── shared/
-│   │           │   ├── sessionProjection.test.ts
-│   │           │   ├── activeSessionProjection.test.ts
-│   │           │   └── liveStats.test.ts
 │   │           └── services/
 │   │               ├── settings.service.test.ts
 │   │               └── session.service.test.ts
@@ -72,7 +69,7 @@ flexi-pomodoro/
 │       ├── index.html
 │       ├── package.json
 │       ├── vite.config.ts       # proxy /api → :3847; __APP_VERSION__
-│       ├── tsconfig.json
+│       ├── tsconfig.json        # excludes src/tests/**
 │       ├── tsconfig.node.json
 │       ├── public/alerts/       # placeholder-*.wav (7 files)
 │       └── src/
@@ -88,7 +85,12 @@ flexi-pomodoro/
 │           ├── browserFlags/    # createFlagCatalog, createFlagStore, debug/, ui/
 │           ├── providers/       # Toast
 │           ├── queries/         # fetch helpers + React Query hooks
-│           └── utils/           # time, liveStats, sessionProjection, activeSessionProjection, fetchJson, alerts, errorMessage
+│           ├── utils/           # time, liveStats, sessionProjection, activeSessionProjection, fetchJson, alerts, errorMessage
+│           └── tests/
+│               └── utils/
+│                   ├── sessionProjection.test.ts
+│                   ├── activeSessionProjection.test.ts
+│                   └── liveStats.test.ts
 ```
 
 ## Top-level folder roles
@@ -121,7 +123,9 @@ flexi-pomodoro/
 | HTTP error mapping | `apps/server/src/utils/errorReply.ts` (shared by session and settings routes) |
 | Session transition / alert | `SessionService` + shared `AlertIdSchema` / phase types; extend tests under `apps/server/src/tests/services/` |
 | Work-pause strategy | New plugin under `apps/server/src/pause/`; register in `defaultPauseRegistry()`; add isolated tests under `apps/server/src/tests/pause/` |
-| Settings field | Shared Zod schemas + `DEFAULT_SETTINGS` + `SettingsService` + Settings UI |
+| Settings field | Shared Zod schemas + `DEFAULT_SETTINGS` + server `settingsValidation` / `SettingsService` + Settings UI |
+| Settings / start body parse | `apps/server/src/utils/settingsValidation.ts` |
+| Web projection / liveStats unit test | `apps/web/src/tests/utils/<module>.test.ts` |
 | Debug feature (server bounds) | `packages/shared/src/debug/features/<id>.ts`; register in `DEBUG_SERVER_FEATURES`; add web labels in `browserFlags/debug/features/` |
 | Browser UI preference | New feature under `browserFlags/ui/features/`; register in `browserFlags/ui/catalog.ts` |
 | UI tab / panel | `apps/web/src/components/`; wire in `App.tsx` + `Nav.tsx` |
@@ -130,7 +134,7 @@ flexi-pomodoro/
 
 ## Test location convention
 
-Server tests: service integration under `src/tests/services/`; pause plugin unit tests under `src/tests/pause/`. Web has **no** committed unit/e2e tests.
+Mirrored `src/tests/` trees (not colocated): server `services/` + `pause/`; web `utils/`. Each package runs its own tests; packages do not import each other's application source for tests.
 
 ## Config & build artifacts (ignored / not committed)
 

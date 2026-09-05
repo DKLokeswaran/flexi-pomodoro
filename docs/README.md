@@ -9,7 +9,7 @@ Self-hosted, flow-aware Pomodoro timer. This documentation set describes the cur
 npm install
 npm run build -w @flexi-pomodoro/shared
 npm run dev          # API :3847 + Vite :5173 (proxies /api)
-npm test             # server unit tests
+npm test             # server then web unit tests
 npm run typecheck
 ```
 
@@ -58,7 +58,7 @@ flowchart LR
   Sched -->|"tick(nowMs)"| Sess
 ```
 
-Request flow (session action): route → Zod / shared parsers → `SettingsService` / `SessionService` → `SessionSnapshot` JSON (and SSE fan-out).
+Request flow (session action): route → server Zod parsers (`settingsValidation`) → `SettingsService` / `SessionService` → `SessionSnapshot` JSON (and SSE fan-out).
 
 ## Documentation index
 

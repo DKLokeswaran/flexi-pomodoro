@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ActiveSnapshot } from "@flexi-pomodoro/shared";
-import { liveStatsAt } from "../../../../web/src/utils/liveStats.js";
+import { liveStatsAt } from "../../utils/liveStats";
 
 const START_MS = Date.parse("2026-07-12T10:00:00.000Z");
 
@@ -54,7 +54,6 @@ describe("liveStatsAt paused totals", () => {
   it("soft pause: paused grows with wall clock; worked holds at pause start", () => {
     const pauseAt = START_MS + 20_000;
     const serverNow = pauseAt + 2_000;
-    // Snapshot overlay: 20 worked, 2 paused (at serverNow).
     const snapshot = pausedWorkSnapshot("soft", pauseAt, serverNow, {
       workedSec: 20,
       deliberationSec: 0,

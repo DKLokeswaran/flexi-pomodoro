@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ActiveSnapshot } from "@flexi-pomodoro/shared";
-import { SessionService } from "../../services/session.service.js";
-import { SettingsService } from "../../services/settings.service.js";
-import { activeEstimatedSessionEndMs } from "../../../../web/src/utils/activeSessionProjection.js";
+import { activeEstimatedSessionEndMs } from "../../utils/activeSessionProjection";
 import {
   estimatedSessionEndMs,
   nominalSessionDurationSec,
-} from "../../../../web/src/utils/sessionProjection.js";
+} from "../../utils/sessionProjection";
 
 const START_MS = Date.parse("2026-07-12T10:00:00.000Z");
 const SERVER_NOW_MS = START_MS + 30_000;
@@ -209,31 +207,39 @@ describe("activeSessionProjection", () => {
     );
   });
 
-  it("matches SessionService snapshot through extended work and rest", () => {
-    const settings = new SettingsService();
-    settings.update(PARAMS);
-    const session = new SessionService();
-    const params = settings.resolveSessionParams();
-    session.start(params, START_MS, "soft");
-
+  it("ETA stays stable from extended work into rest at the same slip", () => {
     const afterWork = START_MS + 60_000;
-    session.getSnapshot(afterWork, 0);
-    session.continueExtended(afterWork + 2_000);
     const extendedStartMs = afterWork + 2_000;
     const afterExtended = extendedStartMs + 20_000;
-    const restSnapshot = session.startRest(afterExtended);
-    assert.equal(restSnapshot.status, "active");
-    if (restSnapshot.status !== "active") return;
+    const restStartMs = afterExtended;
 
     const duringExtended = activeEstimatedSessionEndMs(
-      session.getSnapshot(afterExtended, 0),
+      activeSnapshot(
+        {
+          kind: "extended_work",
+          cycleIndex: 1,
+          startedAt: new Date(extendedStartMs).toISOString(),
+        },
+        { workedSec: 60, deliberationSec: 2, restSec: 0, pausedSec: 0 },
+      ),
       afterExtended,
     );
 
-    assert.equal(
-      activeEstimatedSessionEndMs(restSnapshot, afterExtended + 5_000),
-      duringExtended,
+    const duringRest = activeEstimatedSessionEndMs(
+      activeSnapshot(
+        {
+          kind: "short_rest",
+          cycleIndex: 1,
+          startedAt: new Date(restStartMs).toISOString(),
+          plannedDurationSec: 60,
+          plannedEndAt: new Date(restStartMs + 60_000).toISOString(),
+        },
+        { workedSec: 80, deliberationSec: 2, restSec: 0, pausedSec: 0 },
+      ),
+      afterExtended + 5_000,
     );
+
+    assert.equal(duringRest, duringExtended);
   });
 
   it("nominal duration matches two-cycle happy path length", () => {

@@ -58,7 +58,7 @@ flowchart TB
 | **Strategy (pause plugins)** | `PauseStrategyRegistry` + `WorkPauseStrategy` | Engine calls `onPause` / `onResume` / `isCountdownFrozen` / `onPlannedEnd`; default registry registers `soft` and `hard` |
 | **Catalog / plugin registration** | `DEBUG_SERVER_FEATURES` in `packages/shared/src/debug/catalog.ts` | Server debug features register id + optional `applyBounds`; web labels live in `browserFlags/debug/` |
 | **Browser flag stores** | `createFlagCatalog` + `createFlagStore` in `apps/web/src/browserFlags/` | Shared localStorage-backed stores for debug flags (gated) and UI preferences (ungated) |
-| **Schema-driven validation** | Zod schemas in shared | Shared between server routes and client start body |
+| **Schema-driven validation** | Zod in shared + server | Shared exports type-source schemas; server `settingsValidation.ts` parses HTTP bodies |
 | **Watermark / cursor** | Server `listenerCursors` + client `AlertSeqStore` | Alert delivery is delta-only via `sinceSeq` |
 | **SPA fallback** | `app.setNotFoundHandler` | Non-API 404s serve `index.html` when `WEB_DIST` exists |
 
@@ -84,7 +84,7 @@ On the web, React Context provides `UiFlagsProvider`, `DebugFlagsProvider` (both
 | Concern | Implementation |
 |---------|----------------|
 | Logging | Fastify `{ logger: true }` |
-| Validation | Zod (`SessionParamsSchema`, `SettingsPatchSchema`, `parseStartSessionBody`, `parseDebugFlags`) |
+| Validation | Zod (`SessionParamsSchema` / `SettingsSchema` in shared; `SettingsPatchSchema` / `parseStartSessionBody` / `mergeSessionParams` in server `settingsValidation.ts`; `parseDebugFlags` in shared) |
 | Error mapping | Shared `errorReply` in `apps/server/src/utils/errorReply.ts` → HTTP 400/403/409 + `{ error, code }` |
 | Auth / rate limit / tracing | Not found in committed history |
 | Static assets | `@fastify/static` when web dist is discoverable |
@@ -94,7 +94,7 @@ On the web, React Context provides `UiFlagsProvider`, `DebugFlagsProvider` (both
 
 1. **Entry** — `apps/server/src/index.ts` reads `PORT` / `HOST`, calls `buildApp()`, `listen`.
 2. **App** — Fastify instance; services + routes + scheduler; optional static hosting.
-3. **Route** — e.g. `POST /api/session/start` parses body via `parseStartSessionBody`, resolves params via `settings.resolveSessionParams`, calls `session.start`.
+3. **Route** — e.g. `POST /api/session/start` parses body via server `parseStartSessionBody`, resolves params via `settings.resolveSessionParams`, calls `session.start`.
 4. **Service** — mutates in-memory session; `notify()` pushes snapshots to SSE subscribers.
 5. **Tick** — every 250ms `session.tick(nowMs, true)` catch-up advances due phase boundaries (wall-clock).
 

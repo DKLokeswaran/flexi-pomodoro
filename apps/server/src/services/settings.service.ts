@@ -5,10 +5,12 @@ import {
   type Settings,
   type SettingsPatch,
   DEFAULT_SETTINGS,
-  mergeSessionParams,
-  parseSettingsPatch,
 } from "@flexi-pomodoro/shared";
 import { ZodError } from "zod";
+import {
+  mergeSessionParams,
+  parseSettingsPatch,
+} from "../utils/settingsValidation.js";
 
 /** Validation failure when reading or updating settings. */
 export class SettingsError extends Error {

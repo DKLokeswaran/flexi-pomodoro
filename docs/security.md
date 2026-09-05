@@ -18,7 +18,7 @@
 
 ## Input validation & injection
 
-- All mutable API bodies go through **Zod** schemas (`SettingsPatchSchema`, `parseStartSessionBody`, etc.).
+- All mutable API bodies go through **Zod** schemas (server `SettingsPatchSchema` / `parseStartSessionBody`, shared `parseDebugFlags`, etc.).
 - No SQL layer → no SQL injection surface in M1.
 - SSE payloads are server-serialized `JSON.stringify` of internal snapshots.
 - Client `JSON.parse` of EventSource data is try/catch guarded.

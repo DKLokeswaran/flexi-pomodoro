@@ -6,13 +6,19 @@
 |-------|--------|
 | Runner | Node.js built-in `node:test` via `tsx --test` |
 | Assertions | `node:assert/strict` |
-| Mocking library | Not found (tests construct real services) |
+| Mocking library | Not found (tests construct real services / fabricated snapshots) |
 | Coverage tooling | Not found in committed scripts |
-| Web / e2e tests | Not found in committed history |
+| E2E / browser | Not found |
 
-**Script:** `apps/server` → `"test": "tsx --test src/tests/**/*.test.ts"`; root `"test": "npm run test -w @flexi-pomodoro/server"`.
+**Scripts:**
 
-Server `tsconfig.json` **excludes** `src/tests/**` from the production `tsc` build (tests run via tsx only).
+| Package | Script |
+|---------|--------|
+| Root | `npm test` → server then web |
+| `@flexi-pomodoro/server` | `tsx --test src/tests/**/*.test.ts` |
+| `@flexi-pomodoro/web` | `tsx --test src/tests/**/*.test.ts` |
+
+Server and web `tsconfig.json` files **exclude** `src/tests/**` from production typecheck/build (tests run via tsx only).
 
 ---
 
@@ -20,7 +26,8 @@ Server `tsconfig.json` **excludes** `src/tests/**` from the production `tsc` bui
 
 | Type | Present? |
 |------|----------|
-| Unit (services + shared parsers) | Yes |
+| Unit (server services, pause plugins, settings validation) | Yes |
+| Unit (web projection / liveStats helpers) | Yes |
 | Integration (HTTP Fastify inject) | Not found |
 | E2E / browser | Not found |
 | Snapshot tests | Not found |
@@ -55,6 +62,8 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 
 ### `apps/server/src/tests/services/settings.service.test.ts`
 
+Imports parsers from `utils/settingsValidation.ts`.
+
 | Suite | Cases |
 |-------|-------|
 | `parseStartSessionBody` | Accepts 1s with flag; rejects 1s without; rejects unknown debug keys (`ZodError`) |
@@ -82,29 +91,24 @@ Isolated `hardPauseStrategy` unit tests:
 | `onResume` | Remaining time unchanged; `plannedEndAt` shifted by paused duration |
 | `onPlannedEnd` | → `"decision"` when unfrozen |
 
-### `apps/server/src/tests/shared/liveStats.test.ts`
-
-Imports web `liveStatsAt`.
+### `apps/web/src/tests/utils/liveStats.test.ts`
 
 | Case | Asserts |
 |------|---------|
 | Soft pause | `pausedSec` grows with wall clock; `workedSec` holds at pause start |
 | Hard pause | Same paused growth; worked holds while `timerFrozenAt` set |
 
-### `apps/server/src/tests/shared/sessionProjection.test.ts`
-
-Imports web `sessionProjection` helpers (tsx path into `apps/web`).
+### `apps/web/src/tests/utils/sessionProjection.test.ts`
 
 | Case | Asserts |
 |------|---------|
 | Nominal duration N=2 / N=1 | Work + short rests + long rest arithmetic |
 | `estimatedSessionEndMs` | Equals start + nominal duration |
 | DEFAULT_SETTINGS | Matches formula for default cycle count |
-| Instant-ack happy path | `SessionService` goes idle at projected end |
 
-### `apps/server/src/tests/shared/activeSessionProjection.test.ts`
+### `apps/web/src/tests/utils/activeSessionProjection.test.ts`
 
-Imports web `activeSessionProjection` helpers.
+Fabricated `ActiveSnapshot` fixtures only (no server imports).
 
 | Case | Asserts |
 |------|---------|
@@ -113,13 +117,13 @@ Imports web `activeSessionProjection` helpers.
 | Extended → rest | Slip persists via rest anchors |
 | Hard pause open / resume | Open pause adds time; shifted `plannedEndAt` keeps it after resume |
 | Short rest after deliberation | Anchor slip reflected |
-| SessionService extended → rest | Projection stable across transition |
+| Extended → rest ETA stability | Projection unchanged across the transition at the same slip |
 
 ---
 
 ## Mocking patterns
 
-Not found. Tests use real `SettingsService` + `SessionService` and inject deterministic `nowMs` into service methods (`start`, `pause`, `resume`, `getSnapshot`, `ackRest`, `ackWork`, etc.). Scheduler is not exercised in these unit tests.
+Not found. Server tests use real `SettingsService` + `SessionService` and inject deterministic `nowMs`. Web projection tests build plain snapshot objects. Scheduler is not exercised in these unit tests.
 
 ## Fixtures
 
@@ -127,7 +131,9 @@ Inline constants and helper factories only — no fixture files.
 
 ## Conventions
 
-- File naming: `*.service.test.ts` under `src/tests/services/`; pause plugins under `src/tests/pause/*.test.ts`; web projection helpers under `src/tests/shared/*.test.ts`
+- Layout: mirrored tree under `src/tests/` (not colocated with source), matching the area under test (`services/`, `pause/`, `utils/`)
+- File naming: `<module>.test.ts` (e.g. `session.service.test.ts`, `sessionProjection.test.ts`)
 - Blocks: `describe("ClassOrFn", () => { it("behavior…", …) })`
 - Style: strict assert (`assert.equal`, `assert.ok`, `assert.throws`, `assert.deepEqual`)
-- Phase checks often narrow with `if (snap.status !== "active") throw …` after assert for TypeScript narrowing
+- Server phase checks often narrow with `if (snap.status !== "active") throw …` after assert for TypeScript narrowing
+- Packages do not import each other's application source for tests

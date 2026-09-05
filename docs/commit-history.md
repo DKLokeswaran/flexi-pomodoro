@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 37 |
+| Total commits | 38 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-09-04 |
+| Latest commit date | 2026-09-05 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (37) |
+| Most active contributor | Lokeswaran DK (38) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0`, `v0.0.2-alpha.1`, `v0.0.2-alpha.2` |
 
@@ -20,7 +20,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 |-------|--------:|
 | 2026-07 | 23 |
 | 2026-08 | 11 |
-| 2026-09 | 3 |
+| 2026-09 | 4 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -142,6 +142,11 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Stop committing `decisionWindowSec` into `workedSec` on work-decision timeout; extended `startedAt` at decision start attributes the window once.
 - Regression test for single-count worked totals; data-model and testing docs updated.
 
+### 2026-09-05 — Paused live stats
+
+- Add `SessionLiveStats.pausedSec` and show it on the active timer HUD for soft and hard pause.
+- Share planned-work progress helpers (`pausedSecAt` / `plannedWorkSecAt`); keep `workedSec` frozen at pause start while pause time accrues.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -155,6 +160,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| e5c5228 | Lokeswaran DK | 2026-09-05 | Add paused live stats and freeze worked while paused. |
 | efa2cca | Lokeswaran DK | 2026-09-04 | Release v0.0.2-alpha.2 — Fix decision-timeout liveStats double-count. |
 | e0bd52d | Lokeswaran DK | 2026-09-03 | Show estimated session end on idle and active timers. |
 | 907ea9d | Lokeswaran DK | 2026-09-02 | Release v0.0.2-alpha.1 — M2.5 short-rest ack + live session stats. |
@@ -193,4 +199,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: efa2ccacb8e5c70db66568e149b919918758e486
+Last Synced Commit: e5c522823f88c3fd21925388c7f456a6f9f49204

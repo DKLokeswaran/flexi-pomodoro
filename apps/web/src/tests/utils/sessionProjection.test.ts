@@ -4,9 +4,7 @@ import { DEFAULT_SETTINGS } from "@flexi-pomodoro/shared";
 import {
   estimatedSessionEndMs,
   nominalSessionDurationSec,
-} from "../../../../web/src/utils/sessionProjection.js";
-import { SessionService } from "../../services/session.service.js";
-import { SettingsService } from "../../services/settings.service.js";
+} from "../../utils/sessionProjection";
 
 describe("sessionProjection", () => {
   it("nominalSessionDurationSec sums work, short rests, and long rest", () => {
@@ -63,32 +61,5 @@ describe("sessionProjection", () => {
       }),
       expected,
     );
-  });
-
-  it("matches SessionService end when transitions are acknowledged immediately", () => {
-    const settings = new SettingsService();
-    settings.update({
-      workDurationSec: 60,
-      shortRestDurationSec: 60,
-      longRestDurationSec: 120,
-      cyclesBeforeLongRest: 2,
-      decisionWindowSec: 15,
-    });
-    const session = new SessionService();
-    const startMs = Date.parse("2026-07-12T10:00:00.000Z");
-    const params = settings.resolveSessionParams();
-    const projectedEndMs = estimatedSessionEndMs(params, startMs);
-
-    session.start(params, startMs, settings.get().workPauseStrategy);
-
-    const afterWork1 = startMs + 60_000;
-    session.ackRest(afterWork1);
-    const afterShort = afterWork1 + 60_000;
-    session.ackWork(afterShort);
-    const afterWork2 = afterShort + 60_000;
-    session.ackRest(afterWork2);
-
-    const snapshot = session.getSnapshot(projectedEndMs, 0);
-    assert.equal(snapshot.status, "idle");
   });
 });

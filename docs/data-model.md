@@ -28,7 +28,7 @@ Holds a single `Settings` object, initialized from `DEFAULT_SETTINGS`.
 
 ## Domain types (`@flexi-pomodoro/shared`)
 
-### `PhaseKind`
+### Phase kinds (`Phase["kind"]`)
 
 `"planned_work" | "decision" | "short_rest_ack" | "extended_work" | "short_rest" | "long_rest"`
 
@@ -115,7 +115,7 @@ No foreign keys — single process, single active session.
 
 | Name | Direction | Definition |
 |------|-----------|------------|
-| `Settings` / `SettingsPatch` | REST settings | Zod `SettingsSchema` / partial |
+| `Settings` / `SettingsPatch` | REST settings | Zod `SettingsSchema` / `Partial<Settings>` |
 | `SessionOverrides` | start body fields | Partial `SessionParams` |
 | `StartSessionBody` | POST start | Overrides + optional `debug?: DebugFlags` |
 | `DebugFlags` | start body | Optional booleans per `DebugFeatureId`; strict object |

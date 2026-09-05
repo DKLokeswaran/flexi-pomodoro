@@ -1,11 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import {
-  type SettingsPatch,
-  SESSION_API,
-  SettingsPatchSchema,
-} from "@flexi-pomodoro/shared";
+import { type SettingsPatch, SESSION_API } from "@flexi-pomodoro/shared";
 import type { SettingsService } from "../services/settings.service.js";
 import { errorReply } from "../utils/errorReply.js";
+import { SettingsPatchSchema } from "../utils/settingsValidation.js";
 
 /** GET/PUT persisted session defaults (production bounds; not debug overrides). */
 export function registerSettingsRoutes(

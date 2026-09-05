@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { SETTINGS_BOUNDS, type SettingsBounds } from "./bounds.js";
-import { parseDebugFlags, type DebugFlags } from "./debug/catalog.js";
-import { getSettingsBounds } from "./debug/getSettingsBounds.js";
+import type { DebugFlags } from "./debug/catalog.js";
 
 export { SETTINGS_BOUNDS, type SettingsBounds } from "./bounds.js";
 export {
@@ -61,7 +60,7 @@ function boundedInt(fieldName: string, bounds: { min: number; max: number }) {
 }
 
 /** Session-timing object schema using the given min/max bounds. */
-function sessionParamsSchemaForBounds(bounds: SettingsBounds) {
+export function sessionParamsSchemaForBounds(bounds: SettingsBounds) {
   return z.object({
     workDurationSec: boundedInt("workDurationSec", bounds.workDurationSec),
     shortRestDurationSec: boundedInt(
@@ -97,8 +96,7 @@ export const SettingsSchema = SessionParamsSchema.extend({
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
-export const SettingsPatchSchema = SettingsSchema.partial();
-export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;
+export type SettingsPatch = Partial<Settings>;
 
 /** Body for POST /api/session/start — overrides plus optional per-feature debug flags. */
 export type StartSessionBody = SessionOverrides & { debug?: DebugFlags };
@@ -112,66 +110,6 @@ export const DEFAULT_SETTINGS: Settings = {
   alertsMuted: false,
   workPauseStrategy: "soft",
 };
-
-/** Overlay start-session overrides on persisted defaults, then validate bounds. */
-export function mergeSessionParams(
-  settings: Settings,
-  overrides?: SessionOverrides,
-  options?: { debug?: DebugFlags },
-): SessionParams {
-  const schema = sessionParamsSchemaForBounds(
-    getSettingsBounds(options?.debug),
-  );
-  return schema.parse({
-    workDurationSec: overrides?.workDurationSec ?? settings.workDurationSec,
-    shortRestDurationSec:
-      overrides?.shortRestDurationSec ?? settings.shortRestDurationSec,
-    cyclesBeforeLongRest:
-      overrides?.cyclesBeforeLongRest ?? settings.cyclesBeforeLongRest,
-    longRestDurationSec:
-      overrides?.longRestDurationSec ?? settings.longRestDurationSec,
-    decisionWindowSec:
-      overrides?.decisionWindowSec ?? settings.decisionWindowSec,
-  });
-}
-
-/**
- * Parse start-session body: extract `debug` (strict), then validate overrides
- * against bounds from enabled debug flags.
- */
-export function parseStartSessionBody(body: unknown): {
-  debug: DebugFlags | undefined;
-  overrides: SessionOverrides;
-} {
-  const rawBody = z
-    .object({})
-    .passthrough()
-    .parse(body ?? {}) as Record<string, unknown>;
-  const { debug: debugRaw, ...overrideRaw } = rawBody;
-  const debug =
-    debugRaw === undefined ? undefined : parseDebugFlags(debugRaw);
-  const overrides = sessionParamsSchemaForBounds(getSettingsBounds(debug))
-    .partial()
-    .parse(overrideRaw);
-  return { debug, overrides };
-}
-
-/** Merge a settings patch onto current settings and re-validate the result. */
-export function parseSettingsPatch(
-  current: Settings,
-  patch: unknown,
-): Settings {
-  const partial = SettingsPatchSchema.parse(patch ?? {});
-  return SettingsSchema.parse({ ...current, ...partial });
-}
-
-export type PhaseKind =
-  | "planned_work"
-  | "decision"
-  | "short_rest_ack"
-  | "extended_work"
-  | "short_rest"
-  | "long_rest";
 
 export interface PlannedWorkPhase {
   kind: "planned_work";
@@ -207,8 +145,6 @@ export interface RestPhase {
   plannedDurationSec: number;
   plannedEndAt: string;
 }
-
-export type RestKind = RestPhase["kind"];
 
 export type Phase =
   PlannedWorkPhase | DecisionPhase | ExtendedWorkPhase | RestPhase;

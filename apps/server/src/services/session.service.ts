@@ -5,7 +5,6 @@ import {
   type DecisionPhase,
   type Phase,
   type PlannedWorkPhase,
-  type RestKind,
   type RestPhase,
   type SessionLiveStats,
   type SessionParams,
@@ -65,7 +64,10 @@ function startPlannedWork(
 }
 
 /** Long rest after N cycles; otherwise short rest. */
-function restKindForCycle(params: SessionParams, cycleIndex: number): RestKind {
+function restKindForCycle(
+  params: SessionParams,
+  cycleIndex: number,
+): RestPhase["kind"] {
   return cycleIndex >= params.cyclesBeforeLongRest ? "long_rest" : "short_rest";
 }
 

@@ -1,7 +1,6 @@
 import type {
   ActiveSnapshot,
   Phase,
-  PhaseKind,
   SessionLiveStats,
   WorkPauseStrategy,
 } from "@flexi-pomodoro/shared";
@@ -19,7 +18,7 @@ import { liveStatsAt } from "../../utils/liveStats";
 import displayStyles from "./timerDisplay.module.css";
 
 /** Short UI title for the current phase kind. */
-function phaseTitle(kind: PhaseKind): string {
+function phaseTitle(kind: Phase["kind"]): string {
   switch (kind) {
     case "planned_work":
       return "Work";

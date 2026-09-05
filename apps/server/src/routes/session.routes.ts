@@ -3,11 +3,11 @@ import {
   type SessionSnapshot,
   type StartSessionBody,
   SESSION_API,
-  parseStartSessionBody,
 } from "@flexi-pomodoro/shared";
 import type { SettingsService } from "../services/settings.service.js";
 import { SessionService } from "../services/session.service.js";
 import { errorReply } from "../utils/errorReply.js";
+import { parseStartSessionBody } from "../utils/settingsValidation.js";
 
 /** Parse a query/body watermark; missing or invalid values become 0. */
 function parseSinceSeq(rawSinceSeq: unknown): number {

@@ -39,7 +39,7 @@ Server and web `tsconfig.json` files **exclude** `src/tests/**` from production 
 
 ### `apps/server/src/tests/services/session.service.test.ts`
 
-Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`; fixed clock `T0 = 2026-07-12T10:00:00.000Z`.
+Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`, `reachShortRestAck`, `liveStatsAt`; fixed clock `T0 = 2026-07-12T10:00:00.000Z`.
 
 | Case | Asserts |
 |------|---------|
@@ -59,6 +59,16 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | Tick catch-up | Past work+decision → extended in one snapshot |
 | shortDurations debug | Allows 1s params |
 | Rejects 1s without flag | `SettingsError` / `INVALID_SETTINGS` |
+| Explicit ackWork (soft) | Cycle-2 `planned_work` running; `timerFrozenAt` null |
+| Explicit ackWork (hard) | Cycle-2 `planned_work` running; no freeze |
+| Ack timeout (soft) | Cycle-2 paused; `timerFrozenAt` null; `short_rest_ack_expired` fires |
+| Ack timeout (hard) | Cycle-2 paused; `timerFrozenAt` set; `short_rest_ack_expired` fires |
+| Long rest end | Idle; never enters `short_rest_ack` |
+| Pause/resume during short_rest_ack | `INVALID_PHASE` |
+| Work-decision explicit act liveStats | Elapsed to click in `deliberationSec`; planned work in `workedSec` |
+| ackWork explicit act liveStats | Decision + ack elapsed in `deliberationSec` |
+| Ack timeout liveStats | Full ack window in `deliberationSec` |
+| Live stats full cycle | Worked excludes soft pause; deliberation + rest + `pausedSec` match timeline |
 
 ### `apps/server/src/tests/services/settings.service.test.ts`
 
@@ -137,3 +147,15 @@ Inline constants and helper factories only — no fixture files.
 - Style: strict assert (`assert.equal`, `assert.ok`, `assert.throws`, `assert.deepEqual`)
 - Server phase checks often narrow with `if (snap.status !== "active") throw …` after assert for TypeScript narrowing
 - Packages do not import each other's application source for tests
+
+---
+
+## Manual smoke (M2.5 short-rest ack + live stats)
+
+Operator checklist (not automated):
+
+1. Soft pause default → short rest ends → ack window (countdown, hint) → acknowledge → running work; timeout path → `short_rest_ack_expired` sound → paused work → Resume
+2. Hard pause enabled → ack timeout → frozen clock → Resume shifts deadline
+3. Long rest completion → no ack prompt
+4. HUD Worked / Deliberation / Rest / Paused counters increment during session; reset on next start
+5. Hide Continue working (Browser preferences) → decision shows only Acknowledge rest; uncheck → Continue reappears

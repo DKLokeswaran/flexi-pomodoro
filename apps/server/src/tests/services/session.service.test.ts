@@ -60,6 +60,34 @@ function alertsSince(
   return snapshot.session.pendingAlerts.map((alertEvent) => alertEvent.id);
 }
 
+/**
+ * Drive cycle-1 work → decision → short rest → short_rest_ack.
+ * Returns the short-rest end clock (ack window start).
+ */
+function reachShortRestAck(
+  settings: SettingsService,
+  session: SessionService,
+  startMs: number,
+): number {
+  startSession(settings, session, startMs);
+  const afterWork = startMs + 60_000;
+  activePhase(session, afterWork);
+  const restStart = afterWork + 1_000;
+  session.ackRest(restStart);
+  const afterShort = restStart + 60_000;
+  const phase = activePhase(session, afterShort);
+  assert.equal(phase.kind, "short_rest_ack");
+  return afterShort;
+}
+
+/** Active-session liveStats at nowMs (full overlay). */
+function liveStatsAt(session: SessionService, nowMs: number) {
+  const snapshot = session.getSnapshot(nowMs, 0);
+  assert.equal(snapshot.status, "active");
+  if (snapshot.status !== "active") throw new Error("expected active");
+  return snapshot.session.liveStats;
+}
+
 describe("SessionService", () => {
   it("happy path N=2: ack → short rest → ack work → long rest → idle", () => {
     const { settings, session } = servicesWithShortTimers(2);
@@ -505,5 +533,167 @@ describe("SessionService", () => {
         return true;
       },
     );
+  });
+
+  it("explicit ackWork (soft) → cycle-2 planned_work running", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    const afterShort = reachShortRestAck(settings, session, SESSION_START_MS);
+    const ackAt = afterShort + 3_000;
+    session.ackWork(ackAt);
+    const phase = activePhase(session, ackAt);
+    assert.equal(phase.kind, "planned_work");
+    assert.equal(phase.cycleIndex, 2);
+    if (phase.kind !== "planned_work") throw new Error("expected planned_work");
+    assert.equal(phase.paused, false);
+    assert.equal(phase.timerFrozenAt, null);
+  });
+
+  it("explicit ackWork (hard) → cycle-2 planned_work running, no freeze", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    settings.update({ workPauseStrategy: "hard" });
+    const afterShort = reachShortRestAck(settings, session, SESSION_START_MS);
+    const ackAt = afterShort + 3_000;
+    session.ackWork(ackAt);
+    const phase = activePhase(session, ackAt);
+    assert.equal(phase.kind, "planned_work");
+    assert.equal(phase.cycleIndex, 2);
+    if (phase.kind !== "planned_work") throw new Error("expected planned_work");
+    assert.equal(phase.paused, false);
+    assert.equal(phase.timerFrozenAt, null);
+  });
+
+  it("ack timeout (soft) → cycle-2 paused work; short_rest_ack_expired fires", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    const afterShort = reachShortRestAck(settings, session, SESSION_START_MS);
+    const seqBefore = session.getAlertSeq();
+    const timeoutAt = afterShort + 15_000;
+    const phase = activePhase(session, timeoutAt);
+    assert.equal(phase.kind, "planned_work");
+    assert.equal(phase.cycleIndex, 2);
+    if (phase.kind !== "planned_work") throw new Error("expected planned_work");
+    assert.equal(phase.paused, true);
+    assert.equal(phase.timerFrozenAt, null);
+    assert.ok(
+      alertsSince(session, timeoutAt, seqBefore).includes(
+        "short_rest_ack_expired",
+      ),
+    );
+  });
+
+  it("ack timeout (hard) → cycle-2 paused work with timerFrozenAt", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    settings.update({ workPauseStrategy: "hard" });
+    const afterShort = reachShortRestAck(settings, session, SESSION_START_MS);
+    const seqBefore = session.getAlertSeq();
+    const timeoutAt = afterShort + 15_000;
+    const phase = activePhase(session, timeoutAt);
+    assert.equal(phase.kind, "planned_work");
+    assert.equal(phase.cycleIndex, 2);
+    if (phase.kind !== "planned_work") throw new Error("expected planned_work");
+    assert.equal(phase.paused, true);
+    assert.equal(phase.timerFrozenAt, new Date(timeoutAt).toISOString());
+    assert.ok(
+      alertsSince(session, timeoutAt, seqBefore).includes(
+        "short_rest_ack_expired",
+      ),
+    );
+  });
+
+  it("long rest end → idle without short_rest_ack", () => {
+    const { settings, session } = servicesWithShortTimers(1);
+    startSession(settings, session, SESSION_START_MS);
+    const afterWork = SESSION_START_MS + 60_000;
+    activePhase(session, afterWork);
+    session.ackRest(afterWork + 500);
+    const longRest = activePhase(session, afterWork + 500);
+    assert.equal(longRest.kind, "long_rest");
+
+    const afterLong = afterWork + 500 + 120_000;
+    const snapshot = session.getSnapshot(afterLong, 0);
+    assert.equal(snapshot.status, "idle");
+  });
+
+  it("pause and resume rejected during short_rest_ack", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    const afterShort = reachShortRestAck(settings, session, SESSION_START_MS);
+    assert.throws(
+      () => session.pause(afterShort + 1_000),
+      (error: unknown) => {
+        assert.ok(error instanceof SessionError);
+        assert.equal(error.code, "INVALID_PHASE");
+        return true;
+      },
+    );
+    assert.throws(
+      () => session.resume(afterShort + 1_000),
+      (error: unknown) => {
+        assert.ok(error instanceof SessionError);
+        assert.equal(error.code, "INVALID_PHASE");
+        return true;
+      },
+    );
+  });
+
+  it("work-decision explicit act attributes elapsed to deliberationSec", () => {
+    const { settings, session } = servicesWithShortTimers(1);
+    startSession(settings, session, SESSION_START_MS);
+    const afterWork = SESSION_START_MS + 60_000;
+    activePhase(session, afterWork);
+    const clickAt = afterWork + 5_000;
+    session.ackRest(clickAt);
+    const stats = liveStatsAt(session, clickAt);
+    assert.equal(stats.deliberationSec, 5);
+    assert.equal(stats.workedSec, 60);
+  });
+
+  it("ackWork explicit act attributes elapsed to deliberationSec", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    const afterShort = reachShortRestAck(settings, session, SESSION_START_MS);
+    const ackAt = afterShort + 4_000;
+    session.ackWork(ackAt);
+    const stats = liveStatsAt(session, ackAt);
+    // 1s deliberation at work-decision ackRest + 4s at short-rest ack.
+    assert.equal(stats.deliberationSec, 5);
+  });
+
+  it("ack timeout attributes full window to deliberationSec", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    const afterShort = reachShortRestAck(settings, session, SESSION_START_MS);
+    const timeoutAt = afterShort + 15_000;
+    const stats = liveStatsAt(session, timeoutAt);
+    // 1s at work-decision ackRest + full 15s ack window.
+    assert.equal(stats.deliberationSec, 16);
+    assert.equal(activePhase(session, timeoutAt).kind, "planned_work");
+  });
+
+  it("live stats full cycle: work, deliberation, rest; soft pause excluded from worked", () => {
+    const { settings, session } = servicesWithShortTimers(2);
+    startSession(settings, session, SESSION_START_MS);
+
+    // Soft-pause 10s mid work (20s–30s).
+    session.pause(SESSION_START_MS + 20_000);
+    session.resume(SESSION_START_MS + 30_000);
+
+    const afterWork = SESSION_START_MS + 60_000;
+    activePhase(session, afterWork);
+    // Soft pause keeps planned end; 60s wall − 10s pause = 50 worked.
+    assert.equal(liveStatsAt(session, afterWork).workedSec, 50);
+    assert.equal(liveStatsAt(session, afterWork).pausedSec, 10);
+
+    const restStart = afterWork + 2_000;
+    session.ackRest(restStart);
+    assert.equal(liveStatsAt(session, restStart).deliberationSec, 2);
+
+    const afterShort = restStart + 60_000;
+    activePhase(session, afterShort);
+    assert.equal(liveStatsAt(session, afterShort).restSec, 60);
+
+    const ackAt = afterShort + 3_000;
+    session.ackWork(ackAt);
+    const stats = liveStatsAt(session, ackAt);
+    assert.equal(stats.workedSec, 50);
+    assert.equal(stats.deliberationSec, 5); // 2s decision + 3s ack
+    assert.equal(stats.restSec, 60);
+    assert.equal(stats.pausedSec, 10);
   });
 });

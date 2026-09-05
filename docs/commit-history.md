@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 41 |
+| Total commits | 43 |
 | First commit date | 2026-07-12 |
 | Latest commit date | 2026-09-05 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (41) |
+| Most active contributor | Lokeswaran DK (43) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0`, `v0.0.2-alpha.1`, `v0.0.2-alpha.2` |
 
@@ -20,7 +20,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 |-------|--------:|
 | 2026-07 | 23 |
 | 2026-08 | 11 |
-| 2026-09 | 7 |
+| 2026-09 | 9 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -157,6 +157,14 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Reformat touched sources (`style: apply Prettier formatting`).
 - Ignore that format commit in `.git-blame-ignore-revs`.
 
+### 2026-09-05 — Ack-timeout alert asset
+
+- Add `placeholder-short_rest_ack_expired.wav` so short-rest ack timeout plays audio via `playAlerts`.
+
+### 2026-09-05 — Live stats duration format
+
+- Format live-stats HUD durations with `formatHhMmSs` (`mm:ss` under one hour, `hh:mm:ss` after).
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -170,6 +178,8 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 3350399 | Lokeswaran DK | 2026-09-05 | Show live stats as hh:mm:ss after the first hour, and sync docs. |
+| 74cbcab | Lokeswaran DK | 2026-09-05 | Add short_rest_ack_expired placeholder alert so ack timeout plays audio. |
 | dd60c55 | Lokeswaran DK | 2026-09-05 | chore: ignore the Prettier format commit in git blame |
 | dbfb86c | Lokeswaran DK | 2026-09-05 | style: apply Prettier formatting |
 | cac13e1 | Lokeswaran DK | 2026-09-05 | Keep package boundaries: server owns settings validation, web owns its tests. |
@@ -212,4 +222,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: dd60c55b9eaee419a387f5bbcbacef04131c247f
+Last Synced Commit: 3350399b52e6a99f0ca82c378d60d920843a64af

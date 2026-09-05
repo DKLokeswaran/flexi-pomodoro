@@ -11,7 +11,10 @@ export {
   type ServerFeatureDef,
 } from "./debug/catalog.js";
 export { getSettingsBounds } from "./debug/getSettingsBounds.js";
-export { SHORT_DURATIONS_MIN_OVERLAY, shortDurationsServerFeature } from "./debug/features/shortDurations.js";
+export {
+  SHORT_DURATIONS_MIN_OVERLAY,
+  shortDurationsServerFeature,
+} from "./debug/features/shortDurations.js";
 export {
   pausedSecAt,
   plannedWorkSecAt,

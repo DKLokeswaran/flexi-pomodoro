@@ -8,7 +8,6 @@ import {
 import type { FlagMap } from "./createFlagCatalog";
 import { usePersistedState } from "./persistedState";
 
-
 /** In-memory / logical shape shared by debug and UI flag stores. */
 export type FlagStoreState<Flags extends object> = {
   gateEnabled: boolean;

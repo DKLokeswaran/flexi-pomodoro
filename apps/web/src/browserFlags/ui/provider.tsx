@@ -1,12 +1,5 @@
-import {
-  readUiFlags,
-  type UiFeatureId,
-  type UiFlags,
-} from "./catalog";
-import {
-  createFlagStore,
-  type FlagStoreState,
-} from "../createFlagStore";
+import { readUiFlags, type UiFeatureId, type UiFlags } from "./catalog";
+import { createFlagStore, type FlagStoreState } from "../createFlagStore";
 import { readStoredRecord } from "../readStoredRecord";
 
 const STORAGE_KEY = "flexi-pomodoro:uiFlags";

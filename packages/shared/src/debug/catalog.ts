@@ -4,8 +4,7 @@ import { shortDurationsServerFeature } from "./features/shortDurations.js";
 /** Server-visible debug features (id + bounds logic only). */
 export const DEBUG_SERVER_FEATURES = [shortDurationsServerFeature] as const;
 
-export type DebugFeatureId =
-  (typeof DEBUG_SERVER_FEATURES)[number]["id"];
+export type DebugFeatureId = (typeof DEBUG_SERVER_FEATURES)[number]["id"];
 
 export const DEBUG_FEATURE_IDS: readonly DebugFeatureId[] =
   DEBUG_SERVER_FEATURES.map((feature) => feature.id);

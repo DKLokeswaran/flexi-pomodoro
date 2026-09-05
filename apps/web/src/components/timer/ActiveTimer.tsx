@@ -187,9 +187,7 @@ export function ActiveTimer({
         {phaseTitle(phase.kind)}
         {pausedLabel}
       </p>
-      <div className={displayStyles.clock}>
-        {displayClock(snapshot, now)}
-      </div>
+      <div className={displayStyles.clock}>{displayClock(snapshot, now)}</div>
       <p className={displayStyles.cycle}>
         Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
       </p>

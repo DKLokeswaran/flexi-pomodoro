@@ -17,8 +17,7 @@ export function TimerTab({
   onAction: (path: string, body?: StartSessionBody) => void;
   defaults: SessionTimingDefaults;
 }) {
-  const activeSnapshot =
-    snapshot?.status === "active" ? snapshot : null;
+  const activeSnapshot = snapshot?.status === "active" ? snapshot : null;
 
   return (
     <section className={styles.timerShell} aria-live="polite">

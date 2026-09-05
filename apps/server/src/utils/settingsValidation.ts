@@ -48,8 +48,7 @@ export function parseStartSessionBody(body: unknown): {
     .passthrough()
     .parse(body ?? {}) as Record<string, unknown>;
   const { debug: debugRaw, ...overrideRaw } = rawBody;
-  const debug =
-    debugRaw === undefined ? undefined : parseDebugFlags(debugRaw);
+  const debug = debugRaw === undefined ? undefined : parseDebugFlags(debugRaw);
   const overrides = sessionParamsSchemaForBounds(getSettingsBounds(debug))
     .partial()
     .parse(overrideRaw);

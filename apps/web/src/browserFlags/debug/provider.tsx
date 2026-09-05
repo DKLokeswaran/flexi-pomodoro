@@ -3,10 +3,7 @@ import {
   type DebugFeatureId,
   type DebugFlags,
 } from "@flexi-pomodoro/shared";
-import {
-  createFlagStore,
-  type FlagStoreState,
-} from "../createFlagStore";
+import { createFlagStore, type FlagStoreState } from "../createFlagStore";
 import { readStoredRecord } from "../readStoredRecord";
 
 const STORAGE_KEY = "flexi-pomodoro:debugFlags";

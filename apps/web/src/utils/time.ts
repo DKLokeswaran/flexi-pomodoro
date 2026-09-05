@@ -1,10 +1,27 @@
-/** Format a duration as signed mm:ss (e.g. 75 → 01:15, −5 → -00:05). */
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Whole hours, minutes-within-hour, and seconds from a non-negative duration. */
+function splitSec(totalSec: number): [number, number, number] {
+  const sec = Math.floor(totalSec);
+  return [Math.floor(sec / 3600), Math.floor((sec % 3600) / 60), sec % 60];
+}
+
+/** Format a non-negative duration as mm:ss (e.g. 75 → 01:15). */
 export function formatMmSs(totalSec: number): string {
-  const sign = totalSec < 0 ? "-" : "";
-  const absoluteSeconds = Math.abs(Math.floor(totalSec));
-  const minutes = Math.floor(absoluteSeconds / 60);
-  const seconds = absoluteSeconds % 60;
-  return `${sign}${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  const [hours, minutes, seconds] = splitSec(totalSec);
+  return `${pad2(hours * 60 + minutes)}:${pad2(seconds)}`;
+}
+
+/**
+ * Format a non-negative duration as mm:ss under one hour, else hh:mm:ss
+ * (e.g. 75 → 01:15, 3661 → 01:01:01).
+ */
+export function formatHhMmSs(totalSec: number): string {
+  const [hours, minutes, seconds] = splitSec(totalSec);
+  if (hours === 0) return `${pad2(minutes)}:${pad2(seconds)}`;
+  return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
 }
 
 /** Whole seconds from now until an ISO timestamp (negative if already past). */

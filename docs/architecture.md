@@ -172,7 +172,7 @@ No React Router. `App` holds `tab: "timer" | "settings" | "analytics" | "about"`
 - **Authoritative phase changes**: SSE (`/api/session/events`) + hybrid poll fallback (`sessionStream.sse.ts`).
 - **UI countdown**: each leaf owns its clock. `ActiveTimer` uses `useNow(ACTIVE_UI_TICK_MS)` (250ms) for remaining/overtime from ISO anchors — no sub-second API polling. Hard pause uses `timerFrozenAt` as the clock anchor while paused. `IdleStartForm` uses `useNow(IDLE_ESTIMATE_TICK_MS)` (60s) only for the absolute estimated-end label.
 - **Estimated session end**: idle shows locale wall-clock end plus approximate duration (`sessionProjection` — nominal path: `N×work + (N−1)×short rest + long rest`, no decision windows). Active shows a live end time via `activeEstimatedSessionEndMs` (forward remainder from current phase anchors; deliberation, extended work, and hard-pause slip shift the projection).
-- **Live stats HUD**: `ActiveTimer` shows Worked / Deliberation / Rest / Paused counters. `liveStatsAt(snapshot, now)` strips in-phase progress at `serverNow` and re-adds at local `now`. Worked/paused formulas use shared `plannedWorkSecAt` / `pausedSecAt`. While planned work is paused, the client freezes **worked** at pause start (`timerFrozenAt ?? pauseStartedAt`); **paused** keeps advancing on the wall clock (soft and hard).
+- **Live stats HUD**: `ActiveTimer` shows Worked / Deliberation / Rest / Paused counters formatted with `formatHhMmSs` (`mm:ss` under one hour, `hh:mm:ss` after). `liveStatsAt(snapshot, now)` strips in-phase progress at `serverNow` and re-adds at local `now`. Worked/paused formulas use shared `plannedWorkSecAt` / `pausedSecAt`. While planned work is paused, the client freezes **worked** at pause start (`timerFrozenAt ?? pauseStartedAt`); **paused** keeps advancing on the wall clock (soft and hard).
 - **Browser preferences**: `hideContinueButton` UI flag (localStorage `flexi-pomodoro:uiFlags`) omits the Continue action during the work-decision phase.
 - **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`. Label and phase suffix follow the locked session strategy (`Soft pause` vs `Hard pause (experimental)`). Toasts mirror the same strategy.
 - **Settings**: Experimental features gate exposes **Enable hard pause (experimental)**; unchecked maps to `workPauseStrategy: "soft"`, checked to `"hard"`. Saved with **Save defaults**; locked while a session is active.
@@ -185,7 +185,7 @@ Not found in committed history (no `React.lazy` / dynamic import of routes).
 
 1. Server appends `{ seq, id }` to an alert log on transitions.
 2. Snapshots include `pendingAlerts` filtered by client `sinceSeq`.
-3. Client `AlertSeqStore` persists watermark in `localStorage` (`flexi-pomodoro:lastPlayedAlertSeq`).
+3. Client `playAlerts` maps each `AlertId` to `public/alerts/placeholder-<id>.wav` (including `short_rest_ack_expired`) and plays unplayed deltas; `AlertSeqStore` persists the watermark in `localStorage` (`flexi-pomodoro:lastPlayedAlertSeq`).
 4. On idle after active, client `syncAlertSeq()` aligns with server high-water and may reset history server-side after session end.
 
 ## Persistence (current vs planned)

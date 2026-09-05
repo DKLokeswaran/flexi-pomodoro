@@ -6,12 +6,12 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 38 |
+| Total commits | 41 |
 | First commit date | 2026-07-12 |
 | Latest commit date | 2026-09-05 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (38) |
-| Conventional-commit prefix count (`feat`/`fix`/…) | 4 (`chore` × 3, `style` × 1) |
+| Most active contributor | Lokeswaran DK (41) |
+| Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0`, `v0.0.2-alpha.1`, `v0.0.2-alpha.2` |
 
 ## Commit velocity
@@ -20,7 +20,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 |-------|--------:|
 | 2026-07 | 23 |
 | 2026-08 | 11 |
-| 2026-09 | 4 |
+| 2026-09 | 7 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -147,6 +147,16 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Add `SessionLiveStats.pausedSec` and show it on the active timer HUD for soft and hard pause.
 - Share planned-work progress helpers (`pausedSecAt` / `plannedWorkSecAt`); keep `workedSec` frozen at pause start while pause time accrues.
 
+### 2026-09-05 — Package boundaries
+
+- Move settings HTTP parse/merge helpers into `apps/server` (`settingsValidation`); drop one-sided shared type aliases.
+- Keep web projection/liveStats unit tests under `apps/web/src/tests/`; stop server tests from importing `apps/web`.
+
+### 2026-09-05 — Prettier follow-up
+
+- Reformat touched sources (`style: apply Prettier formatting`).
+- Ignore that format commit in `.git-blame-ignore-revs`.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -160,6 +170,9 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| dd60c55 | Lokeswaran DK | 2026-09-05 | chore: ignore the Prettier format commit in git blame |
+| dbfb86c | Lokeswaran DK | 2026-09-05 | style: apply Prettier formatting |
+| cac13e1 | Lokeswaran DK | 2026-09-05 | Keep package boundaries: server owns settings validation, web owns its tests. |
 | e5c5228 | Lokeswaran DK | 2026-09-05 | Add paused live stats and freeze worked while paused. |
 | efa2cca | Lokeswaran DK | 2026-09-04 | Release v0.0.2-alpha.2 — Fix decision-timeout liveStats double-count. |
 | e0bd52d | Lokeswaran DK | 2026-09-03 | Show estimated session end on idle and active timers. |
@@ -199,4 +212,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: e5c522823f88c3fd21925388c7f456a6f9f49204
+Last Synced Commit: dd60c55b9eaee419a387f5bbcbacef04131c247f

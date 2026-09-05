@@ -10,6 +10,7 @@ import { ACTIVE_UI_TICK_MS, useNow } from "../../hooks/useNow";
 import {
   elapsedFromIso,
   formatLocalTime,
+  formatHhMmSs,
   formatMmSs,
   remainingSecFromIso,
 } from "../../utils/time";
@@ -144,16 +145,16 @@ function LiveStatsRow({ liveStats }: { liveStats: SessionLiveStats }) {
   return (
     <p className={displayStyles.liveStats}>
       <span>
-        Worked <strong>{formatMmSs(liveStats.workedSec)}</strong>
+        Worked <strong>{formatHhMmSs(liveStats.workedSec)}</strong>
       </span>
       <span>
-        Deliberation <strong>{formatMmSs(liveStats.deliberationSec)}</strong>
+        Deliberation <strong>{formatHhMmSs(liveStats.deliberationSec)}</strong>
       </span>
       <span>
-        Rest <strong>{formatMmSs(liveStats.restSec)}</strong>
+        Rest <strong>{formatHhMmSs(liveStats.restSec)}</strong>
       </span>
       <span>
-        Paused <strong>{formatMmSs(liveStats.pausedSec)}</strong>
+        Paused <strong>{formatHhMmSs(liveStats.pausedSec)}</strong>
       </span>
     </p>
   );

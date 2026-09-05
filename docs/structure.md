@@ -71,7 +71,7 @@ flexi-pomodoro/
 │       ├── vite.config.ts       # proxy /api → :3847; __APP_VERSION__
 │       ├── tsconfig.json        # excludes src/tests/**
 │       ├── tsconfig.node.json
-│       ├── public/alerts/       # placeholder-*.wav (7 files)
+│       ├── public/alerts/       # placeholder-*.wav (one per AlertId; 8 files)
 │       └── src/
 │           ├── main.tsx
 │           ├── App.tsx / App.module.css

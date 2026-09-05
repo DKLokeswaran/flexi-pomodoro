@@ -288,13 +288,16 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 
 | Export | Purpose |
 |--------|---------|
-| `formatMmSs(totalSec)` | `MM:SS` with optional minus |
+| `formatMmSs(totalSec)` | Non-negative duration as `mm:ss` (total minutes may exceed 59) |
+| `formatHhMmSs(totalSec)` | Non-negative duration as `mm:ss` under one hour, else `hh:mm:ss` |
 | `secFromIso(iso, nowMs)` | signed seconds to event |
 | `elapsedFromIso(iso, nowMs)` | non-negative elapsed |
 | `minutesToSec` / `secToMinutes` | conversions |
 | `remainingSecFromIso(iso, nowMs)` | non-negative countdown seconds |
 | `formatLocalTime(ms)` | locale wall-clock label (hour + minute) |
 | `formatApproxDuration(totalSec)` | approximate duration (`~2h 15m`) |
+
+Internal helpers `pad2` and `splitSec` back both formatters.
 
 ### `src/utils/sessionProjection.ts`
 
@@ -349,10 +352,10 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 
 | Export | Purpose |
 |--------|---------|
-| `playAlerts(events)` | play new Audio deltas |
+| `playAlerts(events)` | play new Audio deltas (`placeholder-<AlertId>.wav`) |
 | `alertsFromSnapshot(snapshot)` | extract pendingAlerts |
 
-**Side effects:** Audio playback; advances watermark.
+**Side effects:** Audio playback; advances watermark. Missing asset files fail silently in `audio.play()`.
 
 ---
 
@@ -518,7 +521,7 @@ Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and appr
 | `snapshot` | `ActiveSnapshot` |
 | `onAction` | `(path: string) => void` |
 
-Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Renders phase label, countdown, cycle, estimated end (`activeEstimatedSessionEndMs`), hint, actions, and live-stats HUD (`liveStatsAt`: Worked / Deliberation / Rest / Paused). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
+Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Renders phase label, countdown (`formatMmSs`), cycle, estimated end (`activeEstimatedSessionEndMs`), hint, actions, and live-stats HUD (`liveStatsAt`: Worked / Deliberation / Rest / Paused via `formatHhMmSs`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
 
 Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button label and phase suffix follow `snapshot.session.pauseStrategy`.
 

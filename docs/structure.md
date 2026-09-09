@@ -57,14 +57,17 @@ flexi-pomodoro/
 │   │       ├── utils/
 │   │       │   ├── errorReply.ts         # HTTP mapping for SettingsError / SessionError
 │   │       │   ├── settingsValidation.ts # SettingsPatchSchema, parse/merge start+settings bodies
-│   │       │   └── iso.ts                # msToIso / parseIso helpers
+│   │       │   ├── iso.ts                # msToIso / parseIso helpers
+│   │       │   └── asyncMutex.ts         # runExclusive / tryRunExclusive for session ticks
 │   │       └── tests/
 │   │           ├── pause/
 │   │           │   ├── softPause.test.ts
 │   │           │   └── hardPause.test.ts
-│   │           └── services/
-│   │               ├── settings.service.test.ts
-│   │               └── session.service.test.ts
+│   │           ├── services/
+│   │           │   ├── settings.service.test.ts
+│   │           │   └── session.service.test.ts
+│   │           └── utils/
+│   │               └── asyncMutex.test.ts
 │   └── web/                     # @flexi-pomodoro/web
 │       ├── index.html
 │       ├── package.json
@@ -134,7 +137,7 @@ flexi-pomodoro/
 
 ## Test location convention
 
-Mirrored `src/tests/` trees (not colocated): server `services/` + `pause/`; web `utils/`. Each package runs its own tests; packages do not import each other's application source for tests.
+Mirrored `src/tests/` trees (not colocated): server `services/` + `pause/` + `utils/`; web `utils/`. Each package runs its own tests; packages do not import each other's application source for tests.
 
 ## Config & build artifacts (ignored / not committed)
 

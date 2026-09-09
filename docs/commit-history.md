@@ -6,13 +6,13 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 43 |
+| Total commits | 45 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-09-05 |
+| Latest commit date | 2026-09-08 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (43) |
+| Most active contributor | Lokeswaran DK (45) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
-| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0`, `v0.0.2-alpha.1`, `v0.0.2-alpha.2` |
+| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` … `v0.0.2-alpha.3` |
 
 ## Commit velocity
 
@@ -20,7 +20,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 |-------|--------:|
 | 2026-07 | 23 |
 | 2026-08 | 11 |
-| 2026-09 | 9 |
+| 2026-09 | 11 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -165,6 +165,15 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 
 - Format live-stats HUD durations with `formatHhMmSs` (`mm:ss` under one hour, `hh:mm:ss` after).
 
+### 2026-09-05 — M2.5 tests-smoke / `v0.0.2-alpha.3`
+
+- Expand `SessionService` tests for M2.5 short-rest ack and live-stats smoke coverage.
+- Tag/release `v0.0.2-alpha.3`.
+
+### 2026-09-08 — M3 persistence plan
+
+- Add M3 persistence and resume implementation plan (FPMD-19): async engine mutex, Knex/SQLite stores, phase write rules, boot recovery, non-root Docker ownership, serialized delivery groups.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -178,6 +187,8 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 3748b35 | Lokeswaran DK | 2026-09-08 | Add M3 persistence and resume implementation plan. |
+| ec0adae | Lokeswaran DK | 2026-09-05 | Release v0.0.2-alpha.3 — Complete M2.5 tests-smoke coverage and sync docs. |
 | 3350399 | Lokeswaran DK | 2026-09-05 | Show live stats as hh:mm:ss after the first hour, and sync docs. |
 | 74cbcab | Lokeswaran DK | 2026-09-05 | Add short_rest_ack_expired placeholder alert so ack timeout plays audio. |
 | dd60c55 | Lokeswaran DK | 2026-09-05 | chore: ignore the Prettier format commit in git blame |
@@ -222,4 +233,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: 3350399b52e6a99f0ca82c378d60d920843a64af
+Last Synced Commit: 3748b3543ebf88fb4231dddfb9fa8a9aae36e909

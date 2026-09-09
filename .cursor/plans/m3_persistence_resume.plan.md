@@ -4,7 +4,7 @@ overview: "Implement FPMD-19 / PRD M3: async engine first, then Knex + SQLite (b
 todos:
   - id: async-engine
     content: Async tick/commands; serial mutex on every tick path (commands, scheduler, boot); getSnapshot/SSE pure read (no tick); scheduler skip-if-busy or await; routes await; async tests
-    status: pending
+    status: completed
   - id: db-bootstrap
     content: Knex + better-sqlite3, DATA_DIR, migrations, purpose-split stores (settings/session/phases); wire in buildApp
     status: pending

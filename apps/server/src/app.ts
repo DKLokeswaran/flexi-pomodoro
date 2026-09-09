@@ -52,7 +52,9 @@ export async function buildApp() {
 
   const scheduler = new IntervalScheduler({
     intervalMs: 250,
-    onTick: (nowMs) => session.tick(nowMs, true),
+    onTick: async (nowMs) => {
+      await session.tickIfIdle(nowMs, true);
+    },
   });
   scheduler.start();
 

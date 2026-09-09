@@ -39,7 +39,7 @@ Server and web `tsconfig.json` files **exclude** `src/tests/**` from production 
 
 ### `apps/server/src/tests/services/session.service.test.ts`
 
-Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`, `reachShortRestAck`, `liveStatsAt`; fixed clock `T0 = 2026-07-12T10:00:00.000Z`.
+Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`, `reachShortRestAck`, `liveStatsAt`, `snapshotAt`; fixed clock `SESSION_START_MS = 2026-07-12T10:00:00.000Z`. Engine tests that advance time call `tickIfIdle` before `getSnapshot`.
 
 | Case | Asserts |
 |------|---------|
@@ -56,7 +56,7 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | Hard-paused past original end | Stays in planned work while frozen |
 | Pause/resume outside planned work (FR-PAUSE-S6) | `INVALID_PHASE` in decision, short_rest_ack, extended, short rest, long rest |
 | N=1 | Long rest after first work path |
-| Tick catch-up | Past work+decision → extended in one snapshot |
+| Tick catch-up | Past work+decision → extended in one idle tick |
 | shortDurations debug | Allows 1s params |
 | Rejects 1s without flag | `SettingsError` / `INVALID_SETTINGS` |
 | Explicit ackWork (soft) | Cycle-2 `planned_work` running; `timerFrozenAt` null |
@@ -69,7 +69,9 @@ Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`
 | ackWork explicit act liveStats | Decision + ack elapsed in `deliberationSec` |
 | Ack timeout liveStats | Full ack window in `deliberationSec` |
 | Live stats full cycle | Worked excludes soft pause; deliberation + rest + `pausedSec` match timeline |
-
+| getSnapshot pure read | Overdue clock without tick keeps planned_work; after `tickIfIdle` → decision |
+| Concurrent tickIfIdle | Overlapping idle ticks may skip; follow-up idle tick leaves consistent extended_work |
+| tickIfIdle skip-if-busy | Concurrent `tickIfIdle` calls: at least one returns `false` |
 ### `apps/server/src/tests/services/settings.service.test.ts`
 
 Imports parsers from `utils/settingsValidation.ts`.
@@ -100,6 +102,13 @@ Isolated `hardPauseStrategy` unit tests:
 | `onPause` | Sets `timerFrozenAt`; `isCountdownFrozen` true |
 | `onResume` | Remaining time unchanged; `plannedEndAt` shifted by paused duration |
 | `onPlannedEnd` | → `"decision"` when unfrozen |
+
+### `apps/server/src/tests/utils/asyncMutex.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| `runExclusive` | Overlapping work runs serially (FIFO) |
+| `tryRunExclusive` | Returns `null` / skips while locked |
 
 ### `apps/web/src/tests/utils/liveStats.test.ts`
 

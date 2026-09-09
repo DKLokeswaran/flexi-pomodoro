@@ -37,7 +37,7 @@ flowchart TB
     Routes --> SettSvc
     Routes --> SessSvc
     SessSvc --> Pause
-    Sched -->|"tick every 250ms"| SessSvc
+    Sched -->|"tickIfIdle every 250ms"| SessSvc
   end
 
   Shared["packages/shared"]
@@ -54,7 +54,8 @@ flowchart TB
 | **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Instantiates `SettingsService`, `SessionService`, `IntervalScheduler`; passes deps into `registerRoutes` |
 | **Service layer** | `SettingsService`, `SessionService` | Business rules and state; routes stay thin |
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
-| **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later |
+| **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later; `onTick` may return a Promise |
+| **Mutex / skip-if-busy** | `AsyncMutex` in `SessionService` | Commands use `runExclusive`; scheduler uses `tickIfIdle` → `tryRunExclusive` so intervals do not queue behind a long command |
 | **Strategy (pause plugins)** | `PauseStrategyRegistry` + `WorkPauseStrategy` | Engine calls `onPause` / `onResume` / `isCountdownFrozen` / `onPlannedEnd`; default registry registers `soft` and `hard` |
 | **Catalog / plugin registration** | `DEBUG_SERVER_FEATURES` in `packages/shared/src/debug/catalog.ts` | Server debug features register id + optional `applyBounds`; web labels live in `browserFlags/debug/` |
 | **Browser flag stores** | `createFlagCatalog` + `createFlagStore` in `apps/web/src/browserFlags/` | Shared localStorage-backed stores for debug flags (gated) and UI preferences (ungated) |
@@ -73,7 +74,9 @@ const session = new SessionService(); // defaultPauseRegistry: soft + hard
 await registerRoutes(app, { settings, session });
 const scheduler = new IntervalScheduler({
   intervalMs: 250,
-  onTick: (nowMs) => session.tick(nowMs, true),
+  onTick: async (nowMs) => {
+    await session.tickIfIdle(nowMs, true);
+  },
 });
 ```
 
@@ -94,9 +97,9 @@ On the web, React Context provides `UiFlagsProvider`, `DebugFlagsProvider` (both
 
 1. **Entry** — `apps/server/src/index.ts` reads `PORT` / `HOST`, calls `buildApp()`, `listen`.
 2. **App** — Fastify instance; services + routes + scheduler; optional static hosting.
-3. **Route** — e.g. `POST /api/session/start` parses body via server `parseStartSessionBody`, resolves params via `settings.resolveSessionParams`, calls `session.start`.
-4. **Service** — mutates in-memory session; `notify()` pushes snapshots to SSE subscribers.
-5. **Tick** — every 250ms `session.tick(nowMs, true)` catch-up advances due phase boundaries (wall-clock).
+3. **Route** — e.g. `POST /api/session/start` parses body via server `parseStartSessionBody`, resolves params via `settings.resolveSessionParams`, `await`s `session.start` (and other session mutations).
+4. **Service** — under `AsyncMutex.runExclusive`, mutates in-memory session; mutating commands call `tickUnlocked` first via `beginActiveCommand`; `notify()` pushes snapshots to SSE subscribers. `getSnapshot` / SSE open are pure reads (no catch-up).
+5. **Tick** — every 250ms `session.tickIfIdle(nowMs, true)` advances due phase boundaries when the mutex is free; overlapping intervals skip instead of queuing.
 
 There are **no DB transactions**. Session and settings live in process memory only.
 

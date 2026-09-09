@@ -9,7 +9,7 @@ export interface Scheduler {
 
 export interface IntervalSchedulerOptions {
   intervalMs: number;
-  onTick: (nowMs: number) => void;
+  onTick: (nowMs: number) => void | Promise<void>;
   now?: () => number;
 }
 
@@ -23,7 +23,7 @@ export class IntervalScheduler implements Scheduler {
   start(): void {
     if (this.timer) return;
     this.timer = setInterval(() => {
-      this.options.onTick(this.options.now?.() ?? Date.now());
+      void this.options.onTick(this.options.now?.() ?? Date.now());
     }, this.options.intervalMs);
     this.timer.unref?.();
   }

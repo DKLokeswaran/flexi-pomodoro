@@ -19,6 +19,7 @@ import {
   PauseStrategyRegistry,
   type WorkPauseStrategy,
 } from "../pause/index.js";
+import { AsyncMutex } from "../utils/asyncMutex.js";
 import { elapsedSecFromIso, msToIso, parseIso } from "../utils/iso.js";
 
 /** Domain error from session commands (wrong phase, no session, etc.). */
@@ -136,6 +137,8 @@ export class SessionService {
   private listeners = new Set<SnapshotListener>();
   /** Per-listener delivery cursor (last seq sent). */
   private listenerCursors = new WeakMap<SnapshotListener, number>();
+  /** Serializes tick and every command that ticks (commands, scheduler, boot). */
+  private readonly mutex = new AsyncMutex();
 
   constructor(
     private readonly pauseRegistry: PauseStrategyRegistry = defaultPauseRegistry(),
@@ -168,14 +171,17 @@ export class SessionService {
     return this.buildSnapshot(nowMs, sinceSeq);
   }
 
-  /** Tick without notifying, then return the live session for a mutating command. */
-  private beginActiveCommand(nowMs: number): {
+  /**
+   * Tick without notifying, then return the live session for a mutating command.
+   * Caller must already hold the mutex.
+   */
+  private async beginActiveCommand(nowMs: number): Promise<{
     session: ActiveSession;
     seqAtStart: number;
-  } {
+  }> {
     const seqAtStart = this.alertSeq;
     const session = this.requireActive();
-    this.tick(nowMs, false);
+    await this.tickUnlocked(nowMs, false);
     return { session, seqAtStart };
   }
 
@@ -249,9 +255,11 @@ export class SessionService {
     };
   }
 
-  /** Tick due transitions, then return a snapshot; reset alerts if now idle. */
+  /**
+   * Pure read of current in-memory state (no wall-clock catch-up).
+   * Idle cleanup clears delivered alert history after the snapshot is built.
+   */
   getSnapshot(nowMs: number = Date.now(), sinceSeq = 0): SessionSnapshot {
-    this.tick(nowMs, false);
     const snapshot = this.buildSnapshot(nowMs, sinceSeq);
     if (!this.session) {
       this.resetAlertState();
@@ -260,145 +268,170 @@ export class SessionService {
   }
 
   /** Start a new session in planned work; fails if one is already active. */
-  start(
+  async start(
     params: SessionParams,
     nowMs: number = Date.now(),
     pauseStrategy: PauseStrategyId = "soft",
-  ): SessionSnapshot {
-    if (this.session) {
-      throw new SessionError("A session is already active", "SESSION_ACTIVE");
-    }
-    const seqAtStart = this.alertSeq;
-    this.pausePlugin = this.pauseRegistry.get(pauseStrategy)!;
-    this.session = {
-      id: randomUUID(),
-      status: "active",
-      startedAt: msToIso(nowMs),
-      params,
-      pauseStrategy,
-      phase: startPlannedWork(params, 1, nowMs),
-      liveStats: {
-        workedSec: 0,
-        deliberationSec: 0,
-        restSec: 0,
-        pausedSec: 0,
-      },
-      pendingAlerts: [],
-      alertSeq: this.alertSeq,
-    };
-    return this.notifyAndSnapshot(nowMs, seqAtStart);
+  ): Promise<SessionSnapshot> {
+    return this.mutex.runExclusive(() => {
+      if (this.session) {
+        throw new SessionError("A session is already active", "SESSION_ACTIVE");
+      }
+      const seqAtStart = this.alertSeq;
+      this.pausePlugin = this.pauseRegistry.get(pauseStrategy)!;
+      this.session = {
+        id: randomUUID(),
+        status: "active",
+        startedAt: msToIso(nowMs),
+        params,
+        pauseStrategy,
+        phase: startPlannedWork(params, 1, nowMs),
+        liveStats: {
+          workedSec: 0,
+          deliberationSec: 0,
+          restSec: 0,
+          pausedSec: 0,
+        },
+        pendingAlerts: [],
+        alertSeq: this.alertSeq,
+      };
+      return this.notifyAndSnapshot(nowMs, seqAtStart);
+    });
   }
 
   /** Pause planned work via the session's pause strategy. */
-  pause(nowMs: number = Date.now()): SessionSnapshot {
-    const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    const phase = this.requirePhase(
-      session,
-      "planned_work",
-      "Pause is only available during planned work",
-    );
-    if (phase.paused) {
-      throw new SessionError("Already paused", "ALREADY_PAUSED");
-    }
-    if (nowMs >= parseIso(phase.plannedEndAt)) {
-      throw new SessionError("Planned work already ended", "INVALID_PHASE");
-    }
-    this.pausePlugin!.onPause(phase, nowMs);
-    return this.notifyAndSnapshot(nowMs, seqAtStart);
+  async pause(nowMs: number = Date.now()): Promise<SessionSnapshot> {
+    return this.mutex.runExclusive(async () => {
+      const { session, seqAtStart } = await this.beginActiveCommand(nowMs);
+      const phase = this.requirePhase(
+        session,
+        "planned_work",
+        "Pause is only available during planned work",
+      );
+      if (phase.paused) {
+        throw new SessionError("Already paused", "ALREADY_PAUSED");
+      }
+      if (nowMs >= parseIso(phase.plannedEndAt)) {
+        throw new SessionError("Planned work already ended", "INVALID_PHASE");
+      }
+      this.pausePlugin!.onPause(phase, nowMs);
+      return this.notifyAndSnapshot(nowMs, seqAtStart);
+    });
   }
 
   /** End an active pause via the session's pause strategy. */
-  resume(nowMs: number = Date.now()): SessionSnapshot {
-    const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    const phase = this.requirePhase(
-      session,
-      "planned_work",
-      "Resume is only available during planned work",
-    );
-    if (!phase.paused) {
-      throw new SessionError("Not paused", "NOT_PAUSED");
-    }
-    this.pausePlugin!.onResume(phase, nowMs);
-    return this.notifyAndSnapshot(nowMs, seqAtStart);
+  async resume(nowMs: number = Date.now()): Promise<SessionSnapshot> {
+    return this.mutex.runExclusive(async () => {
+      const { session, seqAtStart } = await this.beginActiveCommand(nowMs);
+      const phase = this.requirePhase(
+        session,
+        "planned_work",
+        "Resume is only available during planned work",
+      );
+      if (!phase.paused) {
+        throw new SessionError("Not paused", "NOT_PAUSED");
+      }
+      this.pausePlugin!.onResume(phase, nowMs);
+      return this.notifyAndSnapshot(nowMs, seqAtStart);
+    });
   }
 
   /** Work decision: user chooses rest. */
-  ackRest(nowMs: number = Date.now()): SessionSnapshot {
-    const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    this.requirePhase(
-      session,
-      "decision",
-      "Acknowledge rest is only valid in decision",
-    );
-    addDeliberation(session, session.phase as DecisionPhase, nowMs);
-    this.enterRestFromWork(session, nowMs, ["rest_ack"]);
-    return this.notifyAndSnapshot(nowMs, seqAtStart);
+  async ackRest(nowMs: number = Date.now()): Promise<SessionSnapshot> {
+    return this.mutex.runExclusive(async () => {
+      const { session, seqAtStart } = await this.beginActiveCommand(nowMs);
+      this.requirePhase(
+        session,
+        "decision",
+        "Acknowledge rest is only valid in decision",
+      );
+      addDeliberation(session, session.phase as DecisionPhase, nowMs);
+      this.enterRestFromWork(session, nowMs, ["rest_ack"]);
+      return this.notifyAndSnapshot(nowMs, seqAtStart);
+    });
   }
 
   /** Short-rest ack: user acknowledges; next cycle starts running. */
-  ackWork(nowMs: number = Date.now()): SessionSnapshot {
-    const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    this.requirePhase(
-      session,
-      "short_rest_ack",
-      "Acknowledge work is only valid in short-rest ack",
-    );
-    const phase = session.phase as DecisionPhase;
-    addDeliberation(session, phase, nowMs);
-    session.phase = startPlannedWork(
-      session.params,
-      phase.cycleIndex + 1,
-      nowMs,
-    );
-    return this.notifyAndSnapshot(nowMs, seqAtStart);
+  async ackWork(nowMs: number = Date.now()): Promise<SessionSnapshot> {
+    return this.mutex.runExclusive(async () => {
+      const { session, seqAtStart } = await this.beginActiveCommand(nowMs);
+      this.requirePhase(
+        session,
+        "short_rest_ack",
+        "Acknowledge work is only valid in short-rest ack",
+      );
+      const phase = session.phase as DecisionPhase;
+      addDeliberation(session, phase, nowMs);
+      session.phase = startPlannedWork(
+        session.params,
+        phase.cycleIndex + 1,
+        nowMs,
+      );
+      return this.notifyAndSnapshot(nowMs, seqAtStart);
+    });
   }
 
   /** Work decision: user continues; extended work starts at the click. */
-  continueExtended(nowMs: number = Date.now()): SessionSnapshot {
-    const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    this.requirePhase(
-      session,
-      "decision",
-      "Continue is only valid in decision",
-    );
-    const phase = session.phase as DecisionPhase;
-    addDeliberation(session, phase, nowMs);
-    enterExtendedWork(session, phase.cycleIndex, nowMs);
-    return this.notifyAndSnapshot(nowMs, seqAtStart);
+  async continueExtended(nowMs: number = Date.now()): Promise<SessionSnapshot> {
+    return this.mutex.runExclusive(async () => {
+      const { session, seqAtStart } = await this.beginActiveCommand(nowMs);
+      this.requirePhase(
+        session,
+        "decision",
+        "Continue is only valid in decision",
+      );
+      const phase = session.phase as DecisionPhase;
+      addDeliberation(session, phase, nowMs);
+      enterExtendedWork(session, phase.cycleIndex, nowMs);
+      return this.notifyAndSnapshot(nowMs, seqAtStart);
+    });
   }
 
   /** Extended work: user starts rest (no extra end-of-extended alert). */
-  startRest(nowMs: number = Date.now()): SessionSnapshot {
-    const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    const phase = this.requirePhase(
-      session,
-      "extended_work",
-      "Start rest is only valid during extended work",
-    );
-    session.liveStats.workedSec += elapsedSecFromIso(phase.startedAt, nowMs);
-    this.enterRestFromWork(session, nowMs, []);
-    return this.notifyAndSnapshot(nowMs, seqAtStart);
+  async startRest(nowMs: number = Date.now()): Promise<SessionSnapshot> {
+    return this.mutex.runExclusive(async () => {
+      const { session, seqAtStart } = await this.beginActiveCommand(nowMs);
+      const phase = this.requirePhase(
+        session,
+        "extended_work",
+        "Start rest is only valid during extended work",
+      );
+      session.liveStats.workedSec += elapsedSecFromIso(phase.startedAt, nowMs);
+      this.enterRestFromWork(session, nowMs, []);
+      return this.notifyAndSnapshot(nowMs, seqAtStart);
+    });
   }
 
   /** Long rest: end early, complete the session, then reset alert history. */
-  endLongRest(nowMs: number = Date.now()): SessionSnapshot {
-    const { session, seqAtStart } = this.beginActiveCommand(nowMs);
-    this.requirePhase(
-      session,
-      "long_rest",
-      "Early end is only valid during long rest",
-    );
-    this.completeSession();
-    const snapshot = this.buildSnapshot(nowMs, seqAtStart);
-    this.notify();
-    this.resetAlertState();
-    return snapshot;
+  async endLongRest(nowMs: number = Date.now()): Promise<SessionSnapshot> {
+    return this.mutex.runExclusive(async () => {
+      const { session, seqAtStart } = await this.beginActiveCommand(nowMs);
+      this.requirePhase(
+        session,
+        "long_rest",
+        "Early end is only valid during long rest",
+      );
+      this.completeSession();
+      const snapshot = this.buildSnapshot(nowMs, seqAtStart);
+      this.notify();
+      this.resetAlertState();
+      return snapshot;
+    });
   }
 
   /**
-   * Advance through every due wall-clock boundary. Iteration cap is a safety net.
+   * Scheduler entry: run a tick only if the mutex is free (skip-if-busy).
+   * Returns false when skipped so overlapping intervals do not queue up.
    */
-  tick(nowMs: number = Date.now(), notify = true): void {
+  async tickIfIdle(nowMs: number = Date.now(), notify = true): Promise<boolean> {
+    const ran = await this.mutex.tryRunExclusive(() =>
+      this.tickUnlocked(nowMs, notify),
+    );
+    return ran !== null;
+  }
+
+  /** Tick body; caller must hold the mutex. */
+  private async tickUnlocked(nowMs: number, notify: boolean): Promise<void> {
     if (!this.session) return;
 
     let changed = false;

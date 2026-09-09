@@ -49,11 +49,11 @@ function writeSseSnapshot(
 
 /** Wrap a session mutation so domain errors become HTTP error replies. */
 function sessionAction(
-  runAction: () => SessionSnapshot,
+  runAction: () => Promise<SessionSnapshot>,
 ): (req: FastifyRequest, reply: FastifyReply) => Promise<unknown> {
   return async (_req: FastifyRequest, reply: FastifyReply) => {
     try {
-      return runAction();
+      return await runAction();
     } catch (error) {
       const { statusCode, body } = errorReply(error);
       return reply.code(statusCode).send(body);
@@ -107,7 +107,7 @@ export function registerSessionRoutes(
       try {
         const { debug, overrides } = parseStartSessionBody(req.body ?? {});
         const params = settings.resolveSessionParams(overrides, debug);
-        return session.start(
+        return await session.start(
           params,
           Date.now(),
           settings.get().workPauseStrategy,

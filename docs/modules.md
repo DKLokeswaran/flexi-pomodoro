@@ -95,10 +95,10 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 | Export | Kind |
 |--------|------|
 | `Scheduler` | interface `start`/`stop` |
-| `IntervalSchedulerOptions` | interface |
+| `IntervalSchedulerOptions` | interface (`onTick` may return `void` or `Promise<void>`) |
 | `IntervalScheduler` | class implementing `Scheduler` |
 
-**Methods:** `start()`, `stop()`. Uses `setInterval` (`unref` if available).
+**Methods:** `start()`, `stop()`. Uses `setInterval` (`unref` if available); fires `onTick` without awaiting (errors are not surfaced).
 
 ### `src/routes/index.ts`
 
@@ -197,6 +197,16 @@ Unknown errors are rethrown.
 
 **Imports:** none.
 
+### `src/utils/asyncMutex.ts`
+
+| Export | Kind |
+|--------|------|
+| `AsyncMutex` | class |
+
+**Methods:** `isLocked()`, `runExclusive(fn)` (FIFO waiters), `tryRunExclusive(fn)` (returns `null` when skipped).
+
+**Used by:** `SessionService` to serialize ticks and mutating commands.
+
 ### `src/services/settings.service.ts`
 
 | Export | Kind |
@@ -228,25 +238,24 @@ Unknown errors are rethrown.
 | `constructor(pauseRegistry?)` | defaults to `defaultPauseRegistry()` |
 | `subscribe(listener, sinceSeq?)` | → unsubscribe |
 | `getAlertSeq()` | number |
-| `getSnapshot(nowMs?, sinceSeq?)` | SessionSnapshot |
-| `start(params, nowMs?, pauseStrategy?)` | SessionSnapshot — resolves `pausePlugin` from registry (default `"soft"`; start route passes `settings.workPauseStrategy`) |
-| `pause(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onPause` |
-| `resume(nowMs?)` | SessionSnapshot — delegates to `pausePlugin.onResume` |
-| `ackRest(nowMs?)` | SessionSnapshot |
-| `ackWork(nowMs?)` | SessionSnapshot — short-rest ack → next-cycle planned work running |
-| `continueExtended(nowMs?)` | SessionSnapshot |
-| `startRest(nowMs?)` | SessionSnapshot |
-| `endLongRest(nowMs?)` | SessionSnapshot |
-| `tick(nowMs?, notify?)` | void — wall-clock catch-up |
+| `getSnapshot(nowMs?, sinceSeq?)` | SessionSnapshot — pure read (no wall-clock catch-up) |
+| `start(params, nowMs?, pauseStrategy?)` | `Promise<SessionSnapshot>` — resolves `pausePlugin` from registry (default `"soft"`; start route passes `settings.workPauseStrategy`) |
+| `pause(nowMs?)` | `Promise<SessionSnapshot>` — delegates to `pausePlugin.onPause` |
+| `resume(nowMs?)` | `Promise<SessionSnapshot>` — delegates to `pausePlugin.onResume` |
+| `ackRest(nowMs?)` | `Promise<SessionSnapshot>` |
+| `ackWork(nowMs?)` | `Promise<SessionSnapshot>` — short-rest ack → next-cycle planned work running |
+| `continueExtended(nowMs?)` | `Promise<SessionSnapshot>` |
+| `startRest(nowMs?)` | `Promise<SessionSnapshot>` |
+| `endLongRest(nowMs?)` | `Promise<SessionSnapshot>` |
+| `tickIfIdle(nowMs?, notify?)` | `Promise<boolean>` — scheduler catch-up; `false` when mutex busy |
 
-**Side effects:** mutates in-memory session/alerts/liveStats; notifies listeners; `randomUUID` on start.
+**Side effects:** mutates in-memory session/alerts/liveStats under `AsyncMutex`; notifies listeners; `randomUUID` on start. Mutating commands tick via `beginActiveCommand` → `tickUnlocked` while holding the mutex.
 
-**Private helpers (not exported):** `addDeliberation`, `restSecAt`, `liveStatsWithProgress`, `advanceWorkDecision`, `advanceShortRestAck`, `enterShortRestAckPhase`, `commitPlannedWork`, `commitRest`. Uses shared `pausedSecAt` / `plannedWorkSecAt` for planned-work focus and pause totals.
+**Private helpers (not exported):** `addDeliberation`, `restSecAt`, `liveStatsWithProgress`, `advanceWorkDecision`, `advanceShortRestAck`, `enterShortRestAckPhase`, `commitPlannedWork`, `commitRest`, `tickUnlocked`. Uses shared `pausedSecAt` / `plannedWorkSecAt` for planned-work focus and pause totals.
 
 ### Tests
 
-`src/tests/services/session.service.test.ts`, `settings.service.test.ts`, `src/tests/pause/softPause.test.ts`, `hardPause.test.ts` — no production exports (see [testing.md](./testing.md)).
-
+`src/tests/services/session.service.test.ts`, `settings.service.test.ts`, `src/tests/pause/softPause.test.ts`, `hardPause.test.ts`, `src/tests/utils/asyncMutex.test.ts` — no production exports (see [testing.md](./testing.md)).
 ---
 
 ## `apps/web` — entry & shell

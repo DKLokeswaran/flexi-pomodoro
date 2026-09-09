@@ -32,7 +32,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **Cycle index** | 1-based work cycle counter within a session |
 | **Soft pause** | Pause during planned work that does **not** move `plannedEndAt`; accumulates `pausedSec`; `timerFrozenAt` stays null |
 | **Hard pause** | Experimental strategy (`workPauseStrategy: "hard"`). Freezes countdown via `timerFrozenAt`; shifts `plannedEndAt` on resume. Selected in Settings → Experimental features; locked at session start |
-| **Wall-clock catch-up** | `tick` advances through all due phase boundaries based on real time (recovery policy) |
+| **Wall-clock catch-up** | Advance through all due phase boundaries based on real time (recovery policy). Production entry is `tickIfIdle` (scheduler, skip-if-busy); commands catch up via `tickUnlocked` while holding the session mutex |
 | **Params locked** | Session uses resolved `SessionParams` for its lifetime; settings edits apply to future sessions |
 
 ## Alerts

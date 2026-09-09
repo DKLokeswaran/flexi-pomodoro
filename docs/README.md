@@ -55,10 +55,10 @@ flowchart LR
   API --> Sett
   API --> Sess
   Sess --> Pause
-  Sched -->|"tick(nowMs)"| Sess
+  Sched -->|"tickIfIdle(nowMs)"| Sess
 ```
 
-Request flow (session action): route → server Zod parsers (`settingsValidation`) → `SettingsService` / `SessionService` → `SessionSnapshot` JSON (and SSE fan-out).
+Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async and mutex-serialized) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`) and by commands that tick under the mutex before mutating; GET snapshot / SSE do not tick.
 
 ## Documentation index
 

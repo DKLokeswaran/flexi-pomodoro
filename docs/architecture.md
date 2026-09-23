@@ -7,10 +7,10 @@ Flexi Pomodoro is an **npm-workspace monorepo** with three packages:
 | Package | Role |
 |---------|------|
 | `@flexi-pomodoro/shared` | Domain types, Zod schemas, `SESSION_API` path constants, debug feature catalog |
-| `@flexi-pomodoro/server` | Fastify HTTP/SSE API, in-memory session engine, settings store, static web serving |
+| `@flexi-pomodoro/server` | Fastify HTTP/SSE API, in-memory session engine, SQLite settings persistence, static web serving |
 | `@flexi-pomodoro/web` | React SPA (Vite); talks to the server via REST + Server-Sent Events |
 
-Backend style is **layered**: composition root (`app.ts`) → routes → services → pause plugins → (no persistence layer yet; M3 SQLite is planned). The session engine is an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`). Pause policy is injected as a `WorkPauseStrategy` plugin, not inlined in the engine.
+Backend style is **layered**: composition root (`app.ts`) → routes → services → pause plugins → Knex/SQLite stores. Settings load and save through `SettingsStore`. The session engine is still an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`); session/phase store write-through is not wired yet. Pause policy is injected as a `WorkPauseStrategy` plugin, not inlined in the engine.
 
 Frontend style is **feature-oriented folders** under `apps/web/src`: components (by tab/feature), providers, queries (API + React Query hooks), hooks (SSE stream), utils, constants. Tab switching is local React state (no client router).
 
@@ -34,8 +34,10 @@ flowchart TB
     SessSvc["SessionService"]
     Pause["PauseStrategyRegistry"]
     Sched["IntervalScheduler"]
+    DB["Knex + SettingsStore"]
     Routes --> SettSvc
     Routes --> SessSvc
+    SettSvc --> DB
     SessSvc --> Pause
     Sched -->|"tickIfIdle every 250ms"| SessSvc
   end
@@ -51,7 +53,8 @@ flowchart TB
 
 | Pattern | Where | Notes |
 |---------|-------|-------|
-| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Instantiates `SettingsService`, `SessionService`, `IntervalScheduler`; passes deps into `registerRoutes` |
+| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates `SettingsService`, constructs `SessionService` + `IntervalScheduler`; returns `{ app }` |
+| **Repository / store** | `db/stores/*` | Purpose-split Knex stores; settings is live; session/phases are stubs for later M3 groups |
 | **Service layer** | `SettingsService`, `SessionService` | Business rules and state; routes stay thin |
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
 | **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later; `onTick` may return a Promise |
@@ -68,8 +71,10 @@ flowchart TB
 No DI container. Wiring is explicit:
 
 ```typescript
-// apps/server/src/app.ts (committed pattern)
-const settings = new SettingsService();
+// apps/server/src/app.ts (working-tree pattern)
+const { db, stores } = await openDatabase();
+const settings = new SettingsService(stores.settings);
+await settings.hydrate();
 const session = new SessionService(); // defaultPauseRegistry: soft + hard
 await registerRoutes(app, { settings, session });
 const scheduler = new IntervalScheduler({
@@ -78,6 +83,7 @@ const scheduler = new IntervalScheduler({
     await session.tickIfIdle(nowMs, true);
   },
 });
+// onClose: scheduler.stop(); await db.destroy();
 ```
 
 On the web, React Context provides `UiFlagsProvider`, `DebugFlagsProvider` (both from `browserFlags/`), and `ToastProvider`; TanStack `QueryClientProvider` wraps the tree in `main.tsx`.
@@ -96,12 +102,12 @@ On the web, React Context provides `UiFlagsProvider`, `DebugFlagsProvider` (both
 ## Backend request lifecycle
 
 1. **Entry** — `apps/server/src/index.ts` reads `PORT` / `HOST`, calls `buildApp()`, `listen`.
-2. **App** — Fastify instance; services + routes + scheduler; optional static hosting.
-3. **Route** — e.g. `POST /api/session/start` parses body via server `parseStartSessionBody`, resolves params via `settings.resolveSessionParams`, `await`s `session.start` (and other session mutations).
+2. **App** — `openDatabase()` + settings hydrate; Fastify instance; services + routes + scheduler; optional static hosting; `onClose` destroys Knex.
+3. **Route** — e.g. `POST /api/session/start` parses body via server `parseStartSessionBody`, resolves params via `settings.resolveSessionParams`, `await`s `session.start` (and other session mutations). Settings PUT `await`s `settings.update` (SQLite write-through).
 4. **Service** — under `AsyncMutex.runExclusive`, mutates in-memory session; mutating commands call `tickUnlocked` first via `beginActiveCommand`; `notify()` pushes snapshots to SSE subscribers. `getSnapshot` / SSE open are pure reads (no catch-up).
 5. **Tick** — every 250ms `session.tickIfIdle(nowMs, true)` advances due phase boundaries when the mutex is free; overlapping intervals skip instead of queuing.
 
-There are **no DB transactions**. Session and settings live in process memory only.
+Settings use SQLite (singleton row). Active session state is still in-process memory only; session/phase store write-through is not wired yet.
 
 ## Session phase state machine
 
@@ -193,11 +199,12 @@ Not found in committed history (no `React.lazy` / dynamic import of routes).
 
 ## Persistence (current vs planned)
 
-| Data | M1 (committed) | Planned |
-|------|----------------|---------|
-| Settings | In-memory `SettingsService` (lost on restart) | SQLite (M3) |
-| Session | In-memory `SessionService` | SQLite + crash recovery |
+| Data | Current | Remaining M3 work |
+|------|---------|-------------------|
+| Settings | SQLite singleton via `SettingsStore` (`flexi-pomodoro.sqlite3` under `DATA_DIR`) | — |
+| Session | In-memory `SessionService` | Write-through `SessionStore` / `PhasesStore` + crash recovery |
+| Schema | Knex migration `20260909134105_initial_schema` (settings, sessions, phases, detail tables, pause_slices) | Session/phase hydrate and write paths |
 | Debug prefs | Browser `localStorage` (`flexi-pomodoro:debugFlags`) | Client-only |
 | UI prefs | Browser `localStorage` (`flexi-pomodoro:uiFlags`) | Client-only |
 | Alert watermark | Browser `localStorage` | Client-only |
-| Docker volume `/data` | Mounted stub; unused | Persistence target |
+| Docker volume `/data` | Mounted; `DATA_DIR=/data` in compose | Non-root ownership (later plan group) |

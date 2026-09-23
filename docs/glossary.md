@@ -56,7 +56,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 
 | Term | Meaning |
 |------|---------|
-| **Defaults / settings** | Persistent-in-process preferences used when starting without overrides |
+| **Defaults / settings** | SQLite-backed preferences (singleton row) used when starting without overrides; cached in-process after hydrate |
 | **Overrides** | Per-start session param fields on POST start |
 | **Debug mode** | Client gate unlocking per-feature debug flags (localStorage `flexi-pomodoro:debugFlags`) |
 | **Browser preferences / UI flags** | Client-only toggles in Settings → Browser preferences (localStorage `flexi-pomodoro:uiFlags`); not sent to the server |

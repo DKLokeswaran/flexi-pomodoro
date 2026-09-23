@@ -4,7 +4,8 @@
 
 | Layer | Mechanism |
 |-------|-----------|
-| Server session/settings | In-memory service singletons (per process); session mutations + ticks serialized by `AsyncMutex` |
+| Server session | In-memory `SessionService` singleton; mutations + ticks serialized by `AsyncMutex` |
+| Server settings | In-process cache hydrated from SQLite `SettingsStore`; `update` write-through |
 | Server → clients | SSE snapshots + REST |
 | Client server cache | TanStack React Query (`settings`, `health`) |
 | Client live session | `useState` in `useSessionStream` (not React Query) |

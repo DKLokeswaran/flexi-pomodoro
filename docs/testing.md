@@ -80,7 +80,21 @@ Imports parsers from `utils/settingsValidation.ts`.
 |-------|-------|
 | `parseStartSessionBody` | Accepts 1s with flag; rejects 1s without; rejects unknown debug keys (`ZodError`) |
 | `parseSettingsPatch` | Rejects sub-minute work |
-| `SettingsService` | Accepts `workPauseStrategy: "hard"`; rejects non-int cycles; rejects 1s work in settings |
+| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; `update` calls `store.save`; seed when store empty; load existing row on hydrate |
+
+### `apps/server/src/tests/db/settingsStore.test.ts`
+
+Uses temp `DATA_DIR` via `openDatabase(tempDir)`.
+
+| Case | Asserts |
+|------|---------|
+| `ensureSeeded` | Writes `DEFAULT_SETTINGS` once; second call returns same |
+| save / load | Round-trip across process reopen |
+| initial migration | Expected tables present (`settings`, `sessions`, `phases`, detail tables, `pause_slices`, …) |
+
+### `apps/server/src/tests/helpers/mockSettingsStore.ts`
+
+In-memory `SettingsStore` double for service unit tests (`load` / `save` / `ensureSeeded` + optional `saves` spy).
 
 ### `apps/server/src/tests/pause/softPause.test.ts`
 
@@ -142,7 +156,7 @@ Fabricated `ActiveSnapshot` fixtures only (no server imports).
 
 ## Mocking patterns
 
-Not found. Server tests use real `SettingsService` + `SessionService` and inject deterministic `nowMs`. Web projection tests build plain snapshot objects. Scheduler is not exercised in these unit tests.
+Server service tests inject `createMockSettingsStore()` into `SettingsService` (then `hydrate`). Session tests still use real `SessionService` with deterministic `nowMs`. SQLite store tests use temp directories. Web projection tests build plain snapshot objects. Scheduler is not exercised in these unit tests.
 
 ## Fixtures
 
@@ -150,7 +164,7 @@ Inline constants and helper factories only — no fixture files.
 
 ## Conventions
 
-- Layout: mirrored tree under `src/tests/` (not colocated with source), matching the area under test (`services/`, `pause/`, `utils/`)
+- Layout: mirrored tree under `src/tests/` (not colocated with source), matching the area under test (`services/`, `pause/`, `utils/`, `db/`, `helpers/`)
 - File naming: `<module>.test.ts` (e.g. `session.service.test.ts`, `sessionProjection.test.ts`)
 - Blocks: `describe("ClassOrFn", () => { it("behavior…", …) })`
 - Style: strict assert (`assert.equal`, `assert.ok`, `assert.throws`, `assert.deepEqual`)

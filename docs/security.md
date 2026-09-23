@@ -19,7 +19,7 @@
 ## Input validation & injection
 
 - All mutable API bodies go through **Zod** schemas (server `SettingsPatchSchema` / `parseStartSessionBody`, shared `parseDebugFlags`, etc.).
-- No SQL layer → no SQL injection surface in M1.
+- SQLite access goes through Knex stores (parameterized queries); settings writes validate with Zod before persist.
 - SSE payloads are server-serialized `JSON.stringify` of internal snapshots.
 - Client `JSON.parse` of EventSource data is try/catch guarded.
 
@@ -30,10 +30,12 @@
 | `PORT` | optional | `3847` | Listen port (`index.ts`, Docker, compose, root scripts) |
 | `HOST` | optional | `0.0.0.0` | Listen host |
 | `WEB_DIST` | optional | discovery candidates | Static file root |
-| `NODE_ENV` | set in Docker runtime | `production` | Runtime image |
+| `DATA_DIR` | optional | `/data` (prod) or `./data` (dev) | SQLite directory |
+| `FPMD_DATA_DIR` | optional | named volume | Host bind path for compose `/data` mount |
+| `NODE_ENV` | set in Docker runtime | `production` | Runtime image; also selects default data dir |
 | `TZ` | compose | `Asia/Kolkata` | Container timezone |
 
-No password hashing, crypto secrets, or `.env` samples committed. `.gitignore` excludes `.env` / `.env.local`.
+No password hashing, crypto secrets, or `.env` samples committed. `.gitignore` excludes `.env` / `.env.local`. `data/` is gitignored.
 
 ## Browser storage
 
@@ -57,4 +59,4 @@ About live links open GitHub with `rel="noopener noreferrer"` when `external` is
 
 ## Known product stance
 
-About/legal copy states session data stays on the instance; persistence across restarts is future work. Treat the open HTTP API as **trusted LAN / single-user** until auth is added.
+About/legal copy states session data stays on the instance. Settings now survive restarts via SQLite on the data volume; active session resume is still future M3 work. Treat the open HTTP API as **trusted LAN / single-user** until auth is added.

@@ -8,16 +8,18 @@ import {
   SessionError,
   SessionService,
 } from "../../services/session.service.js";
+import { createMockSettingsStore } from "../helpers/mockSettingsStore.js";
 
 const SESSION_START_MS = Date.parse("2026-07-12T10:00:00.000Z");
 
 /** Settings + session with short timers so tests can advance by seconds, not minutes. */
-function servicesWithShortTimers(cyclesBeforeLongRest = 2): {
+async function servicesWithShortTimers(cyclesBeforeLongRest = 2): Promise<{
   settings: SettingsService;
   session: SessionService;
-} {
-  const settings = new SettingsService();
-  settings.update({
+}> {
+  const settings = new SettingsService(createMockSettingsStore());
+  await settings.hydrate();
+  await settings.update({
     workDurationSec: 60,
     shortRestDurationSec: 60,
     longRestDurationSec: 120,
@@ -106,7 +108,7 @@ async function snapshotAt(
 
 describe("SessionService", () => {
   it("happy path N=2: ack → short rest → ack work → long rest → idle", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
 
     let phase = await activePhase(session, SESSION_START_MS);
@@ -175,7 +177,7 @@ describe("SessionService", () => {
   });
 
   it("resets alertSeq after session end; new session alerts start at 1", async () => {
-    const { settings, session } = servicesWithShortTimers(1);
+    const { settings, session } = await servicesWithShortTimers(1);
     await startSession(settings, session, SESSION_START_MS);
     await snapshotAt(session, SESSION_START_MS + 60_000, 0);
     await session.ackRest(SESSION_START_MS + 60_500);
@@ -203,7 +205,7 @@ describe("SessionService", () => {
   });
 
   it("decision timeout → extended → start rest without extended-end alert", async () => {
-    const { settings, session } = servicesWithShortTimers(1);
+    const { settings, session } = await servicesWithShortTimers(1);
     await startSession(settings, session, SESSION_START_MS);
 
     const afterWork = SESSION_START_MS + 60_000;
@@ -241,7 +243,7 @@ describe("SessionService", () => {
   });
 
   it("decision timeout folds window into worked once (no double-count)", async () => {
-    const { settings, session } = servicesWithShortTimers(1);
+    const { settings, session } = await servicesWithShortTimers(1);
     await startSession(settings, session, SESSION_START_MS);
 
     const afterWork = SESSION_START_MS + 60_000;
@@ -280,7 +282,7 @@ describe("SessionService", () => {
   });
 
   it("continue from decision starts extended at click (decision time excluded)", async () => {
-    const { settings, session } = servicesWithShortTimers(1);
+    const { settings, session } = await servicesWithShortTimers(1);
     await startSession(settings, session, SESSION_START_MS);
     const afterWork = SESSION_START_MS + 60_000;
     await activePhase(session, afterWork);
@@ -292,7 +294,7 @@ describe("SessionService", () => {
   });
 
   it("soft pause mid-work keeps planned end unchanged", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
     const plannedEnd = (
       (await activePhase(session, SESSION_START_MS)) as { plannedEndAt: string }
@@ -319,7 +321,7 @@ describe("SessionService", () => {
   });
 
   it("soft-paused through planned end → auto rest, skip decision", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
     await session.pause(SESSION_START_MS + 40_000);
 
@@ -334,7 +336,7 @@ describe("SessionService", () => {
   });
 
   it("N=1 → long rest only after first work path", async () => {
-    const { settings, session } = servicesWithShortTimers(1);
+    const { settings, session } = await servicesWithShortTimers(1);
     await startSession(settings, session, SESSION_START_MS);
 
     await snapshotAt(session, SESSION_START_MS + 60_000, session.getAlertSeq());
@@ -345,7 +347,7 @@ describe("SessionService", () => {
   });
 
   it("tick catch-up walks all due boundaries until blocked", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
     // Past work end and decision window → extended (two advances in one tick).
     const phase = await activePhase(
@@ -356,7 +358,8 @@ describe("SessionService", () => {
   });
 
   it("starts with 1s durations when debug.shortDurations is enabled", async () => {
-    const settings = new SettingsService();
+    const settings = new SettingsService(createMockSettingsStore());
+    await settings.hydrate();
     const session = new SessionService();
     const params = settings.resolveSessionParams(
       {
@@ -376,8 +379,8 @@ describe("SessionService", () => {
   });
 
   it("hard pause 3s with 10s left keeps remaining time and shifts planned end", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
-    settings.update({ workPauseStrategy: "hard" });
+    const { settings, session } = await servicesWithShortTimers(2);
+    await settings.update({ workPauseStrategy: "hard" });
     await startSession(settings, session, SESSION_START_MS);
     const originalEnd = (
       (await activePhase(session, SESSION_START_MS)) as { plannedEndAt: string }
@@ -409,8 +412,8 @@ describe("SessionService", () => {
   });
 
   it("hard-paused past original planned end stays in planned work", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
-    settings.update({ workPauseStrategy: "hard" });
+    const { settings, session } = await servicesWithShortTimers(2);
+    await settings.update({ workPauseStrategy: "hard" });
     await startSession(settings, session, SESSION_START_MS);
     const originalEnd = (
       (await activePhase(session, SESSION_START_MS)) as { plannedEndAt: string }
@@ -424,7 +427,7 @@ describe("SessionService", () => {
   });
 
   it("soft pause liveStats pausedSec grows during pause and commits after resume", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
 
     const pauseAt = SESSION_START_MS + 20_000;
@@ -463,8 +466,8 @@ describe("SessionService", () => {
   });
 
   it("hard pause liveStats pausedSec grows while frozen and commits after resume", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
-    settings.update({ workPauseStrategy: "hard" });
+    const { settings, session } = await servicesWithShortTimers(2);
+    await settings.update({ workPauseStrategy: "hard" });
     await startSession(settings, session, SESSION_START_MS);
 
     const pauseAt = SESSION_START_MS + 50_000;
@@ -503,7 +506,7 @@ describe("SessionService", () => {
   });
 
   it("pause and resume rejected outside planned work (FR-PAUSE-S6)", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
 
     const assertInvalidPhase = async (run: () => Promise<unknown>) => {
@@ -528,7 +531,7 @@ describe("SessionService", () => {
     await assertInvalidPhase(() => session.resume(afterWork + 2_000));
 
     const { settings: longSettings, session: longSession } =
-      servicesWithShortTimers(1);
+      await servicesWithShortTimers(1);
     await startSession(longSettings, longSession, SESSION_START_MS);
     await snapshotAt(longSession, afterWork, longSession.getAlertSeq());
     await longSession.ackRest(afterWork + 500);
@@ -540,8 +543,9 @@ describe("SessionService", () => {
     await assertInvalidPhase(() => longSession.resume(afterWork + 500));
   });
 
-  it("rejects 1s durations without shortDurations flag", () => {
-    const settings = new SettingsService();
+  it("rejects 1s durations without shortDurations flag", async () => {
+    const settings = new SettingsService(createMockSettingsStore());
+    await settings.hydrate();
     assert.throws(
       () =>
         settings.resolveSessionParams({
@@ -559,7 +563,7 @@ describe("SessionService", () => {
   });
 
   it("explicit ackWork (soft) → cycle-2 planned_work running", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     const afterShort = await reachShortRestAck(
       settings,
       session,
@@ -576,8 +580,8 @@ describe("SessionService", () => {
   });
 
   it("explicit ackWork (hard) → cycle-2 planned_work running, no freeze", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
-    settings.update({ workPauseStrategy: "hard" });
+    const { settings, session } = await servicesWithShortTimers(2);
+    await settings.update({ workPauseStrategy: "hard" });
     const afterShort = await reachShortRestAck(
       settings,
       session,
@@ -594,7 +598,7 @@ describe("SessionService", () => {
   });
 
   it("ack timeout (soft) → cycle-2 paused work; short_rest_ack_expired fires", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     const afterShort = await reachShortRestAck(
       settings,
       session,
@@ -616,8 +620,8 @@ describe("SessionService", () => {
   });
 
   it("ack timeout (hard) → cycle-2 paused work with timerFrozenAt", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
-    settings.update({ workPauseStrategy: "hard" });
+    const { settings, session } = await servicesWithShortTimers(2);
+    await settings.update({ workPauseStrategy: "hard" });
     const afterShort = await reachShortRestAck(
       settings,
       session,
@@ -639,7 +643,7 @@ describe("SessionService", () => {
   });
 
   it("long rest end → idle without short_rest_ack", async () => {
-    const { settings, session } = servicesWithShortTimers(1);
+    const { settings, session } = await servicesWithShortTimers(1);
     await startSession(settings, session, SESSION_START_MS);
     const afterWork = SESSION_START_MS + 60_000;
     await activePhase(session, afterWork);
@@ -653,7 +657,7 @@ describe("SessionService", () => {
   });
 
   it("pause and resume rejected during short_rest_ack", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     const afterShort = await reachShortRestAck(
       settings,
       session,
@@ -678,7 +682,7 @@ describe("SessionService", () => {
   });
 
   it("work-decision explicit act attributes elapsed to deliberationSec", async () => {
-    const { settings, session } = servicesWithShortTimers(1);
+    const { settings, session } = await servicesWithShortTimers(1);
     await startSession(settings, session, SESSION_START_MS);
     const afterWork = SESSION_START_MS + 60_000;
     await activePhase(session, afterWork);
@@ -690,7 +694,7 @@ describe("SessionService", () => {
   });
 
   it("ackWork explicit act attributes elapsed to deliberationSec", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     const afterShort = await reachShortRestAck(
       settings,
       session,
@@ -704,7 +708,7 @@ describe("SessionService", () => {
   });
 
   it("ack timeout attributes full window to deliberationSec", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     const afterShort = await reachShortRestAck(
       settings,
       session,
@@ -718,7 +722,7 @@ describe("SessionService", () => {
   });
 
   it("live stats full cycle: work, deliberation, rest; soft pause excluded from worked", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
 
     // Soft-pause 10s mid work (20s–30s).
@@ -749,7 +753,7 @@ describe("SessionService", () => {
   });
 
   it("getSnapshot does not advance phases (pure read)", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
     const overdue = SESSION_START_MS + 60_000;
     const beforeTick = session.getSnapshot(overdue, 0);
@@ -765,7 +769,7 @@ describe("SessionService", () => {
   });
 
   it("concurrent tickIfIdle catch-up leaves a consistent phase after a follow-up idle tick", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
     const afterDecision = SESSION_START_MS + 60_000 + 15_000;
     await Promise.all([
@@ -782,7 +786,7 @@ describe("SessionService", () => {
   });
 
   it("tickIfIdle skips while another exclusive tick holds the mutex", async () => {
-    const { settings, session } = servicesWithShortTimers(2);
+    const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);
 
     let skipped = false;

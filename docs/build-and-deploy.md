@@ -70,7 +70,7 @@
 
 | Service | Ports | Env | Volumes |
 |---------|-------|-----|---------|
-| `flexi-pomodoro` | `4000:3847` (host:container) | `TZ=Asia/Kolkata`, `PORT=3847` | `flexi-pomodoro-data:/data` (stub) |
+| `flexi-pomodoro` | `4000:3847` (host:container) | `TZ=Asia/Kolkata`, `PORT=3847`, `DATA_DIR=/data` | `${FPMD_DATA_DIR:-flexi-pomodoro-data}:/data` |
 
 `restart: unless-stopped`.
 
@@ -100,7 +100,9 @@ Root package version string: `0.0.1-alpha.4`.
 | `PORT` | `apps/server/src/index.ts`, Dockerfile, compose, root scripts | `3847` |
 | `HOST` | `apps/server/src/index.ts` | `0.0.0.0` |
 | `WEB_DIST` | `apps/server/src/app.ts`, Dockerfile, root `start` | Optional; else path candidates relative to dist/cwd |
-| `NODE_ENV` | Dockerfile runtime | `production` |
+| `DATA_DIR` | `apps/server/src/db/knex.ts`, docker-compose | Optional; else `/data` when `NODE_ENV=production`, else `./data`; SQLite file is `flexi-pomodoro.sqlite3` |
+| `FPMD_DATA_DIR` | docker-compose volume source | Optional host path; unset uses named volume `flexi-pomodoro-data` |
+| `NODE_ENV` | Dockerfile runtime; `resolveDataDir` | `production` in image |
 | `TZ` | docker-compose | `Asia/Kolkata` |
 
 Build-time define (not env): `__APP_VERSION__` from root package version via Vite.

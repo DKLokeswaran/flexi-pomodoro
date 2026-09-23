@@ -3,6 +3,7 @@ import fastifyStatic from "@fastify/static";
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { openDatabase } from "./db/index.js";
 import { SettingsService } from "./services/settings.service.js";
 import { SessionService } from "./services/session.service.js";
 import { registerRoutes } from "./routes/index.js";
@@ -42,10 +43,12 @@ async function registerWebStatic(app: FastifyInstance): Promise<void> {
   });
 }
 
-/** Wire settings, session, routes, tick scheduler, and optional static UI. */
+/** Wire DB, settings hydrate, session, routes, tick scheduler, optional static UI. */
 export async function buildApp() {
   const app = Fastify({ logger: true });
-  const settings = new SettingsService();
+  const { db, stores } = await openDatabase();
+  const settings = new SettingsService(stores.settings);
+  await settings.hydrate();
   const session = new SessionService();
 
   await registerRoutes(app, { settings, session });
@@ -60,9 +63,10 @@ export async function buildApp() {
 
   app.addHook("onClose", async () => {
     scheduler.stop();
+    await db.destroy();
   });
 
   await registerWebStatic(app);
 
-  return { app, settings, session, scheduler };
+  return { app };
 }

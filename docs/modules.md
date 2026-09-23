@@ -84,11 +84,41 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 
 | Export | Kind |
 |--------|------|
-| `buildApp()` | async → `{ app, settings, session, scheduler }` |
+| `buildApp()` | async → `{ app }` |
 
-**Side effects:** Fastify logger; starts scheduler; may register static files; `onClose` stops scheduler.
+**Side effects:** opens SQLite (`openDatabase`), hydrates settings, Fastify logger, starts scheduler, may register static files; `onClose` stops scheduler and `db.destroy()`.
 
-**Deps:** `fastify`, `@fastify/static`, `node:path`/`fs`/`url`, services, routes, scheduler.
+**Deps:** `fastify`, `@fastify/static`, `node:path`/`fs`/`url`, `db`, services, routes, scheduler.
+
+### `src/db/index.ts`
+
+| Export | Kind |
+|--------|------|
+| `AppStores` | type (`settings` / `session` / `phases`) |
+| `createStores(db)` | builds purpose-split stores |
+| `openDatabase(dataDir?)` | create Knex, migrate, return `{ db, stores, dataDir }` |
+| re-exports | `createKnex`, `migrateLatest`, `resolveDataDir`, `sqlitePath`, store classes |
+
+### `src/db/knex.ts`
+
+| Export | Kind |
+|--------|------|
+| `resolveDataDir(env?, cwd?)` | `DATA_DIR` → else `/data` when `NODE_ENV=production` → else `./data` |
+| `sqlitePath(dataDir)` | `…/flexi-pomodoro.sqlite3` |
+| `createKnex(dataDir)` | better-sqlite3 Knex client; creates data dir |
+| `migrateLatest(db)` | `db.migrate.latest()` |
+
+### `src/db/stores/settingsStore.ts`
+
+| Export | Kind |
+|--------|------|
+| `SettingsStore` | class |
+
+**Public methods:** `load()`, `save(settings, updatedAtMs?)`, `ensureSeeded(defaults?)`.
+
+### `src/db/stores/sessionStore.ts` / `phasesStore.ts`
+
+Stub classes constructed by `createStores`; no methods yet (session/phase write-through later).
 
 ### `src/scheduler.ts`
 
@@ -219,8 +249,10 @@ Unknown errors are rethrown.
 
 | Method | Returns |
 |--------|---------|
+| `constructor(store)` | requires `SettingsStore` |
+| `hydrate()` | `Promise<void>` — load or seed defaults |
 | `get()` | `Settings` copy |
-| `update(partial)` | `Settings` |
+| `update(partial)` | `Promise<Settings>` — validate, persist, return copy |
 | `resolveSessionParams(overrides?, debug?)` | `SessionParams` |
 
 ### `src/services/session.service.ts`

@@ -10,6 +10,7 @@ import {
   parseSettingsPatch,
   parseStartSessionBody,
 } from "../../utils/settingsValidation.js";
+import { createMockSettingsStore } from "../helpers/mockSettingsStore.js";
 
 describe("parseStartSessionBody", () => {
   it("accepts 1s overrides when shortDurations is set", () => {
@@ -56,26 +57,35 @@ describe("parseSettingsPatch", () => {
 });
 
 describe("SettingsService", () => {
-  it("accepts hard pause strategy", () => {
-    const settings = new SettingsService();
-    const next = settings.update({ workPauseStrategy: "hard" });
+  it("accepts hard pause strategy", async () => {
+    const store = createMockSettingsStore();
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    const next = await settings.update({ workPauseStrategy: "hard" });
     assert.equal(next.workPauseStrategy, "hard");
+    assert.equal(store.saved.at(-1)?.workPauseStrategy, "hard");
   });
 
-  it("rejects invalid settings", () => {
-    const settings = new SettingsService();
-    assert.throws(
+  it("rejects invalid settings without calling save", async () => {
+    const store = createMockSettingsStore();
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    const savesBefore = store.saved.length;
+    await assert.rejects(
       () => settings.update({ cyclesBeforeLongRest: 3.5 }),
       (error: unknown) => {
         assert.ok(error instanceof SettingsError);
         return true;
       },
     );
+    assert.equal(store.saved.length, savesBefore);
   });
 
-  it("rejects sub-minute work in settings even when short timers are desired", () => {
-    const settings = new SettingsService();
-    assert.throws(
+  it("rejects sub-minute work in settings even when short timers are desired", async () => {
+    const store = createMockSettingsStore();
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    await assert.rejects(
       () => settings.update({ workDurationSec: 1 }),
       (error: unknown) => {
         assert.ok(error instanceof SettingsError);
@@ -83,5 +93,49 @@ describe("SettingsService", () => {
         return true;
       },
     );
+  });
+
+  it("hydrate loads seeded defaults from the store", async () => {
+    const store = createMockSettingsStore(null);
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    assert.equal(store.ensureSeededCalls, 1);
+    assert.deepEqual(settings.get(), DEFAULT_SETTINGS);
+  });
+
+  it("hydrate restores previously saved settings from the store", async () => {
+    const store = createMockSettingsStore({
+      ...DEFAULT_SETTINGS,
+      workDurationSec: 30 * 60,
+      workPauseStrategy: "hard",
+      alertsMuted: true,
+      cyclesBeforeLongRest: 2,
+    });
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    assert.equal(settings.get().workDurationSec, 30 * 60);
+    assert.equal(settings.get().workPauseStrategy, "hard");
+    assert.equal(settings.get().alertsMuted, true);
+    assert.equal(settings.get().cyclesBeforeLongRest, 2);
+  });
+
+  it("update persists the merged settings through the store", async () => {
+    const store = createMockSettingsStore(null);
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    await settings.update({
+      workDurationSec: 30 * 60,
+      workPauseStrategy: "hard",
+      alertsMuted: true,
+      cyclesBeforeLongRest: 2,
+    });
+    assert.equal(store.saved.length, 2); // seed + update
+    assert.deepEqual(store.saved.at(-1), {
+      ...DEFAULT_SETTINGS,
+      workDurationSec: 30 * 60,
+      workPauseStrategy: "hard",
+      alertsMuted: true,
+      cyclesBeforeLongRest: 2,
+    });
   });
 });

@@ -7,10 +7,10 @@ todos:
     status: completed
   - id: db-bootstrap
     content: Knex + better-sqlite3, DATA_DIR, migrations, purpose-split stores (settings/session/phases); wire in buildApp
-    status: pending
+    status: completed
   - id: settings-persist
     content: Persist/load SettingsService via settings store; settings round-trip tests
-    status: pending
+    status: completed
   - id: segment-writes
     content: Write-through phase/session stores (close every ending phase; decision-timeout delete trx; pause via plugin diff + pause_slices/planned_work columns; FR-FLOW-11 / FR-ACK-6)
     status: pending

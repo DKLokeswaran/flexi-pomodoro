@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 45 |
+| Total commits | 46 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-09-08 |
+| Latest commit date | 2026-09-09 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (45) |
+| Most active contributor | Lokeswaran DK (46) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` … `v0.0.2-alpha.3` |
 
@@ -20,7 +20,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 |-------|--------:|
 | 2026-07 | 23 |
 | 2026-08 | 11 |
-| 2026-09 | 11 |
+| 2026-09 | 12 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -174,6 +174,12 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 
 - Add M3 persistence and resume implementation plan (FPMD-19): async engine mutex, Knex/SQLite stores, phase write rules, boot recovery, non-root Docker ownership, serialized delivery groups.
 
+### 2026-09-09 — Session AsyncMutex / tickIfIdle
+
+- Serialize session mutations with a FIFO `AsyncMutex`; commands catch up under the lock before mutating.
+- Scheduler calls `tickIfIdle` (`tryRunExclusive`) so interval ticks skip when a command holds the lock.
+- `getSnapshot` / SSE open stay pure reads (no wall-clock catch-up).
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -187,6 +193,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| a1823d0 | Lokeswaran DK | 2026-09-09 | Serialize session ticks and commands with AsyncMutex; scheduler uses tickIfIdle. |
 | 3748b35 | Lokeswaran DK | 2026-09-08 | Add M3 persistence and resume implementation plan. |
 | ec0adae | Lokeswaran DK | 2026-09-05 | Release v0.0.2-alpha.3 — Complete M2.5 tests-smoke coverage and sync docs. |
 | 3350399 | Lokeswaran DK | 2026-09-05 | Show live stats as hh:mm:ss after the first hour, and sync docs. |
@@ -233,4 +240,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: 3748b3543ebf88fb4231dddfb9fa8a9aae36e909
+Last Synced Commit: a1823d058f8009c33acf320fac86e21ba21a58ac

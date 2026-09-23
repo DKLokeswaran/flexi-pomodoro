@@ -61,15 +61,23 @@ Internal deps use `"@flexi-pomodoro/shared": "*"`.
 | `tsx` | ^4.19.4 | 4.23.0 | server dev (watch + tests) |
 | `typescript` | ^5.8.3 | 5.9.3 | shared/server/web dev |
 
+### Database
+
+| Package | Declared | Locked | Scope |
+|---------|----------|--------|-------|
+| `better-sqlite3` | ^13.0.3 | 13.0.3 | server prod |
+| `knex` | ^3.3.0 | 3.3.0 | server prod |
+| `@types/better-sqlite3` | ^9.6.0 | 9.6.0 | server dev |
+
 ### Types
 
 | Package | Declared | Locked | Scope |
 |---------|----------|--------|-------|
 | `@types/node` | ^22.15.30 | 22.20.1 | server dev |
 
-### Database / ORM / auth / testing libs
+### Auth / extra test libs
 
-**Not found** as direct dependencies (no Prisma, better-sqlite3, passport, vitest, jest, playwright, etc.).
+**Not found** as direct dependencies (no Prisma, passport, vitest, jest, playwright, etc.).
 
 ---
 
@@ -79,6 +87,7 @@ Internal deps use `"@flexi-pomodoro/shared": "*"`.
 |---------|-----|
 | `fastify` / `@fastify/static` | Network attack surface, path serving |
 | `zod` | Input boundary hardening (positive control) |
+| `better-sqlite3` / `knex` | Local DB file I/O under `DATA_DIR` |
 
 No dedicated crypto/auth client libraries committed.
 
@@ -92,4 +101,4 @@ No ESLint package or config committed.
 
 ## Transitive dependencies
 
-Hundreds via `package-lock.json` (3562 lines). Prefer lockfile for exact transitive versions; only direct packages are tabulated above.
+Hundreds via `package-lock.json` (3863 lines). Prefer lockfile for exact transitive versions; only direct packages are tabulated above.

@@ -14,7 +14,7 @@ export function registerSettingsRoutes(
   app.put<{ Body: SettingsPatch }>(SESSION_API.settings, async (req, reply) => {
     try {
       const patch = SettingsPatchSchema.parse(req.body ?? {});
-      return settings.update(patch);
+      return await settings.update(patch);
     } catch (error) {
       const { statusCode, body } = errorReply(error);
       return reply.code(statusCode).send(body);

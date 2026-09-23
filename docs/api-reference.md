@@ -115,7 +115,7 @@ Defaults (`DEFAULT_SETTINGS`): 25×60 / 5×60 / N=4 / 15×60 / decision 15 / `al
 
 **Errors** `400`: `{ error: string; code: "INVALID_SETTINGS" }` (Zod / `SettingsError`).
 
-Note: settings always validate against **production** bounds (debug short durations do not relax persisted defaults).
+Note: settings always validate against **production** bounds (debug short durations do not relax persisted defaults). Successful PUTs write through to SQLite and survive process restart.
 
 ---
 

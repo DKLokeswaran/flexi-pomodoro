@@ -7,7 +7,7 @@ flexi-pomodoro/
 ├── package.json                 # Workspace root: scripts, engines node>=20, version 0.0.1-alpha.4
 ├── package-lock.json
 ├── Dockerfile                   # Multi-stage: deps → build → runtime (port 3847)
-├── docker-compose.yml           # Single service + /data volume stub
+├── docker-compose.yml           # Single service; DATA_DIR=/data; FPMD_DATA_DIR bind or named volume
 ├── .dockerignore
 ├── .gitignore
 ├── .prettierrc
@@ -16,7 +16,8 @@ flexi-pomodoro/
 ├── .cursor/plans/
 │   ├── m1_timer_core.plan.md    # M1 implementation plan notes
 │   ├── m2_pause_modules.plan.md # M2 pause plugin plan notes
-│   └── m2.5-ack-stats.plan.md   # M2.5 short-rest ack + live stats plan
+│   ├── m2.5-ack-stats.plan.md   # M2.5 short-rest ack + live stats plan
+│   └── m3_persistence_resume.plan.md  # M3 SQLite persistence + resume plan
 ├── docs/
 │   └── product/                 # Product docs (PRD, roadmap) — not generated tech reference
 ├── packages/
@@ -38,8 +39,17 @@ flexi-pomodoro/
 │   │   ├── tsconfig.json        # excludes src/tests/**
 │   │   └── src/
 │   │       ├── index.ts         # listen entry
-│   │       ├── app.ts           # composition root
+│   │       ├── app.ts           # composition root (openDatabase + hydrate)
 │   │       ├── scheduler.ts
+│   │       ├── db/
+│   │       │   ├── index.ts         # openDatabase, createStores, AppStores
+│   │       │   ├── knex.ts          # resolveDataDir, createKnex, migrateLatest
+│   │       │   ├── migrations/
+│   │       │   │   └── 20260909134105_initial_schema.ts
+│   │       │   └── stores/
+│   │       │       ├── settingsStore.ts  # singleton settings load/save/seed
+│   │       │       ├── sessionStore.ts   # stub (later M3 write-through)
+│   │       │       └── phasesStore.ts    # stub (later M3 write-through)
 │   │       ├── pause/
 │   │       │   ├── index.ts         # Barrel: registry, soft strategy, types
 │   │       │   ├── types.ts         # WorkPauseStrategy plugin contract
@@ -60,6 +70,10 @@ flexi-pomodoro/
 │   │       │   ├── iso.ts                # msToIso / parseIso helpers
 │   │       │   └── asyncMutex.ts         # runExclusive / tryRunExclusive for session ticks
 │   │       └── tests/
+│   │           ├── db/
+│   │           │   └── settingsStore.test.ts
+│   │           ├── helpers/
+│   │           │   └── mockSettingsStore.ts
 │   │           ├── pause/
 │   │           │   ├── softPause.test.ts
 │   │           │   └── hardPause.test.ts
@@ -100,11 +114,11 @@ flexi-pomodoro/
 
 | Path | Role |
 |------|------|
-| `apps/server` | HTTP/SSE API, session engine, optional static host |
+| `apps/server` | HTTP/SSE API, session engine, SQLite settings, optional static host |
 | `apps/web` | React UI |
 | `packages/shared` | Cross-cutting domain contract |
 | `docs/product` | Product PRD and roadmap |
-| `.cursor/plans` | Internal planning artifacts (M1 timer core, M2 pause modules) |
+| `.cursor/plans` | Internal planning artifacts (M1–M3) |
 
 ## Language composition (committed files)
 
@@ -126,8 +140,9 @@ flexi-pomodoro/
 | HTTP error mapping | `apps/server/src/utils/errorReply.ts` (shared by session and settings routes) |
 | Session transition / alert | `SessionService` + shared `AlertIdSchema` / phase types; extend tests under `apps/server/src/tests/services/` |
 | Work-pause strategy | New plugin under `apps/server/src/pause/`; register in `defaultPauseRegistry()`; add isolated tests under `apps/server/src/tests/pause/` |
-| Settings field | Shared Zod schemas + `DEFAULT_SETTINGS` + server `settingsValidation` / `SettingsService` + Settings UI |
+| Settings field | Shared Zod schemas + `DEFAULT_SETTINGS` + server `settingsValidation` / `SettingsService` + `SettingsStore` + Settings UI |
 | Settings / start body parse | `apps/server/src/utils/settingsValidation.ts` |
+| SQLite table / migration | `apps/server/src/db/migrations/`; store methods under `db/stores/` |
 | Web projection / liveStats unit test | `apps/web/src/tests/utils/<module>.test.ts` |
 | Debug feature (server bounds) | `packages/shared/src/debug/features/<id>.ts`; register in `DEBUG_SERVER_FEATURES`; add web labels in `browserFlags/debug/features/` |
 | Browser UI preference | New feature under `browserFlags/ui/features/`; register in `browserFlags/ui/catalog.ts` |
@@ -137,7 +152,7 @@ flexi-pomodoro/
 
 ## Test location convention
 
-Mirrored `src/tests/` trees (not colocated): server `services/` + `pause/` + `utils/`; web `utils/`. Each package runs its own tests; packages do not import each other's application source for tests.
+Mirrored `src/tests/` trees (not colocated): server `services/` + `pause/` + `utils/` + `db/` + `helpers/`; web `utils/`. Each package runs its own tests; packages do not import each other's application source for tests.
 
 ## Config & build artifacts (ignored / not committed)
 

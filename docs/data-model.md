@@ -2,7 +2,13 @@
 
 ## Persistence
 
-**Not found in committed history:** SQL schemas, migrations, ORM entities, or SQLite usage. Settings and sessions are **in-memory** on the server. Docker Compose mounts volume `flexi-pomodoro-data` at `/data` as a stub for future M3 persistence.
+SQLite via Knex + `better-sqlite3`. File: `flexi-pomodoro.sqlite3` under the resolved data directory (`DATA_DIR`, else `/data` in production, else `./data` in dev). Migrations run on `openDatabase()`.
+
+**Live today:** the singleton `settings` row (seeded from `DEFAULT_SETTINGS` on first boot; updated on every successful `PUT /api/settings`).
+
+**Schema present, stores stubbed:** `sessions`, `session_runtime`, `phases`, class-table detail tables (`planned_work`, `decision`, `short_rest_ack`, `extended_work`, `rest`), and `pause_slices`. `SessionStore` / `PhasesStore` are constructed but not yet used by `SessionService`.
+
+Docker Compose sets `DATA_DIR=/data` and mounts `${FPMD_DATA_DIR:-flexi-pomodoro-data}:/data`.
 
 ---
 
@@ -10,7 +16,7 @@
 
 ### `SettingsService`
 
-Holds a single `Settings` object, initialized from `DEFAULT_SETTINGS`.
+Holds a cached `Settings` object. Constructed with a `SettingsStore`; `hydrate()` loads or seeds the singleton row. `update()` validates, writes through the store, then returns a copy.
 
 ### `SessionService`
 
@@ -107,7 +113,7 @@ ActiveSession 1──1 Phase (current)
 ActiveSession 1──* AlertEvent (via alertLog / pendingAlerts)
 ```
 
-No foreign keys — single process, single active session.
+Runtime session state is still single-process / single active session. The SQLite schema uses class-table inheritance for phases (`phases` + per-kind detail tables) and FK links for `session_runtime` / `pause_slices` once write-through lands.
 
 ---
 
@@ -128,8 +134,21 @@ No foreign keys — single process, single active session.
 
 ## ORM / query patterns
 
-Not found in committed history.
+Knex query builder over `better-sqlite3`. No ORM entities. Stores wrap table access (`SettingsStore.load` / `save` / `ensureSeeded`).
+
+## SQLite tables (initial migration)
+
+| Table | Role |
+|-------|------|
+| `settings` | Singleton row `id=1`; all `Settings` fields + `updatedAt` |
+| `sessions` | Session header + locked params |
+| `phases` | Phase id + kind |
+| `planned_work` / `decision` / `short_rest_ack` / `extended_work` / `rest` | Per-kind detail (FK → `phases`, `sessions`) |
+| `session_runtime` | Current phase id, liveStats counters, `alertSeq` |
+| `pause_slices` | Soft/hard pause intervals linked to planned work |
 
 ## Migration history
 
-Not found in committed history.
+| Migration | Purpose |
+|-----------|---------|
+| `20260909134105_initial_schema` | Creates the tables above |

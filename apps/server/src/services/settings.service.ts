@@ -7,6 +7,7 @@ import {
   DEFAULT_SETTINGS,
 } from "@flexi-pomodoro/shared";
 import { ZodError } from "zod";
+import type { SettingsStore } from "../db/stores/settingsStore.js";
 import {
   mergeSessionParams,
   parseSettingsPatch,
@@ -34,22 +35,30 @@ export function toSettingsError(error: unknown): SettingsError {
   throw error;
 }
 
-/** In-memory persisted defaults used when starting a session. */
+/** Persisted session defaults backed by SettingsStore. */
 export class SettingsService {
   private settings: Settings = { ...DEFAULT_SETTINGS };
+
+  constructor(private readonly store: SettingsStore) {}
+
+  /** Load from the store; seed DEFAULT_SETTINGS on first boot. */
+  async hydrate(): Promise<void> {
+    this.settings = { ...(await this.store.ensureSeeded(DEFAULT_SETTINGS)) };
+  }
 
   /** Return a shallow copy of the current persisted defaults. */
   get(): Settings {
     return { ...this.settings };
   }
 
-  /** Merge and validate a patch onto persisted defaults. */
-  update(partial: SettingsPatch): Settings {
+  /** Merge and validate a patch, then persist. */
+  async update(partial: SettingsPatch): Promise<Settings> {
     try {
       this.settings = parseSettingsPatch(this.settings, partial);
     } catch (error) {
       throw toSettingsError(error);
     }
+    await this.store.save(this.settings);
     return this.get();
   }
 

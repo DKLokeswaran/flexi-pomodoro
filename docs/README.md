@@ -1,6 +1,6 @@
 # Flexi Pomodoro — Technical Documentation
 
-Self-hosted, flow-aware Pomodoro timer. This documentation set describes the current source tree on branch `master` (version `0.0.2-alpha.1`). Product requirements and roadmap live separately under [`product/`](./product/).
+Self-hosted, flow-aware Pomodoro timer. This documentation set describes the current source tree on branch `master` (version `0.0.2-alpha.3`). Product requirements and roadmap live separately under [`product/`](./product/).
 
 ## Quick start
 
@@ -24,6 +24,7 @@ Docker:
 ```bash
 docker compose up --build
 # http://localhost:4000 (maps host 4000 → container 3847)
+# optional: FPMD_DATA_DIR=/path/on/host docker compose up --build
 ```
 
 ## Tech stack
@@ -32,7 +33,7 @@ docker compose up --build
 |-------|--------|
 | Monorepo | npm workspaces (`apps/*`, `packages/*`) |
 | Shared types/validation | TypeScript, Zod (`@flexi-pomodoro/shared`) |
-| Server | Fastify 5, `@fastify/static`, Node 20+/22 |
+| Server | Fastify 5, `@fastify/static`, Knex + better-sqlite3, Node 20+/22 |
 | Web | React 19, Vite 6, TanStack Query 5, CSS modules |
 | Tests | Node.js built-in test runner (`node:test`) |
 | Deploy | Multi-stage Dockerfile, docker-compose |
@@ -47,6 +48,7 @@ flowchart LR
   Sched["IntervalScheduler 250ms"]
   Sess["SessionService"]
   Sett["SettingsService"]
+  Store["SettingsStore / SQLite"]
   Pause["PauseStrategyRegistry"]
 
   Browser -->|"REST + SSE /api/*"| API
@@ -54,11 +56,12 @@ flowchart LR
   API -.-> Shared
   API --> Sett
   API --> Sess
+  Sett --> Store
   Sess --> Pause
   Sched -->|"tickIfIdle(nowMs)"| Sess
 ```
 
-Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async and mutex-serialized) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`) and by commands that tick under the mutex before mutating; GET snapshot / SSE do not tick.
+Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async and mutex-serialized) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`) and by commands that tick under the mutex before mutating; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT.
 
 ## Documentation index
 
@@ -68,7 +71,7 @@ Request flow (session action): route → server Zod parsers (`settingsValidation
 | [structure.md](./structure.md) | Annotated tree, folder roles, where to add code |
 | [modules.md](./modules.md) | Exported symbols, props, methods, imports |
 | [api-reference.md](./api-reference.md) | REST + SSE endpoints, schemas, status codes |
-| [data-model.md](./data-model.md) | In-memory models, phase types, DTO shapes |
+| [data-model.md](./data-model.md) | SQLite schema, in-memory session models, phase types, DTOs |
 | [state-management.md](./state-management.md) | React Query, contexts, localStorage, session stream |
 | [error-handling.md](./error-handling.md) | Error classes, validation, client toasts |
 | [security.md](./security.md) | Auth (none), CORS, secrets/env, browser storage |

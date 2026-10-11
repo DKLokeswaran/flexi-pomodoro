@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: segment-writes
     content: Write-through phase/session stores (close every ending phase; decision-timeout delete trx; pause via plugin diff + pause_slices/planned_work columns; FR-FLOW-11 / FR-ACK-6)
-    status: pending
+    status: completed
   - id: boot-recovery
     content: "Hydrate alertSeq + ActiveSession; await tick(now, { recovery: true }); clear runtime on complete"
     status: pending

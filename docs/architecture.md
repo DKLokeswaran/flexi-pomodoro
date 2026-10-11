@@ -7,10 +7,10 @@ Flexi Pomodoro is an **npm-workspace monorepo** with three packages:
 | Package | Role |
 |---------|------|
 | `@flexi-pomodoro/shared` | Domain types, Zod schemas, `SESSION_API` path constants, debug feature catalog |
-| `@flexi-pomodoro/server` | Fastify HTTP/SSE API, in-memory session engine, SQLite settings persistence, static web serving |
+| `@flexi-pomodoro/server` | Fastify HTTP/SSE API, in-memory session engine with SQLite write-through, static web serving |
 | `@flexi-pomodoro/web` | React SPA (Vite); talks to the server via REST + Server-Sent Events |
 
-Backend style is **layered**: composition root (`app.ts`) → routes → services → pause plugins → Knex/SQLite stores. Settings load and save through `SettingsStore`. The session engine is still an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`); session/phase store write-through is not wired yet. Pause policy is injected as a `WorkPauseStrategy` plugin, not inlined in the engine.
+Backend style is **layered**: composition root (`app.ts`) → routes → services → pause plugins → Knex/SQLite stores. Settings load and save through `SettingsStore`. The session engine is an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`), with transactional write-through to `SessionStore` / `PhasesStore` on every transition. Boot hydrate / crash recovery is not wired yet. Pause policy is injected as a `WorkPauseStrategy` plugin, not inlined in the engine.
 
 Frontend style is **feature-oriented folders** under `apps/web/src`: components (by tab/feature), providers, queries (API + React Query hooks), hooks (SSE stream), utils, constants. Tab switching is local React state (no client router).
 
@@ -34,10 +34,11 @@ flowchart TB
     SessSvc["SessionService"]
     Pause["PauseStrategyRegistry"]
     Sched["IntervalScheduler"]
-    DB["Knex + SettingsStore"]
+    DB["Knex stores (settings / session / phases)"]
     Routes --> SettSvc
     Routes --> SessSvc
     SettSvc --> DB
+    SessSvc --> DB
     SessSvc --> Pause
     Sched -->|"tickIfIdle every 250ms"| SessSvc
   end
@@ -53,8 +54,8 @@ flowchart TB
 
 | Pattern | Where | Notes |
 |---------|-------|-------|
-| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates `SettingsService`, constructs `SessionService` + `IntervalScheduler`; returns `{ app }` |
-| **Repository / store** | `db/stores/*` | Purpose-split Knex stores; settings is live; session/phases are stubs for later M3 groups |
+| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates `SettingsService`, injects session/phases stores into `SessionService` + `IntervalScheduler`; returns `{ app }` |
+| **Repository / store** | `db/stores/*` | Purpose-split Knex stores; settings + session/phase write-through live; boot hydrate pending |
 | **Service layer** | `SettingsService`, `SessionService` | Business rules and state; routes stay thin |
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
 | **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later; `onTick` may return a Promise |
@@ -71,11 +72,14 @@ flowchart TB
 No DI container. Wiring is explicit:
 
 ```typescript
-// apps/server/src/app.ts (working-tree pattern)
+// apps/server/src/app.ts
 const { db, stores } = await openDatabase();
 const settings = new SettingsService(stores.settings);
 await settings.hydrate();
-const session = new SessionService(); // defaultPauseRegistry: soft + hard
+const session = new SessionService({
+  session: stores.session,
+  phases: stores.phases,
+});
 await registerRoutes(app, { settings, session });
 const scheduler = new IntervalScheduler({
   intervalMs: 250,
@@ -104,10 +108,10 @@ On the web, React Context provides `UiFlagsProvider`, `DebugFlagsProvider` (both
 1. **Entry** — `apps/server/src/index.ts` reads `PORT` / `HOST`, calls `buildApp()`, `listen`.
 2. **App** — `openDatabase()` + settings hydrate; Fastify instance; services + routes + scheduler; optional static hosting; `onClose` destroys Knex.
 3. **Route** — e.g. `POST /api/session/start` parses body via server `parseStartSessionBody`, resolves params via `settings.resolveSessionParams`, `await`s `session.start` (and other session mutations). Settings PUT `await`s `settings.update` (SQLite write-through).
-4. **Service** — under `AsyncMutex.runExclusive`, mutates in-memory session; mutating commands call `tickUnlocked` first via `beginActiveCommand`; `notify()` pushes snapshots to SSE subscribers. `getSnapshot` / SSE open are pure reads (no catch-up).
+4. **Service** — under `AsyncMutex.runExclusive`, mutates in-memory session and writes phase/session rows in a Knex transaction; mutating commands call `tickUnlocked` first via `beginActiveCommand`; `notify()` pushes snapshots to SSE subscribers. `getSnapshot` / SSE open are pure reads (no catch-up).
 5. **Tick** — every 250ms `session.tickIfIdle(nowMs, true)` advances due phase boundaries when the mutex is free; overlapping intervals skip instead of queuing.
 
-Settings use SQLite (singleton row). Active session state is still in-process memory only; session/phase store write-through is not wired yet.
+Settings use SQLite (singleton row). Active session state is still served from process memory; every transition also write-throughs to `sessions` / `session_runtime` / phase tables. Restart hydrate is not implemented yet.
 
 ## Session phase state machine
 
@@ -202,8 +206,8 @@ Not found in committed history (no `React.lazy` / dynamic import of routes).
 | Data | Current | Remaining M3 work |
 |------|---------|-------------------|
 | Settings | SQLite singleton via `SettingsStore` (`flexi-pomodoro.sqlite3` under `DATA_DIR`) | — |
-| Session | In-memory `SessionService` | Write-through `SessionStore` / `PhasesStore` + crash recovery |
-| Schema | Knex migration `20260909134105_initial_schema` (settings, sessions, phases, detail tables, pause_slices) | Session/phase hydrate and write paths |
+| Session / phases | Write-through via `SessionStore` / `PhasesStore` (transactions on start, pause, phase transitions, complete); FR-FLOW-11 deletes decision on timeout; pause_slices + planned_work pause columns | Boot hydrate + wall-clock recovery (`tick` with recovery) |
+| Schema | Knex migration `20260909134105_initial_schema` | — |
 | Debug prefs | Browser `localStorage` (`flexi-pomodoro:debugFlags`) | Client-only |
 | UI prefs | Browser `localStorage` (`flexi-pomodoro:uiFlags`) | Client-only |
 | Alert watermark | Browser `localStorage` | Client-only |

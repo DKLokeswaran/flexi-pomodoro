@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import {
   SettingsError,
   SettingsService,
@@ -9,24 +9,33 @@ import {
   SessionService,
 } from "../../services/session.service.js";
 import { createMockSettingsStore } from "../helpers/mockSettingsStore.js";
+import { openTempSessionServices } from "../helpers/tempSession.js";
 
 const SESSION_START_MS = Date.parse("2026-07-12T10:00:00.000Z");
+
+const disposers: Array<() => Promise<void>> = [];
+
+after(async () => {
+  while (disposers.length > 0) {
+    await disposers.pop()!();
+  }
+});
 
 /** Settings + session with short timers so tests can advance by seconds, not minutes. */
 async function servicesWithShortTimers(cyclesBeforeLongRest = 2): Promise<{
   settings: SettingsService;
   session: SessionService;
 }> {
-  const settings = new SettingsService(createMockSettingsStore());
-  await settings.hydrate();
-  await settings.update({
+  const ctx = await openTempSessionServices();
+  disposers.push(ctx.dispose);
+  await ctx.settings.update({
     workDurationSec: 60,
     shortRestDurationSec: 60,
     longRestDurationSec: 120,
     cyclesBeforeLongRest,
     decisionWindowSec: 15,
   });
-  return { settings, session: new SessionService() };
+  return { settings: ctx.settings, session: ctx.session };
 }
 
 /** Resolve params from settings and start a session at the given clock. */
@@ -358,9 +367,9 @@ describe("SessionService", () => {
   });
 
   it("starts with 1s durations when debug.shortDurations is enabled", async () => {
-    const settings = new SettingsService(createMockSettingsStore());
-    await settings.hydrate();
-    const session = new SessionService();
+    const ctx = await openTempSessionServices();
+    disposers.push(ctx.dispose);
+    const { settings, session } = ctx;
     const params = settings.resolveSessionParams(
       {
         workDurationSec: 1,

@@ -14,6 +14,10 @@ import {
   plannedWorkSecAt,
 } from "@flexi-pomodoro/shared";
 import { randomUUID } from "node:crypto";
+import type { Knex } from "knex";
+import type { PhasesStore } from "../db/stores/phasesStore.js";
+import type { SessionStore } from "../db/stores/sessionStore.js";
+import { SessionStore as SessionStoreClass } from "../db/stores/sessionStore.js";
 import {
   defaultPauseRegistry,
   PauseStrategyRegistry,
@@ -21,6 +25,13 @@ import {
 } from "../pause/index.js";
 import { AsyncMutex } from "../utils/asyncMutex.js";
 import { elapsedSecFromIso, msToIso, parseIso } from "../utils/iso.js";
+
+type PausePersistContext = {
+  sessionId: string;
+  plannedWorkPhaseId: string;
+  cycleIndex: number;
+  strategy: PauseStrategyId;
+};
 
 /** Domain error from session commands (wrong phase, no session, etc.). */
 export class SessionError extends Error {
@@ -110,23 +121,15 @@ function addDeliberation(
   );
 }
 
-/** Enter extended work; startedAtMs is click time or decision start (timeout). */
-function enterExtendedWork(
-  session: ActiveSession,
-  cycleIndex: number,
-  startedAtMs: number,
-): void {
-  session.phase = {
-    kind: "extended_work",
-    cycleIndex,
-    startedAt: msToIso(startedAtMs),
-  };
-}
-
 /** Called with a snapshot whenever the engine notifies subscribers. */
 export type SnapshotListener = (snapshot: SessionSnapshot) => void;
 
-/** In-memory session engine: phases, alerts, and snapshot subscribers. */
+export type SessionServiceStores = {
+  session: SessionStore;
+  phases: PhasesStore;
+};
+
+/** In-memory session engine with SQLite write-through on every transition. */
 export class SessionService {
   private session: ActiveSession | null = null;
   /** Pause plugin resolved at start; cleared when the session ends. */
@@ -139,8 +142,13 @@ export class SessionService {
   private listenerCursors = new WeakMap<SnapshotListener, number>();
   /** Serializes tick and every command that ticks (commands, scheduler, boot). */
   private readonly mutex = new AsyncMutex();
+  /** DB id of the open phase (`phases.id` / detail PK). */
+  private currentPhaseId: string | null = null;
+  /** DB id of the open pause_slices row, if any. */
+  private openPauseSliceId: string | null = null;
 
   constructor(
+    private readonly stores: SessionServiceStores,
     private readonly pauseRegistry: PauseStrategyRegistry = defaultPauseRegistry(),
   ) {}
 
@@ -267,25 +275,186 @@ export class SessionService {
     return snapshot;
   }
 
+  /** Persist liveStats + alertSeq + currentPhaseId on session_runtime. */
+  private async syncRuntime(
+    trx: Knex.Transaction | Knex,
+    session: ActiveSession,
+    nowMs: number,
+    currentPhaseId: string = this.currentPhaseId!,
+  ): Promise<void> {
+    await this.stores.session.updateRuntimeStats(trx, session.id, {
+      currentPhaseId,
+      liveStats: session.liveStats,
+      alertSeq: this.alertSeq,
+      updatedAt: msToIso(nowMs),
+    });
+  }
+
+  private pausePersistCtx(
+    session: ActiveSession,
+    plannedWorkPhaseId: string,
+    cycleIndex: number,
+  ): PausePersistContext {
+    return {
+      sessionId: session.id,
+      plannedWorkPhaseId,
+      cycleIndex,
+      strategy: session.pauseStrategy,
+    };
+  }
+
+  /** Open a pause_slices row and write planned-work pause columns. Returns slice id. */
+  private async persistPauseOpen(
+    trx: Knex.Transaction | Knex,
+    phase: PlannedWorkPhase,
+    ctx: PausePersistContext,
+  ): Promise<string> {
+    if (!phase.pauseStartedAt) {
+      throw new Error("persistPauseOpen requires pauseStartedAt on the phase");
+    }
+    const sliceId = randomUUID();
+    await this.stores.phases.openPauseSlice(trx, {
+      id: sliceId,
+      sessionId: ctx.sessionId,
+      cycleIndex: ctx.cycleIndex,
+      plannedWorkPhaseId: ctx.plannedWorkPhaseId,
+      strategy: ctx.strategy,
+      startedAt: phase.pauseStartedAt,
+    });
+    await this.stores.phases.updatePlannedWorkPause(trx, ctx.plannedWorkPhaseId, {
+      paused: phase.paused,
+      pausedSec: phase.pausedSec,
+      pauseStartedAt: phase.pauseStartedAt,
+      timerFrozenAt: phase.timerFrozenAt,
+      plannedEndAt: phase.plannedEndAt,
+    });
+    return sliceId;
+  }
+
+  /** Close an open pause_slices row and write planned-work pause columns. */
+  private async persistPauseClose(
+    trx: Knex.Transaction | Knex,
+    phase: PlannedWorkPhase,
+    ctx: PausePersistContext & { openPauseSliceId: string },
+    endedAtMs: number,
+    pauseStartedAt: string | null,
+  ): Promise<void> {
+    const startedMs = pauseStartedAt ? parseIso(pauseStartedAt) : endedAtMs;
+    const durationSec = Math.max(
+      0,
+      Math.floor((endedAtMs - startedMs) / 1000),
+    );
+    await this.stores.phases.closePauseSlice(trx, ctx.openPauseSliceId, {
+      endedAt: msToIso(endedAtMs),
+      durationSec,
+    });
+    await this.stores.phases.updatePlannedWorkPause(trx, ctx.plannedWorkPhaseId, {
+      paused: phase.paused,
+      pausedSec: phase.pausedSec,
+      pauseStartedAt: phase.pauseStartedAt,
+      timerFrozenAt: phase.timerFrozenAt,
+      plannedEndAt: phase.plannedEndAt,
+    });
+  }
+
+  /** Move from work into rest and emit the matching rest-start alert. */
+  private enterRestFromWork(
+    session: ActiveSession,
+    nowMs: number,
+    alerts: AlertId[],
+  ): { rest: RestPhase; phaseId: string } {
+    const cycleIndex = session.phase.cycleIndex;
+    const rest = startRest(session.params, cycleIndex, nowMs);
+    const phaseId = randomUUID();
+    session.phase = rest;
+    this.currentPhaseId = phaseId;
+    const restEntryAlert: AlertId =
+      rest.kind === "long_rest" ? "long_rest_start" : "short_rest_start";
+    this.emitAlerts(...alerts, restEntryAlert);
+    return { rest, phaseId };
+  }
+
+  /** Open the work-decision window starting at planned work's end. */
+  private enterDecisionPhase(
+    session: ActiveSession,
+    plannedWork: PlannedWorkPhase,
+    plannedEndMs: number,
+  ): { phase: DecisionPhase; phaseId: string } {
+    const decisionEndsAtMs =
+      plannedEndMs + session.params.decisionWindowSec * 1000;
+    const phaseId = randomUUID();
+    const phase: DecisionPhase = {
+      kind: "decision",
+      cycleIndex: plannedWork.cycleIndex,
+      startedAt: plannedWork.plannedEndAt,
+      decisionEndsAt: msToIso(decisionEndsAtMs),
+      decisionWindowSec: session.params.decisionWindowSec,
+    };
+    session.phase = phase;
+    this.currentPhaseId = phaseId;
+    this.emitAlerts("work_planned_end");
+    return { phase, phaseId };
+  }
+
+  /** Enter extended work; startedAtMs is click time or decision start (timeout). */
+  private enterExtendedWork(
+    session: ActiveSession,
+    cycleIndex: number,
+    startedAtMs: number,
+  ): { phaseId: string } {
+    const phaseId = randomUUID();
+    session.phase = {
+      kind: "extended_work",
+      cycleIndex,
+      startedAt: msToIso(startedAtMs),
+    };
+    this.currentPhaseId = phaseId;
+    return { phaseId };
+  }
+
+  /** Open short-rest ack window after short rest ends. */
+  private enterShortRestAckPhase(
+    session: ActiveSession,
+    restPhase: RestPhase,
+    restEndedAtMs: number,
+  ): { phase: DecisionPhase; phaseId: string } {
+    const phaseId = randomUUID();
+    const phase: DecisionPhase = {
+      kind: "short_rest_ack",
+      cycleIndex: restPhase.cycleIndex,
+      startedAt: msToIso(restEndedAtMs),
+      decisionEndsAt: msToIso(
+        restEndedAtMs + session.params.decisionWindowSec * 1000,
+      ),
+      decisionWindowSec: session.params.decisionWindowSec,
+    };
+    session.phase = phase;
+    this.currentPhaseId = phaseId;
+    return { phase, phaseId };
+  }
+
   /** Start a new session in planned work; fails if one is already active. */
   async start(
     params: SessionParams,
     nowMs: number = Date.now(),
     pauseStrategy: PauseStrategyId = "soft",
   ): Promise<SessionSnapshot> {
-    return this.mutex.runExclusive(() => {
+    return this.mutex.runExclusive(async () => {
       if (this.session) {
         throw new SessionError("A session is already active", "SESSION_ACTIVE");
       }
       const seqAtStart = this.alertSeq;
       this.pausePlugin = this.pauseRegistry.get(pauseStrategy)!;
+      const sessionId = randomUUID();
+      const phaseId = randomUUID();
+      const phase = startPlannedWork(params, 1, nowMs);
       this.session = {
-        id: randomUUID(),
+        id: sessionId,
         status: "active",
         startedAt: msToIso(nowMs),
         params,
         pauseStrategy,
-        phase: startPlannedWork(params, 1, nowMs),
+        phase,
         liveStats: {
           workedSec: 0,
           deliberationSec: 0,
@@ -295,6 +464,38 @@ export class SessionService {
         pendingAlerts: [],
         alertSeq: this.alertSeq,
       };
+      this.currentPhaseId = phaseId;
+      this.openPauseSliceId = null;
+
+      await this.stores.session.transaction(async (trx) => {
+        await this.stores.session.insertSession(trx, {
+          id: sessionId,
+          startedAt: this.session!.startedAt,
+          completedAt: null,
+          status: "active",
+          pauseStrategy,
+          ...SessionStoreClass.paramsColumns(params),
+        });
+        await this.stores.phases.openPlannedWork(trx, {
+          id: phaseId,
+          sessionId,
+          cycleIndex: 1,
+          plannedDurationSec: phase.plannedDurationSec,
+          plannedEndAt: phase.plannedEndAt,
+          startedAt: phase.startedAt,
+        });
+        await this.stores.session.upsertRuntime(trx, {
+          sessionId,
+          currentPhaseId: phaseId,
+          workedSec: 0,
+          deliberationSec: 0,
+          restSec: 0,
+          pausedSec: 0,
+          alertSeq: this.alertSeq,
+          updatedAt: msToIso(nowMs),
+        });
+      });
+
       return this.notifyAndSnapshot(nowMs, seqAtStart);
     });
   }
@@ -315,6 +516,14 @@ export class SessionService {
         throw new SessionError("Planned work already ended", "INVALID_PHASE");
       }
       this.pausePlugin!.onPause(phase, nowMs);
+      await this.stores.session.transaction(async (trx) => {
+        this.openPauseSliceId = await this.persistPauseOpen(
+          trx,
+          phase,
+          this.pausePersistCtx(session, this.currentPhaseId!, phase.cycleIndex),
+        );
+        await this.syncRuntime(trx, session, nowMs);
+      });
       return this.notifyAndSnapshot(nowMs, seqAtStart);
     });
   }
@@ -331,7 +540,27 @@ export class SessionService {
       if (!phase.paused) {
         throw new SessionError("Not paused", "NOT_PAUSED");
       }
+      const pauseStartedAt = phase.pauseStartedAt;
+      const openPauseSliceId = this.openPauseSliceId!;
       this.pausePlugin!.onResume(phase, nowMs);
+      await this.stores.session.transaction(async (trx) => {
+        await this.persistPauseClose(
+          trx,
+          phase,
+          {
+            ...this.pausePersistCtx(
+              session,
+              this.currentPhaseId!,
+              phase.cycleIndex,
+            ),
+            openPauseSliceId,
+          },
+          nowMs,
+          pauseStartedAt,
+        );
+        this.openPauseSliceId = null;
+        await this.syncRuntime(trx, session, nowMs);
+      });
       return this.notifyAndSnapshot(nowMs, seqAtStart);
     });
   }
@@ -345,8 +574,33 @@ export class SessionService {
         "decision",
         "Acknowledge rest is only valid in decision",
       );
-      addDeliberation(session, session.phase as DecisionPhase, nowMs);
-      this.enterRestFromWork(session, nowMs, ["rest_ack"]);
+      const decision = session.phase as DecisionPhase;
+      const decisionPhaseId = this.currentPhaseId!;
+      addDeliberation(session, decision, nowMs);
+      const durationSec = elapsedSecFromIso(decision.startedAt, nowMs);
+      const { rest, phaseId: restPhaseId } = this.enterRestFromWork(
+        session,
+        nowMs,
+        ["rest_ack"],
+      );
+
+      await this.stores.session.transaction(async (trx) => {
+        await this.stores.phases.completeDecision(trx, decisionPhaseId, {
+          endedAt: msToIso(nowMs),
+          durationSec,
+          outcome: "ack_rest",
+        });
+        await this.stores.phases.openRest(trx, {
+          id: restPhaseId,
+          sessionId: session.id,
+          cycleIndex: rest.cycleIndex,
+          plannedDurationSec: rest.plannedDurationSec,
+          plannedEndAt: rest.plannedEndAt,
+          startedAt: rest.startedAt,
+          kind: rest.kind,
+        });
+        await this.syncRuntime(trx, session, nowMs, restPhaseId);
+      });
       return this.notifyAndSnapshot(nowMs, seqAtStart);
     });
   }
@@ -360,13 +614,35 @@ export class SessionService {
         "short_rest_ack",
         "Acknowledge work is only valid in short-rest ack",
       );
-      const phase = session.phase as DecisionPhase;
-      addDeliberation(session, phase, nowMs);
-      session.phase = startPlannedWork(
+      const ack = session.phase as DecisionPhase;
+      const ackPhaseId = this.currentPhaseId!;
+      addDeliberation(session, ack, nowMs);
+      const durationSec = elapsedSecFromIso(ack.startedAt, nowMs);
+      const work = startPlannedWork(
         session.params,
-        phase.cycleIndex + 1,
+        ack.cycleIndex + 1,
         nowMs,
       );
+      const workPhaseId = randomUUID();
+      session.phase = work;
+      this.currentPhaseId = workPhaseId;
+
+      await this.stores.session.transaction(async (trx) => {
+        await this.stores.phases.completeShortRestAck(trx, ackPhaseId, {
+          endedAt: msToIso(nowMs),
+          durationSec,
+          outcome: "acknowledged",
+        });
+        await this.stores.phases.openPlannedWork(trx, {
+          id: workPhaseId,
+          sessionId: session.id,
+          cycleIndex: work.cycleIndex,
+          plannedDurationSec: work.plannedDurationSec,
+          plannedEndAt: work.plannedEndAt,
+          startedAt: work.startedAt,
+        });
+        await this.syncRuntime(trx, session, nowMs, workPhaseId);
+      });
       return this.notifyAndSnapshot(nowMs, seqAtStart);
     });
   }
@@ -380,9 +656,30 @@ export class SessionService {
         "decision",
         "Continue is only valid in decision",
       );
-      const phase = session.phase as DecisionPhase;
-      addDeliberation(session, phase, nowMs);
-      enterExtendedWork(session, phase.cycleIndex, nowMs);
+      const decision = session.phase as DecisionPhase;
+      const decisionPhaseId = this.currentPhaseId!;
+      addDeliberation(session, decision, nowMs);
+      const durationSec = elapsedSecFromIso(decision.startedAt, nowMs);
+      const { phaseId: extendedPhaseId } = this.enterExtendedWork(
+        session,
+        decision.cycleIndex,
+        nowMs,
+      );
+
+      await this.stores.session.transaction(async (trx) => {
+        await this.stores.phases.completeDecision(trx, decisionPhaseId, {
+          endedAt: msToIso(nowMs),
+          durationSec,
+          outcome: "continue",
+        });
+        await this.stores.phases.openExtendedWork(trx, {
+          id: extendedPhaseId,
+          sessionId: session.id,
+          cycleIndex: decision.cycleIndex,
+          startedAt: msToIso(nowMs),
+        });
+        await this.syncRuntime(trx, session, nowMs, extendedPhaseId);
+      });
       return this.notifyAndSnapshot(nowMs, seqAtStart);
     });
   }
@@ -396,8 +693,32 @@ export class SessionService {
         "extended_work",
         "Start rest is only valid during extended work",
       );
-      session.liveStats.workedSec += elapsedSecFromIso(phase.startedAt, nowMs);
-      this.enterRestFromWork(session, nowMs, []);
+      const extendedPhaseId = this.currentPhaseId!;
+      const actualDurationSec = elapsedSecFromIso(phase.startedAt, nowMs);
+      session.liveStats.workedSec += actualDurationSec;
+      const { rest, phaseId: restPhaseId } = this.enterRestFromWork(
+        session,
+        nowMs,
+        [],
+      );
+
+      await this.stores.session.transaction(async (trx) => {
+        await this.stores.phases.completeExtendedWork(trx, extendedPhaseId, {
+          endedAt: msToIso(nowMs),
+          actualDurationSec,
+          endedReason: "user_start_rest",
+        });
+        await this.stores.phases.openRest(trx, {
+          id: restPhaseId,
+          sessionId: session.id,
+          cycleIndex: rest.cycleIndex,
+          plannedDurationSec: rest.plannedDurationSec,
+          plannedEndAt: rest.plannedEndAt,
+          startedAt: rest.startedAt,
+          kind: rest.kind,
+        });
+        await this.syncRuntime(trx, session, nowMs, restPhaseId);
+      });
       return this.notifyAndSnapshot(nowMs, seqAtStart);
     });
   }
@@ -411,6 +732,24 @@ export class SessionService {
         "long_rest",
         "Early end is only valid during long rest",
       );
+      const phase = session.phase as RestPhase;
+      const restPhaseId = this.currentPhaseId!;
+      const actualDurationSec = elapsedSecFromIso(phase.startedAt, nowMs);
+
+      await this.stores.session.transaction(async (trx) => {
+        await this.stores.phases.completeRest(trx, restPhaseId, {
+          endedAt: msToIso(nowMs),
+          actualDurationSec,
+          endedReason: "long_rest_skipped_early",
+        });
+        await this.stores.session.finalizeSession(
+          trx,
+          session.id,
+          msToIso(nowMs),
+        );
+        await this.stores.session.clearRuntime(trx);
+      });
+
       this.completeSession();
       const snapshot = this.buildSnapshot(nowMs, seqAtStart);
       this.notify();
@@ -438,7 +777,7 @@ export class SessionService {
     const maxIterations = 10_000;
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       if (!this.session) break;
-      const advanced = this.advanceOnce(this.session, nowMs);
+      const advanced = await this.advanceOnce(this.session, nowMs);
       if (!advanced) break;
       changed = true;
     }
@@ -449,20 +788,6 @@ export class SessionService {
         this.resetAlertState();
       }
     }
-  }
-
-  /** Move from work into rest and emit the matching rest-start alert. */
-  private enterRestFromWork(
-    session: ActiveSession,
-    nowMs: number,
-    alerts: AlertId[],
-  ): void {
-    const cycleIndex = session.phase.cycleIndex;
-    const rest = startRest(session.params, cycleIndex, nowMs);
-    session.phase = rest;
-    const restEntryAlert: AlertId =
-      rest.kind === "long_rest" ? "long_rest_start" : "short_rest_start";
-    this.emitAlerts(...alerts, restEntryAlert);
   }
 
   private commitPlannedWork(
@@ -483,7 +808,10 @@ export class SessionService {
   }
 
   /** Apply at most one due phase transition; false if nothing is due. */
-  private advanceOnce(session: ActiveSession, nowMs: number): boolean {
+  private async advanceOnce(
+    session: ActiveSession,
+    nowMs: number,
+  ): Promise<boolean> {
     const phase = session.phase;
     switch (phase.kind) {
       case "planned_work":
@@ -501,84 +829,137 @@ export class SessionService {
   }
 
   /** Planned end: skip ticks while frozen; otherwise apply pause-strategy policy. */
-  private advancePlannedWork(
+  private async advancePlannedWork(
     session: ActiveSession,
     phase: PlannedWorkPhase,
     nowMs: number,
-  ): boolean {
+  ): Promise<boolean> {
     if (this.pausePlugin!.isCountdownFrozen(phase)) return false;
     if (isBeforeDeadline(phase.plannedEndAt, nowMs)) return false;
     const plannedEndMs = parseIso(phase.plannedEndAt);
+    const plannedWorkPhaseId = this.currentPhaseId!;
+    // Soft auto-rest closes an open pause; capture before onPlannedEnd clears it.
+    const pauseStartedAt = phase.pauseStartedAt;
+    const openPauseSliceId = this.openPauseSliceId;
     const action = this.pausePlugin!.onPlannedEnd(phase, plannedEndMs);
     this.commitPlannedWork(session, phase, plannedEndMs);
+
     if (action === "rest") {
-      this.enterRestFromWork(session, plannedEndMs, ["work_planned_end"]);
+      const { rest, phaseId: restPhaseId } = this.enterRestFromWork(
+        session,
+        plannedEndMs,
+        ["work_planned_end"],
+      );
+
+      await this.stores.session.transaction(async (trx) => {
+        await this.persistPauseClose(
+          trx,
+          phase,
+          {
+            ...this.pausePersistCtx(
+              session,
+              plannedWorkPhaseId,
+              phase.cycleIndex,
+            ),
+            openPauseSliceId: openPauseSliceId!,
+          },
+          plannedEndMs,
+          pauseStartedAt,
+        );
+        this.openPauseSliceId = null;
+        await this.stores.phases.completePlannedWork(trx, plannedWorkPhaseId, {
+          endedAt: msToIso(plannedEndMs),
+          endedReason: "soft_paused_auto_rest",
+          pausedSec: phase.pausedSec,
+          pauseStartedAt: phase.pauseStartedAt,
+          timerFrozenAt: phase.timerFrozenAt,
+          paused: phase.paused,
+          plannedEndAt: phase.plannedEndAt,
+        });
+        await this.stores.phases.openRest(trx, {
+          id: restPhaseId,
+          sessionId: session.id,
+          cycleIndex: rest.cycleIndex,
+          plannedDurationSec: rest.plannedDurationSec,
+          plannedEndAt: rest.plannedEndAt,
+          startedAt: rest.startedAt,
+          kind: rest.kind,
+        });
+        await this.syncRuntime(trx, session, plannedEndMs, restPhaseId);
+      });
       return true;
     }
-    this.enterDecisionPhase(session, phase, plannedEndMs);
-    return true;
-  }
 
-  /** Open the work-decision window starting at planned work's end. */
-  private enterDecisionPhase(
-    session: ActiveSession,
-    plannedWork: PlannedWorkPhase,
-    plannedEndMs: number,
-  ): void {
-    const decisionEndsAtMs =
-      plannedEndMs + session.params.decisionWindowSec * 1000;
-    session.phase = {
-      kind: "decision",
-      cycleIndex: plannedWork.cycleIndex,
-      startedAt: plannedWork.plannedEndAt,
-      decisionEndsAt: msToIso(decisionEndsAtMs),
-      decisionWindowSec: session.params.decisionWindowSec,
-    };
-    this.emitAlerts("work_planned_end");
+    // Focusing → decision: not paused; onPlannedEnd does not open/close a slice.
+    const { phase: decision, phaseId: decisionPhaseId } =
+      this.enterDecisionPhase(session, phase, plannedEndMs);
+
+    await this.stores.session.transaction(async (trx) => {
+      await this.stores.phases.completePlannedWork(trx, plannedWorkPhaseId, {
+        endedAt: msToIso(plannedEndMs),
+        endedReason: "planned_complete",
+        pausedSec: phase.pausedSec,
+        pauseStartedAt: phase.pauseStartedAt,
+        timerFrozenAt: phase.timerFrozenAt,
+        paused: phase.paused,
+        plannedEndAt: phase.plannedEndAt,
+      });
+      await this.stores.phases.openDecision(trx, {
+        id: decisionPhaseId,
+        sessionId: session.id,
+        cycleIndex: decision.cycleIndex,
+        startedAt: decision.startedAt,
+        decisionEndsAt: decision.decisionEndsAt,
+        decisionWindowSec: decision.decisionWindowSec,
+      });
+      await this.syncRuntime(trx, session, plannedEndMs, decisionPhaseId);
+    });
+    return true;
   }
 
   /**
    * Work-decision timeout: full window folds into extended work (FR-FLOW-11).
    * Keep startedAt at decision start; liveStats progress covers the window once.
    */
-  private advanceWorkDecision(
+  private async advanceWorkDecision(
     session: ActiveSession,
     phase: DecisionPhase,
     nowMs: number,
-  ): boolean {
+  ): Promise<boolean> {
     if (isBeforeDeadline(phase.decisionEndsAt, nowMs)) return false;
-    enterExtendedWork(session, phase.cycleIndex, parseIso(phase.startedAt));
+    const decisionPhaseId = this.currentPhaseId!;
+    const startedAtMs = parseIso(phase.startedAt);
+    const { phaseId: extendedPhaseId } = this.enterExtendedWork(
+      session,
+      phase.cycleIndex,
+      startedAtMs,
+    );
     this.emitAlerts("extended_work_auto_start");
-    return true;
-  }
 
-  /** Open short-rest ack window after short rest ends. */
-  private enterShortRestAckPhase(
-    session: ActiveSession,
-    restPhase: RestPhase,
-    restEndedAtMs: number,
-  ): void {
-    session.phase = {
-      kind: "short_rest_ack",
-      cycleIndex: restPhase.cycleIndex,
-      startedAt: msToIso(restEndedAtMs),
-      decisionEndsAt: msToIso(
-        restEndedAtMs + session.params.decisionWindowSec * 1000,
-      ),
-      decisionWindowSec: session.params.decisionWindowSec,
-    };
+    await this.stores.session.transaction(async (trx) => {
+      await this.stores.phases.openExtendedWork(trx, {
+        id: extendedPhaseId,
+        sessionId: session.id,
+        cycleIndex: phase.cycleIndex,
+        startedAt: phase.startedAt,
+      });
+      await this.syncRuntime(trx, session, nowMs, extendedPhaseId);
+      await this.stores.phases.deleteDecisionPhase(trx, decisionPhaseId);
+    });
+    return true;
   }
 
   /**
    * Short-rest ack timeout: deliberation for the window, then next work paused.
    */
-  private advanceShortRestAck(
+  private async advanceShortRestAck(
     session: ActiveSession,
     phase: DecisionPhase,
     nowMs: number,
-  ): boolean {
+  ): Promise<boolean> {
     if (isBeforeDeadline(phase.decisionEndsAt, nowMs)) return false;
     const timeoutMs = parseIso(phase.decisionEndsAt);
+    const ackPhaseId = this.currentPhaseId!;
     session.liveStats.deliberationSec += phase.decisionWindowSec;
     this.emitAlerts("short_rest_ack_expired");
     const work = startPlannedWork(
@@ -586,26 +967,88 @@ export class SessionService {
       phase.cycleIndex + 1,
       timeoutMs,
     );
+    const workPhaseId = randomUUID();
     session.phase = work;
+    this.currentPhaseId = workPhaseId;
     this.pausePlugin!.onPause(work, timeoutMs);
+
+    await this.stores.session.transaction(async (trx) => {
+      await this.stores.phases.completeShortRestAck(trx, ackPhaseId, {
+        endedAt: msToIso(timeoutMs),
+        durationSec: phase.decisionWindowSec,
+        outcome: "timeout_paused",
+      });
+      await this.stores.phases.openPlannedWork(trx, {
+        id: workPhaseId,
+        sessionId: session.id,
+        cycleIndex: work.cycleIndex,
+        plannedDurationSec: work.plannedDurationSec,
+        plannedEndAt: work.plannedEndAt,
+        startedAt: work.startedAt,
+      });
+      this.openPauseSliceId = await this.persistPauseOpen(
+        trx,
+        work,
+        this.pausePersistCtx(session, workPhaseId, work.cycleIndex),
+      );
+      await this.syncRuntime(trx, session, timeoutMs, workPhaseId);
+    });
     return true;
   }
 
   /** Rest end → short-rest ack, or session complete after long rest. */
-  private advanceRest(
+  private async advanceRest(
     session: ActiveSession,
     phase: RestPhase,
     nowMs: number,
-  ): boolean {
+  ): Promise<boolean> {
     if (isBeforeDeadline(phase.plannedEndAt, nowMs)) return false;
     const restEndedAtMs = parseIso(phase.plannedEndAt);
+    const restPhaseId = this.currentPhaseId!;
     this.commitRest(session, phase, restEndedAtMs);
+
     if (phase.kind === "short_rest") {
       this.emitAlerts("short_rest_end");
-      this.enterShortRestAckPhase(session, phase, restEndedAtMs);
+      const { phase: ack, phaseId: ackPhaseId } = this.enterShortRestAckPhase(
+        session,
+        phase,
+        restEndedAtMs,
+      );
+
+      await this.stores.session.transaction(async (trx) => {
+        await this.stores.phases.completeRest(trx, restPhaseId, {
+          endedAt: msToIso(restEndedAtMs),
+          actualDurationSec: phase.plannedDurationSec,
+          endedReason: "completed",
+        });
+        await this.stores.phases.openShortRestAck(trx, {
+          id: ackPhaseId,
+          sessionId: session.id,
+          cycleIndex: ack.cycleIndex,
+          startedAt: ack.startedAt,
+          decisionEndsAt: ack.decisionEndsAt,
+          decisionWindowSec: ack.decisionWindowSec,
+        });
+        await this.syncRuntime(trx, session, restEndedAtMs, ackPhaseId);
+      });
       return true;
     }
+
     this.emitAlerts("long_rest_end");
+    await this.stores.session.transaction(async (trx) => {
+      await this.stores.phases.completeRest(trx, restPhaseId, {
+        endedAt: msToIso(restEndedAtMs),
+        actualDurationSec: phase.plannedDurationSec,
+        endedReason: "completed",
+      });
+      await this.syncRuntime(trx, session, restEndedAtMs, restPhaseId);
+      await this.stores.session.finalizeSession(
+        trx,
+        session.id,
+        msToIso(restEndedAtMs),
+      );
+      await this.stores.session.clearRuntime(trx);
+    });
     this.completeSession();
     return true;
   }
@@ -614,6 +1057,8 @@ export class SessionService {
   private completeSession(): void {
     this.session = null;
     this.pausePlugin = null;
+    this.currentPhaseId = null;
+    this.openPauseSliceId = null;
   }
 
   /** Clear alert history and seq after delivery when a session has ended. */

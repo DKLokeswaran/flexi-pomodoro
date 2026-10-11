@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 46 |
+| Total commits | 47 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-09-09 |
+| Latest commit date | 2026-09-23 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (46) |
+| Most active contributor | Lokeswaran DK (47) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` … `v0.0.2-alpha.3` |
 
@@ -20,7 +20,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 |-------|--------:|
 | 2026-07 | 23 |
 | 2026-08 | 11 |
-| 2026-09 | 12 |
+| 2026-09 | 13 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -180,6 +180,12 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Scheduler calls `tickIfIdle` (`tryRunExclusive`) so interval ticks skip when a command holds the lock.
 - `getSnapshot` / SSE open stay pure reads (no wall-clock catch-up).
 
+### 2026-09-23 — SQLite bootstrap + settings persist
+
+- Add Knex + better-sqlite3, `DATA_DIR`, initial schema migration, and purpose-split stores.
+- Hydrate `SettingsService` from `SettingsStore`; settings PUT write-through survives restart.
+- Compose sets `DATA_DIR=/data` with optional `FPMD_DATA_DIR` host bind.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -193,6 +199,7 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 7657c44 | Lokeswaran DK | 2026-09-23 | Add Knex/SQLite bootstrap and persist settings across restarts. |
 | a1823d0 | Lokeswaran DK | 2026-09-09 | Serialize session ticks and commands with AsyncMutex; scheduler uses tickIfIdle. |
 | 3748b35 | Lokeswaran DK | 2026-09-08 | Add M3 persistence and resume implementation plan. |
 | ec0adae | Lokeswaran DK | 2026-09-05 | Release v0.0.2-alpha.3 — Complete M2.5 tests-smoke coverage and sync docs. |
@@ -240,4 +247,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: a1823d058f8009c33acf320fac86e21ba21a58ac
+Last Synced Commit: 7657c4474c752f82b269b8a8a44170a1efd26ba3

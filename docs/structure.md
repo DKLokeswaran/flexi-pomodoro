@@ -48,8 +48,8 @@ flexi-pomodoro/
 │   │       │   │   └── 20260909134105_initial_schema.ts
 │   │       │   └── stores/
 │   │       │       ├── settingsStore.ts  # singleton settings load/save/seed
-│   │       │       ├── sessionStore.ts   # stub (later M3 write-through)
-│   │       │       └── phasesStore.ts    # stub (later M3 write-through)
+│   │       │       ├── sessionStore.ts   # sessions + session_runtime write-through
+│   │       │       └── phasesStore.ts    # phase/segment + pause_slices write-through
 │   │       ├── pause/
 │   │       │   ├── index.ts         # Barrel: registry, soft strategy, types
 │   │       │   ├── types.ts         # WorkPauseStrategy plugin contract
@@ -73,13 +73,15 @@ flexi-pomodoro/
 │   │           ├── db/
 │   │           │   └── settingsStore.test.ts
 │   │           ├── helpers/
-│   │           │   └── mockSettingsStore.ts
+│   │           │   ├── mockSettingsStore.ts
+│   │           │   └── tempSession.ts      # openTempSessionServices (temp DB + SessionService)
 │   │           ├── pause/
 │   │           │   ├── softPause.test.ts
 │   │           │   └── hardPause.test.ts
 │   │           ├── services/
 │   │           │   ├── settings.service.test.ts
-│   │           │   └── session.service.test.ts
+│   │           │   ├── session.service.test.ts
+│   │           │   └── segmentWrites.test.ts
 │   │           └── utils/
 │   │               └── asyncMutex.test.ts
 │   └── web/                     # @flexi-pomodoro/web
@@ -114,7 +116,7 @@ flexi-pomodoro/
 
 | Path | Role |
 |------|------|
-| `apps/server` | HTTP/SSE API, session engine, SQLite settings, optional static host |
+| `apps/server` | HTTP/SSE API, session engine, SQLite settings + session write-through, optional static host |
 | `apps/web` | React UI |
 | `packages/shared` | Cross-cutting domain contract |
 | `docs/product` | Product PRD and roadmap |
@@ -156,4 +158,4 @@ Mirrored `src/tests/` trees (not colocated): server `services/` + `pause/` + `ut
 
 ## Config & build artifacts (ignored / not committed)
 
-`node_modules/`, `dist/`, `coverage/`, `.env*`, `data/` — see `.gitignore`. Docker ignores `node_modules`, `dist`, `.git`, `*.md`, `.cursor`.
+`node_modules/`, `dist/`, `coverage/`, `.env*`, `data/`, `.archify/` — see `.gitignore`. Docker ignores `node_modules`, `dist`, `.git`, `*.md`, `.cursor`.

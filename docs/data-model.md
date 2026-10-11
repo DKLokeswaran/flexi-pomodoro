@@ -4,9 +4,12 @@
 
 SQLite via Knex + `better-sqlite3`. File: `flexi-pomodoro.sqlite3` under the resolved data directory (`DATA_DIR`, else `/data` in production, else `./data` in dev). Migrations run on `openDatabase()`.
 
-**Live today:** the singleton `settings` row (seeded from `DEFAULT_SETTINGS` on first boot; updated on every successful `PUT /api/settings`).
+**Live today:**
 
-**Schema present, stores stubbed:** `sessions`, `session_runtime`, `phases`, class-table detail tables (`planned_work`, `decision`, `short_rest_ack`, `extended_work`, `rest`), and `pause_slices`. `SessionStore` / `PhasesStore` are constructed but not yet used by `SessionService`.
+- Singleton `settings` row (seeded from `DEFAULT_SETTINGS` on first boot; updated on every successful `PUT /api/settings`).
+- Session write-through: `sessions`, `session_runtime`, `phases` + detail tables, `pause_slices` updated on every engine transition (FR-FLOW-11 / FR-ACK-6 attribution rules).
+
+**Not yet:** boot hydrate of an in-flight session from `session_runtime` / open phase rows (crash recovery).
 
 Docker Compose sets `DATA_DIR=/data` and mounts `${FPMD_DATA_DIR:-flexi-pomodoro-data}:/data`.
 
@@ -24,11 +27,14 @@ Holds a cached `Settings` object. Constructed with a `SettingsStore`; `hydrate()
 |-------|------|------|
 | `session` | `ActiveSession \| null` | Current session or idle |
 | `pausePlugin` | `WorkPauseStrategy \| null` | Pause plugin resolved at start; cleared when the session ends |
-| `pauseRegistry` | `PauseStrategyRegistry` | Constructor default `defaultPauseRegistry()` (`buildApp` does not inject a custom registry) |
+| `stores` | `SessionServiceStores` | `{ session: SessionStore; phases: PhasesStore }` (required) |
+| `pauseRegistry` | `PauseStrategyRegistry` | Constructor default `defaultPauseRegistry()` |
 | `alertLog` | `AlertEvent[]` | Append-only until session ends |
 | `alertSeq` | number | Monotonic high-water; reset to 0 after idle delivery |
 | `listeners` | `Set<SnapshotListener>` | SSE subscribers |
 | `listenerCursors` | `WeakMap<listener, number>` | Last delivered `alertSeq` per listener |
+| `currentPhaseId` | `string \| null` | Open `phases.id` for the in-memory current phase |
+| `openPauseSliceId` | `string \| null` | Open `pause_slices.id` while paused |
 
 ---
 
@@ -113,7 +119,7 @@ ActiveSession 1──1 Phase (current)
 ActiveSession 1──* AlertEvent (via alertLog / pendingAlerts)
 ```
 
-Runtime session state is still single-process / single active session. The SQLite schema uses class-table inheritance for phases (`phases` + per-kind detail tables) and FK links for `session_runtime` / `pause_slices` once write-through lands.
+Runtime session state is still single-process / single active session (served from memory). The SQLite schema uses class-table inheritance for phases (`phases` + per-kind detail tables) with FK links for `session_runtime` / `pause_slices`. Decision timeout deletes the decision row and opens extended work from decision start (FR-FLOW-11).
 
 ---
 
@@ -134,7 +140,11 @@ Runtime session state is still single-process / single active session. The SQLit
 
 ## ORM / query patterns
 
-Knex query builder over `better-sqlite3`. No ORM entities. Stores wrap table access (`SettingsStore.load` / `save` / `ensureSeeded`).
+Knex query builder over `better-sqlite3`. No ORM entities. Stores wrap table access:
+
+- `SettingsStore`: `load` / `save` / `ensureSeeded`
+- `SessionStore`: `transaction`, `insertSession`, `upsertRuntime`, `updateRuntimeStats`, `finalizeSession`, `clearRuntime`
+- `PhasesStore`: open/complete per kind, `deleteDecisionPhase`, pause slice open/close, list helpers for tests
 
 ## SQLite tables (initial migration)
 

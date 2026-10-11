@@ -127,7 +127,7 @@ Note: settings always validate against **production** bounds (debug short durati
 |-------|------|----------|
 | `sinceSeq` | string/number | If missing/0/invalid → treated as current high-water (no history replay). Else floor of positive number. |
 
-**Response** `200`: `SessionSnapshot` (pure read of current in-memory state; does not run wall-clock catch-up).
+**Response** `200`: `SessionSnapshot` (pure read of current in-memory state; does not run wall-clock catch-up). Mutating session routes also write-through phase/session rows to SQLite.
 
 ---
 

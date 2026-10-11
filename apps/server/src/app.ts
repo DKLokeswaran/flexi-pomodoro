@@ -49,7 +49,10 @@ export async function buildApp() {
   const { db, stores } = await openDatabase();
   const settings = new SettingsService(stores.settings);
   await settings.hydrate();
-  const session = new SessionService();
+  const session = new SessionService({
+    session: stores.session,
+    phases: stores.phases,
+  });
 
   await registerRoutes(app, { settings, session });
 

@@ -48,7 +48,7 @@ flowchart LR
   Sched["IntervalScheduler 250ms"]
   Sess["SessionService"]
   Sett["SettingsService"]
-  Store["SettingsStore / SQLite"]
+  Store["Knex stores / SQLite"]
   Pause["PauseStrategyRegistry"]
 
   Browser -->|"REST + SSE /api/*"| API
@@ -57,11 +57,12 @@ flowchart LR
   API --> Sett
   API --> Sess
   Sett --> Store
+  Sess --> Store
   Sess --> Pause
   Sched -->|"tickIfIdle(nowMs)"| Sess
 ```
 
-Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async and mutex-serialized) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`) and by commands that tick under the mutex before mutating; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT.
+Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`) and by commands that tick under the mutex before mutating; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT.
 
 ## Documentation index
 

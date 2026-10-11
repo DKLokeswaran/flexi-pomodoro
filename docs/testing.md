@@ -39,7 +39,7 @@ Server and web `tsconfig.json` files **exclude** `src/tests/**` from production 
 
 ### `apps/server/src/tests/services/session.service.test.ts`
 
-Helpers: `servicesWithShortTimers`, `startSession`, `activePhase`, `alertsSince`, `reachShortRestAck`, `liveStatsAt`, `snapshotAt`; fixed clock `SESSION_START_MS = 2026-07-12T10:00:00.000Z`. Engine tests that advance time call `tickIfIdle` before `getSnapshot`.
+Helpers: `servicesWithShortTimers` (via `openTempSessionServices`), `startSession`, `activePhase`, `alertsSince`, `reachShortRestAck`, `liveStatsAt`, `snapshotAt`; fixed clock `SESSION_START_MS = 2026-07-12T10:00:00.000Z`. Engine tests that advance time call `tickIfIdle` before `getSnapshot`.
 
 | Case | Asserts |
 |------|---------|
@@ -95,6 +95,23 @@ Uses temp `DATA_DIR` via `openDatabase(tempDir)`.
 ### `apps/server/src/tests/helpers/mockSettingsStore.ts`
 
 In-memory `SettingsStore` double for service unit tests (`load` / `save` / `ensureSeeded` + optional `saves` spy).
+
+### `apps/server/src/tests/helpers/tempSession.ts`
+
+`openTempSessionServices()` — migrated temp SQLite dir, real `SessionStore` / `PhasesStore`, mocked settings store, `dispose()` cleanup.
+
+### `apps/server/src/tests/services/segmentWrites.test.ts`
+
+SQLite attribution checks (FR-FLOW-11 / FR-ACK-6) against store list helpers after engine transitions.
+
+| Case | Asserts |
+|------|---------|
+| Decision timeout | Decision row deleted; extended open from decision start |
+| `ack_rest` | Decision outcome + duration; open rest |
+| `continue` | Decision outcome `continue`; extended `startedAt` = click |
+| Soft-paused auto-rest | No decision; planned_work `endedReason=soft_paused_auto_rest`; pause slice closed |
+| short_rest_ack outcomes | `acknowledged` vs `timeout_paused`; timeout opens paused planned work + pause slice |
+| Long rest end | `completed` vs `long_rest_skipped_early` + `actualDurationSec` |
 
 ### `apps/server/src/tests/pause/softPause.test.ts`
 
@@ -156,7 +173,7 @@ Fabricated `ActiveSnapshot` fixtures only (no server imports).
 
 ## Mocking patterns
 
-Server service tests inject `createMockSettingsStore()` into `SettingsService` (then `hydrate`). Session tests still use real `SessionService` with deterministic `nowMs`. SQLite store tests use temp directories. Web projection tests build plain snapshot objects. Scheduler is not exercised in these unit tests.
+Settings unit tests inject `createMockSettingsStore()`. Session and segment-write tests use `openTempSessionServices()` (real SQLite + `SessionService`) with deterministic `nowMs`. SettingsStore tests use temp directories via `openDatabase`. Web projection tests build plain snapshot objects. Scheduler is not exercised in these unit tests.
 
 ## Fixtures
 

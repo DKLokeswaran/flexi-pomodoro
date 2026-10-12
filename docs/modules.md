@@ -303,7 +303,7 @@ Unknown errors are rethrown.
 
 ### Tests
 
-`src/tests/services/session.service.test.ts`, `segmentWrites.test.ts`, `settings.service.test.ts`, `src/tests/db/settingsStore.test.ts`, `src/tests/helpers/{mockSettingsStore,tempSession}.ts`, `src/tests/pause/*`, `src/tests/utils/asyncMutex.test.ts` — no production exports (see [testing.md](./testing.md)).
+`src/tests/services/{session,settings}.service.test.ts`, `src/tests/db/{settings,session,phases}Store.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase}.ts`, `src/tests/pause/*`, `src/tests/utils/asyncMutex.test.ts` — no production exports (see [testing.md](./testing.md)).
 ---
 
 ## `apps/web` — entry & shell

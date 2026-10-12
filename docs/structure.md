@@ -71,17 +71,19 @@ flexi-pomodoro/
 │   │       │   └── asyncMutex.ts         # runExclusive / tryRunExclusive for session ticks
 │   │       └── tests/
 │   │           ├── db/
-│   │           │   └── settingsStore.test.ts
+│   │           │   ├── settingsStore.test.ts
+│   │           │   ├── sessionStore.test.ts
+│   │           │   └── phasesStore.test.ts
 │   │           ├── helpers/
 │   │           │   ├── mockSettingsStore.ts
-│   │           │   └── tempSession.ts      # openTempSessionServices (temp DB + SessionService)
+│   │           │   ├── mockSessionStores.ts  # in-memory SessionStore + PhasesStore
+│   │           │   └── tempDatabase.ts       # openTempDatabase (migrated temp SQLite)
 │   │           ├── pause/
 │   │           │   ├── softPause.test.ts
 │   │           │   └── hardPause.test.ts
 │   │           ├── services/
 │   │           │   ├── settings.service.test.ts
-│   │           │   ├── session.service.test.ts
-│   │           │   └── segmentWrites.test.ts
+│   │           │   └── session.service.test.ts
 │   │           └── utils/
 │   │               └── asyncMutex.test.ts
 │   └── web/                     # @flexi-pomodoro/web

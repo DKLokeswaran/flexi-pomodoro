@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { StartSessionBody } from "@flexi-pomodoro/shared";
 import { useDebugFlags } from "../../browserFlags/debug";
+import { useUiFlags } from "../../browserFlags/ui";
 import { DECISION_WINDOW_LABEL } from "../../constants/labels";
 import { IDLE_ESTIMATE_TICK_MS, useNow } from "../../hooks/useNow";
 import {
@@ -17,7 +18,15 @@ import {
 import { NumberField } from "../NumberField";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { DialProgress } from "../../utils/dialProgress";
+import { TimerDial } from "./TimerDial";
 import { timerDisplay } from "./timerDisplay";
+
+/** Idle dial: a full, still ring. */
+const IDLE_DIAL_PROGRESS: DialProgress = {
+  remaining: 1,
+  overtimeLaps: null,
+};
 
 export type SessionTimingDefaults = {
   workDurationSec: number;
@@ -100,6 +109,7 @@ export function IdleStartForm({
   onStart: (body: StartSessionBody) => void;
 }) {
   const { isEnabled } = useDebugFlags();
+  const { isEnabled: isUiEnabled } = useUiFlags();
   const shortDurations = isEnabled("shortDurations");
   const now = useNow(IDLE_ESTIMATE_TICK_MS);
   const [overrides, setOverrides] = useState(() =>
@@ -126,21 +136,40 @@ export function IdleStartForm({
     { key: "decisionWindowSec", label: DECISION_WINDOW_LABEL },
   ];
 
+  const readyLabel = (
+    <p className={cn(timerDisplay.phaseLabel, "text-muted-foreground")}>
+      Ready
+    </p>
+  );
+
   return (
     <>
-      <p className={cn(timerDisplay.phaseLabel, "text-muted-foreground")}>
-        Ready
-      </p>
-      <div className={timerDisplay.clock}>00:00</div>
-      <p className={timerDisplay.cycle}>Start a committed session</p>
-      <div className={timerDisplay.estimatedEnd}>
-        <p>
-          Estimated end <strong>{estimatedEnd}</strong>
-        </p>
-        <p>
-          Ends in <strong>{endsIn}</strong> if you start now
-        </p>
-      </div>
+      {isUiEnabled("timerDial") ? (
+        <TimerDial
+          progress={IDLE_DIAL_PROGRESS}
+          eyebrow={readyLabel}
+          clock="00:00"
+          readouts={[
+            { label: "Cycles", value: String(overrides.cyclesBeforeLongRest) },
+            { label: "Ends in", value: endsIn },
+            { label: "Estimated end", value: estimatedEnd },
+          ]}
+        />
+      ) : (
+        <>
+          {readyLabel}
+          <div className={timerDisplay.clock}>00:00</div>
+          <p className={timerDisplay.cycle}>Start a committed session</p>
+          <div className={timerDisplay.estimatedEnd}>
+            <p>
+              Estimated end <strong>{estimatedEnd}</strong>
+            </p>
+            <p>
+              Ends in <strong>{endsIn}</strong> if you start now
+            </p>
+          </div>
+        </>
+      )}
       <div className="flex w-full flex-col gap-4">
         <p className="type-label mt-2 text-left text-muted-foreground">
           This session

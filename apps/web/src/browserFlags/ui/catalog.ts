@@ -1,8 +1,12 @@
 import { createFlagCatalog, type FlagMap } from "../createFlagCatalog";
 import { hideContinueButtonFeature } from "./features/hideContinueButton";
+import { timerDialFeature } from "./features/timerDial";
 
 /** Register browser UI features here. */
-export const UI_FEATURES = [hideContinueButtonFeature] as const;
+export const UI_FEATURES = [
+  hideContinueButtonFeature,
+  timerDialFeature,
+] as const;
 
 const catalog = createFlagCatalog(UI_FEATURES);
 

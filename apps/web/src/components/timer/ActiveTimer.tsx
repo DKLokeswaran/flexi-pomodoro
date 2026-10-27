@@ -15,9 +15,12 @@ import {
   remainingSecFromIso,
 } from "../../utils/time";
 import { activeEstimatedSessionEndMs } from "../../utils/activeSessionProjection";
+import { cycleDotStates, dialProgress } from "../../utils/dialProgress";
 import { liveStatsAt } from "../../utils/liveStats";
+import { phaseClockMs, phaseEndAt } from "../../utils/phaseClock";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { TimerDial } from "./TimerDial";
 import { timerDisplay } from "./timerDisplay";
 
 /** Short UI title for the current phase kind. */
@@ -48,27 +51,39 @@ const PHASE_LABEL_CLASS: Record<Phase["kind"], string> = {
   long_rest: "text-fg-soft",
 };
 
-/** Primary countdown (or planned + overtime) based on phase wall-clock anchors. */
-function displayClock(snapshot: ActiveSnapshot, nowMs: number): string {
+type ClockParts = {
+  /** Countdown, or the planned work length once in overtime. */
+  main: string;
+  /** Overtime elapsed so far; null outside extended work. */
+  overtime: string | null;
+};
+
+/** Countdown (or planned + overtime) based on phase wall-clock anchors. */
+function clockParts(snapshot: ActiveSnapshot, nowMs: number): ClockParts {
   const { phase, params } = snapshot.session;
   if (phase.kind === "extended_work") {
-    const planned = formatMmSs(params.workDurationSec);
-    const extended = formatMmSs(elapsedFromIso(phase.startedAt, nowMs));
-    return `${planned} + ${extended}`;
+    return {
+      main: formatMmSs(params.workDurationSec),
+      overtime: formatMmSs(elapsedFromIso(phase.startedAt, nowMs)),
+    };
   }
-  if (phase.kind === "decision" || phase.kind === "short_rest_ack") {
-    return formatMmSs(remainingSecFromIso(phase.decisionEndsAt, nowMs));
-  }
-  if (phase.kind === "planned_work") {
-    const clockMs = phase.timerFrozenAt
-      ? Date.parse(phase.timerFrozenAt)
-      : nowMs;
-    return formatMmSs(remainingSecFromIso(phase.plannedEndAt, clockMs));
-  }
-  if (phase.kind === "short_rest" || phase.kind === "long_rest") {
-    return formatMmSs(remainingSecFromIso(phase.plannedEndAt, nowMs));
-  }
-  return "00:00";
+  const remainingSec = remainingSecFromIso(
+    phaseEndAt(phase),
+    phaseClockMs(phase, nowMs),
+  );
+  return { main: formatMmSs(remainingSec), overtime: null };
+}
+
+/** Single-line clock for the classic layout (e.g. "25:00 + 03:12"). */
+function displayClock(parts: ClockParts): string {
+  return parts.overtime ? `${parts.main} + ${parts.overtime}` : parts.main;
+}
+
+/** Local time the current phase ends, "Paused" while paused, "Open" in overtime. */
+function phaseEndLabel(phase: Phase): string {
+  if (phase.kind === "extended_work") return "Open";
+  if (phase.kind === "planned_work" && phase.paused) return "Paused";
+  return formatLocalTime(Date.parse(phaseEndAt(phase)));
 }
 
 type PhaseAction = {
@@ -165,6 +180,40 @@ function ClockText({ text, live }: { text: string; live: boolean }) {
   );
 }
 
+/** Mono phase label with a live dot that rests while paused. */
+function PhaseLabel({
+  phase,
+  isPaused,
+  pausedLabel,
+  className,
+}: {
+  phase: Phase;
+  isPaused: boolean;
+  pausedLabel: string;
+  className?: string;
+}) {
+  return (
+    <p
+      className={cn(
+        timerDisplay.phaseLabel,
+        PHASE_LABEL_CLASS[phase.kind],
+        className,
+      )}
+      data-phase={phase.kind}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "size-[5px] shrink-0 rounded-full bg-current",
+          !isPaused && "animate-breathe",
+        )}
+      />
+      {phaseTitle(phase.kind)}
+      {pausedLabel}
+    </p>
+  );
+}
+
 /** Live session counters below the phase actions. */
 function LiveStatsRow({ liveStats }: { liveStats: SessionLiveStats }) {
   return (
@@ -204,34 +253,54 @@ export function ActiveTimer({
   );
   const isPaused = phase.kind === "planned_work" && phase.paused;
   const pausedLabel = isPaused ? pausedPhaseLabel(pauseStrategy) : "";
+  const clock = clockParts(snapshot, now);
+  const showDial = isEnabled("timerDial");
+  const phaseLabel = (
+    <PhaseLabel
+      phase={phase}
+      isPaused={isPaused}
+      pausedLabel={pausedLabel}
+      className={cn(showDial && "max-w-[64cqw] justify-center text-center")}
+    />
+  );
 
   return (
     <>
-      <p
-        className={cn(timerDisplay.phaseLabel, PHASE_LABEL_CLASS[phase.kind])}
-        data-phase={phase.kind}
-      >
-        <span
-          aria-hidden
-          className={cn(
-            "size-[5px] rounded-full bg-current",
-            !isPaused && "animate-breathe",
+      {showDial ? (
+        <TimerDial
+          progress={dialProgress(phase, params, now)}
+          eyebrow={phaseLabel}
+          clock={<ClockText text={clock.main} live={!isPaused} />}
+          clockSuffix={clock.overtime ? `+ ${clock.overtime}` : null}
+          cycleDots={cycleDotStates(
+            phase.cycleIndex,
+            params.cyclesBeforeLongRest,
           )}
+          readouts={[
+            {
+              label: "Cycle",
+              value: `${phase.cycleIndex} / ${params.cyclesBeforeLongRest}`,
+            },
+            { label: "Phase ends", value: phaseEndLabel(phase) },
+            { label: "Estimated end", value: estimatedEnd },
+          ]}
         />
-        {phaseTitle(phase.kind)}
-        {pausedLabel}
-      </p>
-      <div className={timerDisplay.clock}>
-        <ClockText text={displayClock(snapshot, now)} live={!isPaused} />
-      </div>
-      <p className={timerDisplay.cycle}>
-        Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
-      </p>
-      <div className={timerDisplay.estimatedEnd}>
-        <p>
-          Estimated end <strong>{estimatedEnd}</strong>
-        </p>
-      </div>
+      ) : (
+        <>
+          {phaseLabel}
+          <div className={timerDisplay.clock}>
+            <ClockText text={displayClock(clock)} live={!isPaused} />
+          </div>
+          <p className={timerDisplay.cycle}>
+            Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
+          </p>
+          <div className={timerDisplay.estimatedEnd}>
+            <p>
+              Estimated end <strong>{estimatedEnd}</strong>
+            </p>
+          </div>
+        </>
+      )}
       {hint ? <p className={timerDisplay.decisionHint}>{hint}</p> : null}
       <div className={timerDisplay.actions}>
         {actions.map((action) => (

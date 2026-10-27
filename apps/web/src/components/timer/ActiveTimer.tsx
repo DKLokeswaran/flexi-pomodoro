@@ -254,7 +254,7 @@ export function ActiveTimer({
   const isPaused = phase.kind === "planned_work" && phase.paused;
   const pausedLabel = isPaused ? pausedPhaseLabel(pauseStrategy) : "";
   const clock = clockParts(snapshot, now);
-  const showDial = isEnabled("timerDial");
+  const showDial = !isEnabled("classicTimer");
   const phaseLabel = (
     <PhaseLabel
       phase={phase}

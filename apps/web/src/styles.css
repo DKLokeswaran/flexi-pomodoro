@@ -222,7 +222,7 @@ body::before {
   --tw-ring-shadow: 0 0 #0000;
 }
 
-/* Motion: entrance rise, blinking countdown colon, breathing live dot. */
+/* Motion: entrance rise, blinking countdown colon, breathing live dot, dial arc sweep. */
 @media (prefers-reduced-motion: no-preference) {
   .animate-rise {
     animation: rise 900ms var(--ease) both;
@@ -234,6 +234,14 @@ body::before {
 
   .animate-breathe {
     animation: breathe 2.4s ease-in-out infinite;
+  }
+
+  .animate-dial-draw {
+    animation: dial-draw 1.6s var(--ease) both;
+  }
+
+  .animate-dial-tip {
+    animation: dial-tip-fade 400ms var(--ease) 1.6s both;
   }
 }
 
@@ -264,5 +272,17 @@ body::before {
   }
   50% {
     opacity: 0.35;
+  }
+}
+
+@keyframes dial-draw {
+  from {
+    stroke-dasharray: 0 1;
+  }
+}
+
+@keyframes dial-tip-fade {
+  from {
+    opacity: 0;
   }
 }

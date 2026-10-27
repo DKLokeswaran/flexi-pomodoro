@@ -1,6 +1,8 @@
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { LinkIcon } from "../../constants/about";
 import { AboutIcon } from "./AboutIcon";
-import styles from "./LinkCard.module.css";
 
 type LinkCardProps = {
   label: string;
@@ -23,29 +25,43 @@ export function LinkCard({
   soon = false,
 }: LinkCardProps) {
   return (
-    <article className={`${styles.card}${soon ? ` ${styles.cardSoon}` : ""}`}>
-      <div className={styles.icon} aria-hidden>
-        <AboutIcon icon={icon} />
-      </div>
-      <h4 className={styles.title}>{label}</h4>
-      {description ? (
-        <p className={styles.desc}>{description}</p>
-      ) : (
-        <div className={styles.descSpacer} aria-hidden />
-      )}
-      {soon || !href ? (
-        <span className={`${styles.cta} ${styles.ctaDisabled}`}>{cta}</span>
-      ) : (
-        <a
-          href={href}
-          className={styles.cta}
-          {...(external
-            ? { target: "_blank", rel: "noopener noreferrer" }
-            : {})}
-        >
-          {cta}
-        </a>
-      )}
-    </article>
+    <Card className={cn("min-h-[10.5rem]", soon && "opacity-80")}>
+      <CardContent className="flex flex-1 flex-col items-start">
+        <div className="mb-3 size-7 text-primary [&_svg]:size-full" aria-hidden>
+          <AboutIcon icon={icon} />
+        </div>
+        <h4 className="type-label mb-1.5 text-fg-bright">{label}</h4>
+        {description ? (
+          <p className="mb-3.5 flex-1 text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+        ) : (
+          <div className="flex-1" aria-hidden />
+        )}
+        {soon || !href ? (
+          <span
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "pointer-events-none mt-auto text-muted-foreground",
+            )}
+          >
+            {cta}
+          </span>
+        ) : (
+          <a
+            href={href}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "mt-auto",
+            )}
+            {...(external
+              ? { target: "_blank", rel: "noopener noreferrer" }
+              : {})}
+          >
+            {cta}
+          </a>
+        )}
+      </CardContent>
+    </Card>
   );
 }

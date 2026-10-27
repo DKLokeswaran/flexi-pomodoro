@@ -5,7 +5,6 @@ import {
   IdleStartForm,
   type SessionTimingDefaults,
 } from "./timer/IdleStartForm";
-import styles from "./TimerTab.module.css";
 
 /** Timer tab: idle start form or the running-session display. */
 export function TimerTab({
@@ -24,7 +23,10 @@ export function TimerTab({
       : undefined;
 
   return (
-    <section className={styles.timerShell} aria-live="polite">
+    <section
+      className="flex animate-rise flex-col items-center gap-4 pt-8 pb-4 text-center"
+      aria-live="polite"
+    >
       {!activeSnapshot ? (
         <IdleStartForm
           defaults={defaults}

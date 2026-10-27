@@ -15,7 +15,9 @@ import {
   secToMinutes,
 } from "../../utils/time";
 import { NumberField } from "../NumberField";
-import displayStyles from "./timerDisplay.module.css";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { timerDisplay } from "./timerDisplay";
 
 export type SessionTimingDefaults = {
   workDurationSec: number;
@@ -128,15 +130,17 @@ export function IdleStartForm({
 
   return (
     <>
-      <p className={displayStyles.phaseLabel}>Ready</p>
-      <div className={displayStyles.clock}>00:00</div>
-      <p className={displayStyles.cycle}>Start a committed session</p>
+      <p className={cn(timerDisplay.phaseLabel, "text-muted-foreground")}>
+        Ready
+      </p>
+      <div className={timerDisplay.clock}>00:00</div>
+      <p className={timerDisplay.cycle}>Start a committed session</p>
       {recoveryAbandonedMessage ? (
-        <p className={displayStyles.recoveryNotice} role="status">
+        <p className={timerDisplay.recoveryNotice} role="status">
           {recoveryAbandonedMessage}
         </p>
       ) : null}
-      <div className={displayStyles.estimatedEnd}>
+      <div className={timerDisplay.estimatedEnd}>
         <p>
           Estimated end <strong>{estimatedEnd}</strong>
         </p>
@@ -144,9 +148,11 @@ export function IdleStartForm({
           Ends in <strong>{endsIn}</strong> if you start now
         </p>
       </div>
-      <div className="panel" style={{ width: "100%" }}>
-        <p className="section-title">This session</p>
-        <div className="form-grid">
+      <div className="flex w-full flex-col gap-4">
+        <p className="type-label mt-2 text-left text-muted-foreground">
+          This session
+        </p>
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 min-[561px]:grid-cols-2">
           {fields.map(({ key, label }) => (
             <NumberField
               key={key}
@@ -164,14 +170,13 @@ export function IdleStartForm({
           ))}
         </div>
       </div>
-      <div className="actions">
-        <button
+      <div className={timerDisplay.actions}>
+        <Button
           type="button"
-          className="btn btn-primary"
           onClick={() => onStart(toStartBody(overrides, shortDurations))}
         >
           Start session
-        </button>
+        </Button>
       </div>
     </>
   );

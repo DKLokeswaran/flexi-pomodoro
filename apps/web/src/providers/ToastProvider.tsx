@@ -6,7 +6,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import styles from "./ToastProvider.module.css";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export type ToastKind = "success" | "error";
 
@@ -42,26 +44,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ pushToast }}>
       {children}
       <div
-        className={styles.stack}
+        className="pointer-events-none fixed right-4 bottom-4 z-40 flex max-w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
         aria-live="polite"
         aria-relevant="additions"
       >
         {toast ? (
           <div
-            className={`${styles.toast} ${
-              toast.kind === "success" ? styles.toastSuccess : styles.toastError
-            }`}
+            className={cn(
+              "pointer-events-auto flex animate-rise items-center gap-3 rounded-md border bg-card py-2.5 pr-2 pl-4 text-sm text-foreground",
+              toast.kind === "success"
+                ? "border-primary/40"
+                : "border-destructive/50 text-destructive",
+            )}
             role="status"
           >
-            <span className={styles.message}>{toast.message}</span>
-            <button
+            <span className="min-w-0 flex-1">{toast.message}</span>
+            <Button
               type="button"
-              className={styles.close}
+              variant="ghost"
+              size="icon-sm"
               aria-label="Dismiss"
               onClick={() => setToast(null)}
             >
-              ×
-            </button>
+              <X aria-hidden />
+            </Button>
           </div>
         ) : null}
       </div>

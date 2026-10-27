@@ -16,7 +16,9 @@ import {
 } from "../../utils/time";
 import { activeEstimatedSessionEndMs } from "../../utils/activeSessionProjection";
 import { liveStatsAt } from "../../utils/liveStats";
-import displayStyles from "./timerDisplay.module.css";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { timerDisplay } from "./timerDisplay";
 
 /** Short UI title for the current phase kind. */
 function phaseTitle(kind: Phase["kind"]): string {
@@ -35,6 +37,16 @@ function phaseTitle(kind: Phase["kind"]): string {
       return "Long rest";
   }
 }
+
+/** Phase label color: gold for work and decisions, soft for rest. */
+const PHASE_LABEL_CLASS: Record<Phase["kind"], string> = {
+  planned_work: "text-primary",
+  extended_work: "text-primary",
+  decision: "text-primary",
+  short_rest_ack: "text-primary",
+  short_rest: "text-fg-soft",
+  long_rest: "text-fg-soft",
+};
 
 /** Primary countdown (or planned + overtime) based on phase wall-clock anchors. */
 function displayClock(snapshot: ActiveSnapshot, nowMs: number): string {
@@ -140,10 +152,23 @@ function phaseHint(phase: Phase, nowMs: number): string | null {
   return null;
 }
 
+/** Clock text with colons that blink while the timer is running. */
+function ClockText({ text, live }: { text: string; live: boolean }) {
+  return text.split(/(:)/).map((part, index) =>
+    part === ":" ? (
+      <span key={index} className={cn(live && "animate-colon")}>
+        :
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
 /** Live session counters below the phase actions. */
 function LiveStatsRow({ liveStats }: { liveStats: SessionLiveStats }) {
   return (
-    <p className={displayStyles.liveStats}>
+    <p className={timerDisplay.liveStats}>
       <span>
         Worked <strong>{formatHhMmSs(liveStats.workedSec)}</strong>
       </span>
@@ -177,37 +202,47 @@ export function ActiveTimer({
   const estimatedEnd = formatLocalTime(
     activeEstimatedSessionEndMs(snapshot, now),
   );
-  const pausedLabel =
-    phase.kind === "planned_work" && phase.paused
-      ? pausedPhaseLabel(pauseStrategy)
-      : "";
+  const isPaused = phase.kind === "planned_work" && phase.paused;
+  const pausedLabel = isPaused ? pausedPhaseLabel(pauseStrategy) : "";
 
   return (
     <>
-      <p className={displayStyles.phaseLabel} data-phase={phase.kind}>
+      <p
+        className={cn(timerDisplay.phaseLabel, PHASE_LABEL_CLASS[phase.kind])}
+        data-phase={phase.kind}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "size-[5px] rounded-full bg-current",
+            !isPaused && "animate-breathe",
+          )}
+        />
         {phaseTitle(phase.kind)}
         {pausedLabel}
       </p>
-      <div className={displayStyles.clock}>{displayClock(snapshot, now)}</div>
-      <p className={displayStyles.cycle}>
+      <div className={timerDisplay.clock}>
+        <ClockText text={displayClock(snapshot, now)} live={!isPaused} />
+      </div>
+      <p className={timerDisplay.cycle}>
         Cycle {phase.cycleIndex} / {params.cyclesBeforeLongRest}
       </p>
-      <div className={displayStyles.estimatedEnd}>
+      <div className={timerDisplay.estimatedEnd}>
         <p>
           Estimated end <strong>{estimatedEnd}</strong>
         </p>
       </div>
-      {hint ? <p className={displayStyles.decisionHint}>{hint}</p> : null}
-      <div className="actions">
+      {hint ? <p className={timerDisplay.decisionHint}>{hint}</p> : null}
+      <div className={timerDisplay.actions}>
         {actions.map((action) => (
-          <button
+          <Button
             key={action.path}
             type="button"
-            className={action.primary ? "btn btn-primary" : "btn"}
+            variant={action.primary ? "default" : "outline"}
             onClick={() => onAction(action.path)}
           >
             {action.label}
-          </button>
+          </Button>
         ))}
       </div>
       <LiveStatsRow liveStats={liveStats} />

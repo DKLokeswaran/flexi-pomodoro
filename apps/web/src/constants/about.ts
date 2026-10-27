@@ -167,12 +167,16 @@ export type CreditItem =
 
 export const FONT_CREDITS = [
   {
-    name: "Fraunces",
-    href: "https://fonts.google.com/specimen/Fraunces",
+    name: "Inter",
+    href: "https://fonts.google.com/specimen/Inter",
   },
   {
-    name: "Source Sans 3",
-    href: "https://fonts.google.com/specimen/Source+Sans+3",
+    name: "Instrument Serif",
+    href: "https://fonts.google.com/specimen/Instrument+Serif",
+  },
+  {
+    name: "JetBrains Mono",
+    href: "https://fonts.google.com/specimen/JetBrains+Mono",
   },
 ] as const;
 

@@ -1,5 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { type Settings } from "@flexi-pomodoro/shared";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 import {
   DEBUG_FEATURE_IDS,
   DEBUG_FEATURE_META,
@@ -13,7 +23,6 @@ import {
 import { DECISION_WINDOW_LABEL } from "../constants/labels";
 import { minutesToSec, secToMinutes } from "../utils/time";
 import { NumberField } from "./NumberField";
-import styles from "./SettingsTab.module.css";
 
 type SettingsDraft = {
   workMinutes: number;
@@ -47,6 +56,60 @@ function settingsFromDraft(settings: Settings, draft: SettingsDraft): Settings {
     decisionWindowSec: draft.decisionWindowSec,
     workPauseStrategy: draft.enableHardPause ? "hard" : "soft",
   };
+}
+
+/** Mono uppercase label above a group of settings. */
+function SectionTitle({ children }: { children: ReactNode }) {
+  return <p className="type-label mt-2 text-muted-foreground">{children}</p>;
+}
+
+/** Vertical stack of flag checkboxes. */
+function FlagList({ children }: { children: ReactNode }) {
+  return <FieldGroup className="mt-3 gap-3 text-left">{children}</FieldGroup>;
+}
+
+/** Checkbox row with a label and optional muted description. */
+function FlagCheckbox({
+  label,
+  description,
+  checked,
+  disabled,
+  nested = false,
+  onCheckedChange,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  disabled?: boolean;
+  nested?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  const checkboxId = useId();
+
+  return (
+    <Field
+      orientation="horizontal"
+      data-disabled={disabled}
+      className={cn(nested && "ml-5")}
+    >
+      <Checkbox
+        id={checkboxId}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+      />
+      <FieldContent>
+        <FieldLabel htmlFor={checkboxId} className="font-normal">
+          {label}
+        </FieldLabel>
+        {description ? (
+          <FieldDescription className="text-[13px]">
+            {description}
+          </FieldDescription>
+        ) : null}
+      </FieldContent>
+    </Field>
+  );
 }
 
 /** Persistent defaults, browser UI prefs, and browser-local debug flags. */
@@ -90,18 +153,18 @@ export function SettingsTab({
   };
 
   return (
-    <section className="panel">
-      <h2>Settings</h2>
-      <p className="lead">
+    <section className="flex animate-rise flex-col gap-4">
+      <h2 className="type-display text-[2rem]">Settings</h2>
+      <p className="text-fg-soft">
         Persistent defaults used when starting without overrides. Edits apply to
         future sessions only.
       </p>
       {locked ? (
-        <p className="stub">
+        <p className="text-muted-foreground">
           A session is active — defaults stay locked until idle.
         </p>
       ) : null}
-      <div className="form-grid">
+      <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 min-[561px]:grid-cols-2">
         <NumberField
           label="Work (min)"
           value={draft.workMinutes}
@@ -135,123 +198,81 @@ export function SettingsTab({
         />
       </div>
 
-      <p className="section-title">Experimental features</p>
-      <div className={styles.debugFlags}>
-        <label className={styles.debugFlag}>
-          <input
-            type="checkbox"
-            checked={experimentalMode}
-            onChange={(event) => setExperimentalMode(event.target.checked)}
-          />
-          <span>
-            Enable experimental features
-            <span className={styles.debugFlagDesc}>
-              Unlocks experimental options for this visit.
-            </span>
-          </span>
-        </label>
+      <SectionTitle>Experimental features</SectionTitle>
+      <FlagList>
+        <FlagCheckbox
+          label="Enable experimental features"
+          description="Unlocks experimental options for this visit."
+          checked={experimentalMode}
+          onCheckedChange={setExperimentalMode}
+        />
         {experimentalMode ? (
-          <label className={`${styles.debugFlag} ${styles.debugFlagNested}`}>
-            <input
-              type="checkbox"
-              checked={draft.enableHardPause}
-              disabled={locked}
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  enableHardPause: event.target.checked,
-                }))
-              }
-            />
-            <span>
-              Enable hard pause (experimental)
-              <span className={styles.debugFlagDesc}>
-                Off = soft pause (default). On = hard pause.
-              </span>
-            </span>
-          </label>
+          <FlagCheckbox
+            nested
+            label="Enable hard pause (experimental)"
+            description="Off = soft pause (default). On = hard pause."
+            checked={draft.enableHardPause}
+            disabled={locked}
+            onCheckedChange={(checked) =>
+              setDraft((current) => ({
+                ...current,
+                enableHardPause: checked,
+              }))
+            }
+          />
         ) : null}
-      </div>
+      </FlagList>
 
-      <div className="actions" style={{ justifyContent: "flex-start" }}>
-        <button
+      <div className="mt-2 flex flex-wrap justify-start gap-3">
+        <Button
           type="button"
-          className="btn btn-primary"
           disabled={locked || saving}
           onClick={() => onSave(settingsFromDraft(settings, draft))}
         >
           Save defaults
-        </button>
+        </Button>
       </div>
 
-      <p className="section-title">Browser preferences</p>
-      <div className={styles.debugFlags}>
+      <SectionTitle>Browser preferences</SectionTitle>
+      <FlagList>
         {UI_FEATURE_IDS.map((featureId) => {
           const meta = UI_FEATURE_META[featureId];
           return (
-            <label key={featureId} className={styles.debugFlag}>
-              <input
-                type="checkbox"
-                checked={Boolean(uiFlags[featureId])}
-                onChange={(event) => setUiFlag(featureId, event.target.checked)}
-              />
-              <span>
-                {meta.label}
-                {meta.description ? (
-                  <span className={styles.debugFlagDesc}>
-                    {meta.description}
-                  </span>
-                ) : null}
-              </span>
-            </label>
+            <FlagCheckbox
+              key={featureId}
+              label={meta.label}
+              description={meta.description}
+              checked={Boolean(uiFlags[featureId])}
+              onCheckedChange={(checked) => setUiFlag(featureId, checked)}
+            />
           );
         })}
-      </div>
+      </FlagList>
 
-      <p className="section-title">Debug</p>
-      <div className={styles.debugFlags}>
-        <label className={styles.debugFlag}>
-          <input
-            type="checkbox"
-            checked={debugMode}
-            onChange={(event) => setDebugMode(event.target.checked)}
-          />
-          <span>
-            Enable debug mode
-            <span className={styles.debugFlagDesc}>
-              Unlocks per-feature debug options for this browser session. Not
-              saved with defaults.
-            </span>
-          </span>
-        </label>
+      <SectionTitle>Debug</SectionTitle>
+      <FlagList>
+        <FlagCheckbox
+          label="Enable debug mode"
+          description="Unlocks per-feature debug options for this browser session. Not saved with defaults."
+          checked={debugMode}
+          onCheckedChange={setDebugMode}
+        />
         {debugMode
           ? DEBUG_FEATURE_IDS.map((featureId) => {
               const meta = DEBUG_FEATURE_META[featureId];
               return (
-                <label
+                <FlagCheckbox
                   key={featureId}
-                  className={`${styles.debugFlag} ${styles.debugFlagNested}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={Boolean(flags[featureId])}
-                    onChange={(event) =>
-                      setFlag(featureId, event.target.checked)
-                    }
-                  />
-                  <span>
-                    {meta.label}
-                    {meta.description ? (
-                      <span className={styles.debugFlagDesc}>
-                        {meta.description}
-                      </span>
-                    ) : null}
-                  </span>
-                </label>
+                  nested
+                  label={meta.label}
+                  description={meta.description}
+                  checked={Boolean(flags[featureId])}
+                  onCheckedChange={(checked) => setFlag(featureId, checked)}
+                />
               );
             })
           : null}
-      </div>
+      </FlagList>
     </section>
   );
 }

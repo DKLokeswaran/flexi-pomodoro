@@ -12,7 +12,6 @@ import {
 } from "./queries/useSessionApi";
 import { useSessionStream } from "./hooks/useSessionStream";
 import { errorMessage } from "./utils/errorMessage";
-import styles from "./App.module.css";
 
 /** Root shell: tab navigation and the selected tab's panel. */
 export function App() {
@@ -26,12 +25,14 @@ export function App() {
   const sessionIsActive = snapshot?.status === "active";
 
   return (
-    <div className={styles.app}>
-      <h1 className={styles.brand}>Flexi Pomodoro</h1>
+    <div className="mx-auto flex min-h-screen max-w-[42rem] flex-col gap-7 px-5 pt-10 pb-12">
+      <h1 className="animate-rise type-display text-[clamp(2.25rem,6vw,3.25rem)]">
+        <em className="type-serif-italic">Flexi</em> Pomodoro
+      </h1>
       <Nav tab={tab} onChange={setTab} />
 
       {settingsQuery.isError ? (
-        <p className={styles.error}>
+        <p className="text-destructive">
           {errorMessage(settingsQuery.error, "Failed to load settings")}
         </p>
       ) : null}

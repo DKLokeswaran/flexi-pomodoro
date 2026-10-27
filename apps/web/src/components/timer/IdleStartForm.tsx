@@ -146,7 +146,7 @@ export function IdleStartForm({
 
   return (
     <>
-      {isUiEnabled("timerDial") ? (
+      {!isUiEnabled("classicTimer") ? (
         <TimerDial
           progress={IDLE_DIAL_PROGRESS}
           eyebrow={readyLabel}

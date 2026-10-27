@@ -180,6 +180,12 @@ export const FONT_CREDITS = [
   },
 ] as const;
 
+export const DESIGN_CREDIT = {
+  name: "Quiet Dark",
+  author: "flavors.design",
+  href: "https://flavors.design/f/quiet-dark",
+} as const;
+
 export const CREDITS: CreditItem[] = [
   {
     kind: "text",

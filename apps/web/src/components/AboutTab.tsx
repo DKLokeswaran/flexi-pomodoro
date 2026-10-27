@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   CREDITS,
+  DESIGN_CREDIT,
   FEATURES,
   FONT_CREDITS,
   IMPORTANT_NOTES,
@@ -285,6 +286,18 @@ export function AboutTab() {
                 </a>
               </span>
             ))}
+          </p>
+          <p className={styles.creditLine}>
+            <span className={styles.creditLabel}>Design</span>
+            <a
+              href={DESIGN_CREDIT.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              {DESIGN_CREDIT.name}
+            </a>{" "}
+            by {DESIGN_CREDIT.author}
           </p>
         </div>
       </section>

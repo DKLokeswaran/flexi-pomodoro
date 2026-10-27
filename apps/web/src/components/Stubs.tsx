@@ -1,9 +1,9 @@
 /** Placeholder panel for milestones that are not implemented yet. */
 export function AnalyticsStub() {
   return (
-    <section className="panel">
-      <h2>Analytics</h2>
-      <p className="stub">Coming in a later milestone.</p>
+    <section className="flex animate-rise flex-col gap-4">
+      <h2 className="type-display text-[2rem]">Analytics</h2>
+      <p className="text-muted-foreground">Coming in a later milestone.</p>
     </section>
   );
 }

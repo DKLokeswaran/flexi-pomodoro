@@ -21,7 +21,7 @@
   --secondary: #22211e;
   --secondary-foreground: #ece8e1;
   --muted: #22211e;
-  --muted-foreground: #918e89;
+  --muted-foreground: #8a857c;
   --accent: #22211e;
   --accent-foreground: #ece8e1;
   --destructive: #f87171;
@@ -102,8 +102,8 @@
   --color-fg-soft: var(--fg-soft);
   --color-border-strong: var(--border-strong);
 
-  /* One 6px radius for every rounded control; pills are not part of the flavor. */
-  --radius-sm: 4px;
+  /* One 6px radius (the rounded.md token) for every rounded control; pills are not part of the flavor. */
+  --radius-sm: var(--radius);
   --radius-md: var(--radius);
   --radius-lg: var(--radius);
   --radius-xl: var(--radius);

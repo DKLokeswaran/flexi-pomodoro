@@ -1,4 +1,6 @@
-import styles from "./NumberField.module.css";
+import { useId } from "react";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 /** Labeled numeric input; min defaults to step when not provided. */
 export function NumberField({
@@ -14,18 +16,24 @@ export function NumberField({
   step?: number;
   min?: number;
 }) {
+  const inputId = useId();
+
   return (
-    <div className={styles.field}>
-      <label>
+    <Field className="gap-2 text-left">
+      <FieldLabel
+        htmlFor={inputId}
+        className="type-label font-normal text-muted-foreground"
+      >
         {label}
-        <input
-          type="number"
-          step={step}
-          min={min ?? step}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
-        />
-      </label>
-    </div>
+      </FieldLabel>
+      <Input
+        id={inputId}
+        type="number"
+        step={step}
+        min={min ?? step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </Field>
   );
 }

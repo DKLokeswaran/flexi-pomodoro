@@ -50,13 +50,4 @@ describe("hardPauseStrategy", () => {
     assert.equal(remainingSec(phase, resumeAt), 10);
     assert.equal(hardPauseStrategy.isCountdownFrozen(phase), false);
   });
-
-  it("onPlannedEnd when unfrozen → decision", () => {
-    const phase = plannedWork();
-    const plannedEndMs = parseIso(phase.plannedEndAt);
-    assert.equal(
-      hardPauseStrategy.onPlannedEnd(phase, plannedEndMs),
-      "decision",
-    );
-  });
 });

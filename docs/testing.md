@@ -70,7 +70,6 @@ Helpers: `servicesWithShortTimers` (via `createMockSessionStores` + mock setting
 | Ack timeout liveStats | Full ack window in `deliberationSec` |
 | Live stats full cycle | Worked excludes soft pause; deliberation + rest + `pausedSec` match timeline |
 | getSnapshot pure read | Overdue clock without tick keeps planned_work; after `tickIfIdle` → decision |
-| Concurrent tickIfIdle | Overlapping idle ticks may skip; follow-up idle tick leaves consistent extended_work |
 | tickIfIdle skip-if-busy | Concurrent `tickIfIdle` calls: at least one returns `false` |
 ### `apps/server/src/tests/services/settings.service.test.ts`
 
@@ -79,8 +78,7 @@ Imports parsers from `utils/settingsValidation.ts`.
 | Suite | Cases |
 |-------|-------|
 | `parseStartSessionBody` | Accepts 1s with flag; rejects 1s without; rejects unknown debug keys (`ZodError`) |
-| `parseSettingsPatch` | Rejects sub-minute work |
-| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; `update` calls `store.save`; seed when store empty; load existing row on hydrate |
+| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; `update` calls `store.save`; load existing row on hydrate |
 
 ### `apps/server/src/tests/db/settingsStore.test.ts`
 
@@ -135,7 +133,6 @@ Isolated `softPauseStrategy` unit tests (no `SessionService`):
 | `onPause` | Sets flags; `timerFrozenAt` null; `plannedEndAt` unchanged |
 | `onResume` | Accumulates `pausedSec`; `plannedEndAt` unchanged |
 | `onPlannedEnd` while paused | → `"rest"`; closes slice through planned end |
-| `onPlannedEnd` while running | → `"decision"` |
 
 ### `apps/server/src/tests/pause/hardPause.test.ts`
 
@@ -145,7 +142,6 @@ Isolated `hardPauseStrategy` unit tests:
 |------|---------|
 | `onPause` | Sets `timerFrozenAt`; `isCountdownFrozen` true |
 | `onResume` | Remaining time unchanged; `plannedEndAt` shifted by paused duration |
-| `onPlannedEnd` | → `"decision"` when unfrozen |
 
 ### `apps/server/src/tests/utils/asyncMutex.test.ts`
 
@@ -166,8 +162,6 @@ Isolated `hardPauseStrategy` unit tests:
 | Case | Asserts |
 |------|---------|
 | Nominal duration N=2 / N=1 | Work + short rests + long rest arithmetic |
-| `estimatedSessionEndMs` | Equals start + nominal duration |
-| DEFAULT_SETTINGS | Matches formula for default cycle count |
 
 ### `apps/web/src/tests/utils/activeSessionProjection.test.ts`
 
@@ -180,7 +174,6 @@ Fabricated `ActiveSnapshot` fixtures only (no server imports).
 | Extended → rest | Slip persists via rest anchors |
 | Hard pause open / resume | Open pause adds time; shifted `plannedEndAt` keeps it after resume |
 | Short rest after deliberation | Anchor slip reflected |
-| Extended → rest ETA stability | Projection unchanged across the transition at the same slip |
 
 ---
 

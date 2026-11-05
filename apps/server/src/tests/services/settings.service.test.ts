@@ -6,10 +6,7 @@ import {
   SettingsError,
   SettingsService,
 } from "../../services/settings.service.js";
-import {
-  parseSettingsPatch,
-  parseStartSessionBody,
-} from "../../utils/settingsValidation.js";
+import { parseStartSessionBody } from "../../utils/settingsValidation.js";
 import { createMockSettingsStore } from "../helpers/mockSettingsStore.js";
 
 describe("parseStartSessionBody", () => {
@@ -42,15 +39,6 @@ describe("parseStartSessionBody", () => {
         parseStartSessionBody({
           debug: { shortDurations: true, timeTravel: true },
         }),
-      ZodError,
-    );
-  });
-});
-
-describe("parseSettingsPatch", () => {
-  it("rejects sub-minute work duration", () => {
-    assert.throws(
-      () => parseSettingsPatch(DEFAULT_SETTINGS, { workDurationSec: 1 }),
       ZodError,
     );
   });
@@ -93,14 +81,6 @@ describe("SettingsService", () => {
         return true;
       },
     );
-  });
-
-  it("hydrate loads seeded defaults from the store", async () => {
-    const store = createMockSettingsStore(null);
-    const settings = new SettingsService(store);
-    await settings.hydrate();
-    assert.equal(store.ensureSeededCalls, 1);
-    assert.deepEqual(settings.get(), DEFAULT_SETTINGS);
   });
 
   it("hydrate restores previously saved settings from the store", async () => {

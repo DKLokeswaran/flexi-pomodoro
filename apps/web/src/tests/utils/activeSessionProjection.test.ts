@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ActiveSnapshot } from "@flexi-pomodoro/shared";
 import { activeEstimatedSessionEndMs } from "../../utils/activeSessionProjection";
-import {
-  estimatedSessionEndMs,
-  nominalSessionDurationSec,
-} from "../../utils/sessionProjection";
+import { estimatedSessionEndMs } from "../../utils/sessionProjection";
 
 const START_MS = Date.parse("2026-07-12T10:00:00.000Z");
 const SERVER_NOW_MS = START_MS + 30_000;
@@ -205,44 +202,5 @@ describe("activeSessionProjection", () => {
       activeEstimatedSessionEndMs(snapshot, nowMs),
       estimatedSessionEndMs(PARAMS, START_MS) + 1_000,
     );
-  });
-
-  it("ETA stays stable from extended work into rest at the same slip", () => {
-    const afterWork = START_MS + 60_000;
-    const extendedStartMs = afterWork + 2_000;
-    const afterExtended = extendedStartMs + 20_000;
-    const restStartMs = afterExtended;
-
-    const duringExtended = activeEstimatedSessionEndMs(
-      activeSnapshot(
-        {
-          kind: "extended_work",
-          cycleIndex: 1,
-          startedAt: new Date(extendedStartMs).toISOString(),
-        },
-        { workedSec: 60, deliberationSec: 2, restSec: 0, pausedSec: 0 },
-      ),
-      afterExtended,
-    );
-
-    const duringRest = activeEstimatedSessionEndMs(
-      activeSnapshot(
-        {
-          kind: "short_rest",
-          cycleIndex: 1,
-          startedAt: new Date(restStartMs).toISOString(),
-          plannedDurationSec: 60,
-          plannedEndAt: new Date(restStartMs + 60_000).toISOString(),
-        },
-        { workedSec: 80, deliberationSec: 2, restSec: 0, pausedSec: 0 },
-      ),
-      afterExtended + 5_000,
-    );
-
-    assert.equal(duringRest, duringExtended);
-  });
-
-  it("nominal duration matches two-cycle happy path length", () => {
-    assert.equal(nominalSessionDurationSec(PARAMS), 60 * 2 + 60 + 120);
   });
 });

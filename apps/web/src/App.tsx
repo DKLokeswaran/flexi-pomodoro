@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS } from "@flexi-pomodoro/shared";
 import { AboutTab } from "./components/AboutTab";
 import { AnalyticsStub } from "./components/Stubs";
 import { SettingsTab } from "./components/SettingsTab";
+import { Logo } from "./components/Logo";
 import { Nav, type Tab } from "./components/Nav";
 import { TimerTab } from "./components/TimerTab";
 import {
@@ -27,7 +28,10 @@ export function App() {
 
   return (
     <div className={styles.app}>
-      <h1 className={styles.brand}>Flexi Pomodoro</h1>
+      <h1 className={styles.brand}>
+        <Logo size={40} />
+        Flexi Pomodoro
+      </h1>
       <Nav tab={tab} onChange={setTab} />
 
       {settingsQuery.isError ? (

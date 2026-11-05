@@ -96,7 +96,11 @@ flexi-pomodoro/
 │       ├── vite.config.ts       # proxy /api → :3847; __APP_VERSION__
 │       ├── tsconfig.json        # excludes src/tests/**
 │       ├── tsconfig.node.json
-│       ├── public/alerts/       # placeholder-*.wav (one per AlertId; 8 files)
+│       ├── public/
+│       │   ├── alerts/          # placeholder-*.wav (one per AlertId; 8 files)
+│       │   ├── logo.svg         # app logo and favicon
+│       │   ├── favicon-32.png   # raster favicon fallback
+│       │   └── apple-touch-icon.png
 │       └── src/
 │           ├── main.tsx
 │           ├── App.tsx / App.module.css

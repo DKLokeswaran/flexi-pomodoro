@@ -21,6 +21,7 @@ import { useHealthQuery } from "../queries/useHealthQuery";
 import { useToast } from "../providers/ToastProvider";
 import { AboutAccordion } from "./about/AboutAccordion";
 import { LinkCard } from "./about/LinkCard";
+import { Logo } from "./Logo";
 
 /** Shared Tailwind classes for About-tab sections. */
 const styles = {
@@ -120,6 +121,7 @@ export function AboutTab() {
       aria-labelledby="about-heading"
     >
       <header className="flex flex-col gap-3">
+        <Logo size={64} />
         <h2 id="about-heading" className="type-display text-[2rem]">
           About
         </h2>

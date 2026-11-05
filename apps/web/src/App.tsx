@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS } from "@flexi-pomodoro/shared";
 import { AboutTab } from "./components/AboutTab";
 import { AnalyticsStub } from "./components/Stubs";
 import { SettingsTab } from "./components/SettingsTab";
+import { Logo } from "./components/Logo";
 import { Nav, type Tab } from "./components/Nav";
 import { TimerTab } from "./components/TimerTab";
 import {
@@ -26,8 +27,11 @@ export function App() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-[42rem] flex-col gap-7 px-5 pt-10 pb-12">
-      <h1 className="animate-rise type-display text-[clamp(2.25rem,6vw,3.25rem)]">
-        <em className="type-serif-italic">Flexi</em> Pomodoro
+      <h1 className="animate-rise type-display flex items-center gap-3 text-[clamp(2.25rem,6vw,3.25rem)]">
+        <Logo size={40} />
+        <span>
+          <em className="type-serif-italic">Flexi</em> Pomodoro
+        </span>
       </h1>
       <Nav tab={tab} onChange={setTab} />
 

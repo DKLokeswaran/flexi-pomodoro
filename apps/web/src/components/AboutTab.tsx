@@ -17,6 +17,7 @@ import { useHealthQuery } from "../queries/useHealthQuery";
 import { useToast } from "../providers/ToastProvider";
 import { AboutAccordion } from "./about/AboutAccordion";
 import { LinkCard } from "./about/LinkCard";
+import { Logo } from "./Logo";
 import styles from "./AboutTab.module.css";
 
 /** Available vs coming-soon badge for the features list. */
@@ -99,6 +100,7 @@ export function AboutTab() {
   return (
     <section className={`panel ${styles.page}`} aria-labelledby="about-heading">
       <header className={styles.section}>
+        <Logo size={64} className={styles.logo} />
         <h2 id="about-heading">About</h2>
         <p className="lead">{TAGLINE}</p>
         <p className={styles.metaLine}>

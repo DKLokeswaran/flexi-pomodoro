@@ -59,4 +59,4 @@ About live links open GitHub with `rel="noopener noreferrer"` when `external` is
 
 ## Known product stance
 
-About/legal copy states session data stays on the instance. Settings and completed session/phase rows survive restarts via SQLite on the data volume; reconstituting an in-flight session after crash (boot hydrate) is still future M3 work. Treat the open HTTP API as **trusted LAN / single-user** until auth is added.
+About/legal copy states session data stays on the instance. Settings and in-flight session/phase rows survive restarts via SQLite on the data volume; boot hydrate + wall-clock recovery resume mid-session. The container runs as non-root (`USER node`) with `/data` owned by `node`. Treat the open HTTP API as **trusted LAN / single-user** until auth is added.

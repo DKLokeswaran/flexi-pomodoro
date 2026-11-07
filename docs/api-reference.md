@@ -39,6 +39,7 @@ Discriminated by `status`:
   serverNow: string;      // ISO
   pendingAlerts: AlertEvent[];
   alertSeq: number;
+  recoveryAbandonedMessage?: string; // set after corrupt-runtime abandon at boot
 }
 ```
 

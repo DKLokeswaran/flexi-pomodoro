@@ -30,6 +30,7 @@
 | `INVALID_PHASE` | Action not valid for current phase |
 | `ALREADY_PAUSED` | Pause while already paused |
 | `NOT_PAUSED` | Resume when not paused |
+| `CORRUPT_RUNTIME` | Boot hydrate/recovery found inconsistent session/runtime/phase rows; `buildApp` abandons instead of failing process start |
 | `FORBIDDEN` / `PARAMS_LOCKED` | Mapped to HTTP 403 in routes (reserved) |
 
 ---

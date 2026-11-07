@@ -68,7 +68,7 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 | `SessionLiveStats` | type (`workedSec`, `deliberationSec`, `restSec`, `pausedSec`) |
 | `pausedSecAt`, `plannedWorkSecAt` | Planned-work progress helpers (`liveStatsProgress.ts`) |
 | `AlertEvent`, `ActiveSession` | types |
-| `IdleSnapshot`, `ActiveSnapshot`, `SessionSnapshot` | types |
+| `IdleSnapshot`, `ActiveSnapshot`, `SessionSnapshot` | types (`IdleSnapshot.recoveryAbandonedMessage?`) |
 
 **Dependencies:** `zod`, local bounds/debug modules.
 
@@ -86,7 +86,7 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 |--------|------|
 | `buildApp()` | async → `{ app }` |
 
-**Side effects:** opens SQLite (`openDatabase`), hydrates settings, injects session/phases stores into `SessionService`, Fastify logger, starts scheduler, may register static files; `onClose` stops scheduler and `db.destroy()`.
+**Side effects:** opens SQLite (`openDatabase`), hydrates settings, injects session/phases stores into `SessionService`, `hydrateFromStore` + `runRecoveryTick` (or `abandonCorruptRuntime` on `CORRUPT_RUNTIME`), Fastify logger, starts scheduler, may register static files; `onClose` stops scheduler and `db.destroy()`.
 
 **Deps:** `fastify`, `@fastify/static`, `node:path`/`fs`/`url`, `db`, services, routes, scheduler.
 
@@ -124,7 +124,7 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 | `SessionRow` / `SessionRuntimeRow` / `SessionStatusRow` | types |
 | `SessionStore.paramsColumns(params)` | static helper |
 
-**Public methods:** `transaction`, `insertSession`, `upsertRuntime`, `updateRuntimeStats`, `finalizeSession`, `clearRuntime`.
+**Public methods:** `transaction`, `insertSession`, `upsertRuntime`, `updateRuntimeStats`, `finalizeSession`, `clearRuntime`, `getRuntime`, `getSession`, `markInterrupted`.
 
 ### `src/db/stores/phasesStore.ts`
 
@@ -133,7 +133,7 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 | `PhasesStore` | class |
 | Phase/outcome row types | `PhaseKind`, open-row types, ended-reason / outcome unions |
 
-**Public methods:** `openPlannedWork` / `completePlannedWork` / `updatePlannedWorkPause`; `openDecision` / `completeDecision` / `deleteDecisionPhase`; `openShortRestAck` / `completeShortRestAck`; `openExtendedWork` / `completeExtendedWork`; `openRest` / `completeRest`; `openPauseSlice` / `closePauseSlice`; list helpers (`listDecisionRows`, `listPlannedWork`, …) and `getPhaseKind`.
+**Public methods:** `openPlannedWork` / `completePlannedWork` / `updatePlannedWorkPause`; `openDecision` / `completeDecision` / `deleteDecisionPhase`; `openShortRestAck` / `completeShortRestAck`; `openExtendedWork` / `completeExtendedWork`; `openRest` / `completeRest`; `openPauseSlice` / `closePauseSlice`; hydrate loaders (`getPlannedWork`, `getDecision`, `getShortRestAck`, `getExtendedWork`, `getRest`, `getOpenPauseSliceId`); list helpers (`listDecisionRows`, `listPlannedWork`, …) and `getPhaseKind`.
 
 ### `src/scheduler.ts`
 
@@ -286,8 +286,11 @@ Unknown errors are rethrown.
 | `constructor(stores, pauseRegistry?)` | requires `SessionServiceStores`; registry defaults to `defaultPauseRegistry()` |
 | `subscribe(listener, sinceSeq?)` | → unsubscribe |
 | `getAlertSeq()` | number |
+| `hydrateFromStore()` | `Promise<boolean>` — rebuild `ActiveSession` from runtime + open phase; `true` when restored; throws `CORRUPT_RUNTIME` on inconsistent rows |
+| `runRecoveryTick(nowMs?)` | `Promise<void>` — one boot catch-up; phases closed in this tick use `endedReason: "recovery"` |
+| `abandonCorruptRuntime(nowMs?)` | `Promise<void>` — mark `interrupted`, clear runtime, set idle `recoveryAbandonedMessage` |
 | `getSnapshot(nowMs?, sinceSeq?)` | SessionSnapshot — pure read (no wall-clock catch-up) |
-| `start(params, nowMs?, pauseStrategy?)` | `Promise<SessionSnapshot>` — resolves `pausePlugin` from registry (default `"soft"`; start route passes `settings.workPauseStrategy`) |
+| `start(params, nowMs?, pauseStrategy?)` | `Promise<SessionSnapshot>` — resolves `pausePlugin` from registry (default `"soft"`; start route passes `settings.workPauseStrategy`); clears recovery notice |
 | `pause(nowMs?)` | `Promise<SessionSnapshot>` — delegates to `pausePlugin.onPause` |
 | `resume(nowMs?)` | `Promise<SessionSnapshot>` — delegates to `pausePlugin.onResume` |
 | `ackRest(nowMs?)` | `Promise<SessionSnapshot>` |
@@ -299,11 +302,11 @@ Unknown errors are rethrown.
 
 **Side effects:** mutates in-memory session/alerts/liveStats under `AsyncMutex`; write-through SQLite transactions on transitions; notifies listeners; `randomUUID` on start. Mutating commands tick via `beginActiveCommand` → `tickUnlocked` while holding the mutex.
 
-**Private helpers (not exported):** `syncRuntime`, `persistPauseOpen` / `persistPauseClose`, `addDeliberation`, `restSecAt`, `liveStatsWithProgress`, `advanceWorkDecision`, `advanceShortRestAck`, `enterShortRestAckPhase`, `commitPlannedWork`, `commitRest`, `tickUnlocked`. Uses shared `pausedSecAt` / `plannedWorkSecAt` for planned-work focus and pause totals.
+**Private helpers (not exported):** `syncRuntime`, `persistPauseOpen` / `persistPauseClose`, `addDeliberation`, `restSecAt`, `liveStatsWithProgress`, `advanceWorkDecision`, `advanceShortRestAck`, `enterShortRestAckPhase`, `commitPlannedWork`, `commitRest`, `tickUnlocked`, `closeReason`. Uses shared `pausedSecAt` / `plannedWorkSecAt` for planned-work focus and pause totals.
 
 ### Tests
 
-`src/tests/services/{session,settings}.service.test.ts`, `src/tests/db/{settings,session,phases}Store.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase}.ts`, `src/tests/pause/*`, `src/tests/utils/asyncMutex.test.ts` — no production exports (see [testing.md](./testing.md)).
+`src/tests/services/{session,settings}.service.test.ts`, `session.attribution.test.ts`, `session.recovery.test.ts`, `session.recovery.matrix.test.ts`, `settings.service.persist.test.ts`, `src/tests/db/{settings,session,phases}Store.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase}.ts`, `src/tests/pause/*`, `src/tests/utils/asyncMutex.test.ts` — no production exports (see [testing.md](./testing.md)).
 ---
 
 ## `apps/web` — entry & shell

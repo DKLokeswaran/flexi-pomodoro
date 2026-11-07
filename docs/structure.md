@@ -6,7 +6,7 @@ Annotated layout of the source tree (binary alert WAVs listed by pattern only).
 flexi-pomodoro/
 ├── package.json                 # Workspace root: scripts, engines node>=20, version 0.0.1-alpha.4
 ├── package-lock.json
-├── Dockerfile                   # Multi-stage: deps → build → runtime (port 3847)
+├── Dockerfile                   # Multi-stage: deps → build → runtime as USER node (port 3847)
 ├── docker-compose.yml           # Single service; DATA_DIR=/data; FPMD_DATA_DIR bind or named volume
 ├── .dockerignore
 ├── .gitignore
@@ -39,7 +39,7 @@ flexi-pomodoro/
 │   │   ├── tsconfig.json        # excludes src/tests/**
 │   │   └── src/
 │   │       ├── index.ts         # listen entry
-│   │       ├── app.ts           # composition root (openDatabase + hydrate)
+│   │       ├── app.ts           # composition root (openDatabase + settings/session hydrate + recovery)
 │   │       ├── scheduler.ts
 │   │       ├── db/
 │   │       │   ├── index.ts         # openDatabase, createStores, AppStores
@@ -83,7 +83,11 @@ flexi-pomodoro/
 │   │           │   └── hardPause.test.ts
 │   │           ├── services/
 │   │           │   ├── settings.service.test.ts
-│   │           │   └── session.service.test.ts
+│   │           │   ├── settings.service.persist.test.ts
+│   │           │   ├── session.service.test.ts
+│   │           │   ├── session.attribution.test.ts
+│   │           │   ├── session.recovery.test.ts
+│   │           │   └── session.recovery.matrix.test.ts
 │   │           └── utils/
 │   │               └── asyncMutex.test.ts
 │   └── web/                     # @flexi-pomodoro/web
@@ -118,7 +122,7 @@ flexi-pomodoro/
 
 | Path | Role |
 |------|------|
-| `apps/server` | HTTP/SSE API, session engine, SQLite settings + session write-through, optional static host |
+| `apps/server` | HTTP/SSE API, session engine, SQLite settings + session write-through + boot resume, optional static host |
 | `apps/web` | React UI |
 | `packages/shared` | Cross-cutting domain contract |
 | `docs/product` | Product PRD and roadmap |
@@ -128,13 +132,13 @@ flexi-pomodoro/
 
 | Extension | Count |
 |-----------|------:|
-| `.ts` | 42 |
+| `.ts` | 79 |
 | `.tsx` | 17 |
 | `.css` | 11 |
-| `.json` | 9 |
-| `.wav` | 7 |
-| `.md` | 3 |
-| Other (yml, html, Docker, ignore) | 5 |
+| `.json` | 22 |
+| `.wav` | 8 |
+| `.md` | 21 |
+| Other (yml, html, Docker, ignore) | — |
 
 ## Where to add new code
 
@@ -160,4 +164,4 @@ Mirrored `src/tests/` trees (not colocated): server `services/` + `pause/` + `ut
 
 ## Config & build artifacts (ignored / not committed)
 
-`node_modules/`, `dist/`, `coverage/`, `.env*`, `data/`, `.archify/` — see `.gitignore`. Docker ignores `node_modules`, `dist`, `.git`, `*.md`, `.cursor`.
+`node_modules/`, `dist/`, `coverage/`, `.env*`, `data/`, `.archify/` — see `.gitignore`. Docker ignores `**/node_modules`, `**/dist`, `.git`, `*.md`, `.cursor`.

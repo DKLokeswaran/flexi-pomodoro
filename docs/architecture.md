@@ -10,7 +10,7 @@ Flexi Pomodoro is an **npm-workspace monorepo** with three packages:
 | `@flexi-pomodoro/server` | Fastify HTTP/SSE API, in-memory session engine with SQLite write-through, static web serving |
 | `@flexi-pomodoro/web` | React SPA (Vite); talks to the server via REST + Server-Sent Events |
 
-Backend style is **layered**: composition root (`app.ts`) → routes → services → pause plugins → Knex/SQLite stores. Settings load and save through `SettingsStore`. The session engine is an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`), with transactional write-through to `SessionStore` / `PhasesStore` on every transition. Boot hydrate / crash recovery is not wired yet. Pause policy is injected as a `WorkPauseStrategy` plugin, not inlined in the engine.
+Backend style is **layered**: composition root (`app.ts`) → routes → services → pause plugins → Knex/SQLite stores. Settings load and save through `SettingsStore`. The session engine is an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`), with transactional write-through to `SessionStore` / `PhasesStore` on every transition. On boot, `buildApp` calls `hydrateFromStore` then one `runRecoveryTick` before the scheduler starts; corrupt runtime abandons to idle with a user-visible notice. Pause policy is injected as a `WorkPauseStrategy` plugin, not inlined in the engine.
 
 Frontend style is **feature-oriented folders** under `apps/web/src`: components (by tab/feature), providers, queries (API + React Query hooks), hooks (SSE stream), utils, constants. Tab switching is local React state (no client router).
 
@@ -54,8 +54,8 @@ flowchart TB
 
 | Pattern | Where | Notes |
 |---------|-------|-------|
-| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates `SettingsService`, injects session/phases stores into `SessionService` + `IntervalScheduler`; returns `{ app }` |
-| **Repository / store** | `db/stores/*` | Purpose-split Knex stores; settings + session/phase write-through live; boot hydrate pending |
+| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates settings + session (`hydrateFromStore` → `runRecoveryTick`), injects stores into `SessionService` + `IntervalScheduler`; returns `{ app }` |
+| **Repository / store** | `db/stores/*` | Purpose-split Knex stores; settings + session/phase write-through; session/phase reads for boot hydrate |
 | **Service layer** | `SettingsService`, `SessionService` | Business rules and state; routes stay thin |
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
 | **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later; `onTick` may return a Promise |
@@ -80,6 +80,12 @@ const session = new SessionService({
   session: stores.session,
   phases: stores.phases,
 });
+try {
+  await session.hydrateFromStore();
+  await session.runRecoveryTick(Date.now());
+} catch (error) {
+  // CORRUPT_RUNTIME → abandonCorruptRuntime (idle + notice)
+}
 await registerRoutes(app, { settings, session });
 const scheduler = new IntervalScheduler({
   intervalMs: 250,
@@ -106,12 +112,12 @@ On the web, React Context provides `UiFlagsProvider`, `DebugFlagsProvider` (both
 ## Backend request lifecycle
 
 1. **Entry** — `apps/server/src/index.ts` reads `PORT` / `HOST`, calls `buildApp()`, `listen`.
-2. **App** — `openDatabase()` + settings hydrate; Fastify instance; services + routes + scheduler; optional static hosting; `onClose` destroys Knex.
+2. **App** — `openDatabase()` + settings hydrate; `session.hydrateFromStore()` + one `runRecoveryTick` (or `abandonCorruptRuntime` on `CORRUPT_RUNTIME`); Fastify instance; services + routes + scheduler; optional static hosting; `onClose` destroys Knex.
 3. **Route** — e.g. `POST /api/session/start` parses body via server `parseStartSessionBody`, resolves params via `settings.resolveSessionParams`, `await`s `session.start` (and other session mutations). Settings PUT `await`s `settings.update` (SQLite write-through).
 4. **Service** — under `AsyncMutex.runExclusive`, mutates in-memory session and writes phase/session rows in a Knex transaction; mutating commands call `tickUnlocked` first via `beginActiveCommand`; `notify()` pushes snapshots to SSE subscribers. `getSnapshot` / SSE open are pure reads (no catch-up).
 5. **Tick** — every 250ms `session.tickIfIdle(nowMs, true)` advances due phase boundaries when the mutex is free; overlapping intervals skip instead of queuing.
 
-Settings use SQLite (singleton row). Active session state is still served from process memory; every transition also write-throughs to `sessions` / `session_runtime` / phase tables. Restart hydrate is not implemented yet.
+Settings use SQLite (singleton row). Active session state is served from process memory after boot hydrate; every transition also write-throughs to `sessions` / `session_runtime` / phase tables. Container recreate with a surviving `/data` volume resumes mid-session via hydrate + recovery.
 
 ## Session phase state machine
 
@@ -187,6 +193,7 @@ No React Router. `App` holds `tab: "timer" | "settings" | "analytics" | "about"`
 - **Estimated session end**: idle shows locale wall-clock end plus approximate duration (`sessionProjection` — nominal path: `N×work + (N−1)×short rest + long rest`, no decision windows). Active shows a live end time via `activeEstimatedSessionEndMs` (forward remainder from current phase anchors; deliberation, extended work, and hard-pause slip shift the projection).
 - **Live stats HUD**: `ActiveTimer` shows Worked / Deliberation / Rest / Paused counters formatted with `formatHhMmSs` (`mm:ss` under one hour, `hh:mm:ss` after). `liveStatsAt(snapshot, now)` strips in-phase progress at `serverNow` and re-adds at local `now`. Worked/paused formulas use shared `plannedWorkSecAt` / `pausedSecAt`. While planned work is paused, the client freezes **worked** at pause start (`timerFrozenAt ?? pauseStartedAt`); **paused** keeps advancing on the wall clock (soft and hard).
 - **Browser preferences**: `hideContinueButton` UI flag (localStorage `flexi-pomodoro:uiFlags`) omits the Continue action during the work-decision phase.
+- **Corrupt-runtime notice**: idle snapshots may include `recoveryAbandonedMessage`; `IdleStartForm` shows it until the next successful start.
 - **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`. Label and phase suffix follow the locked session strategy (`Soft pause` vs `Hard pause (experimental)`). Toasts mirror the same strategy.
 - **Settings**: Experimental features gate exposes **Enable hard pause (experimental)**; unchecked maps to `workPauseStrategy: "soft"`, checked to `"hard"`. Saved with **Save defaults**; locked while a session is active.
 
@@ -201,14 +208,15 @@ Not found in committed history (no `React.lazy` / dynamic import of routes).
 3. Client `playAlerts` maps each `AlertId` to `public/alerts/placeholder-<id>.wav` (including `short_rest_ack_expired`) and plays unplayed deltas; `AlertSeqStore` persists the watermark in `localStorage` (`flexi-pomodoro:lastPlayedAlertSeq`).
 4. On idle after active, client `syncAlertSeq()` aligns with server high-water and may reset history server-side after session end.
 
-## Persistence (current vs planned)
+## Persistence
 
-| Data | Current | Remaining M3 work |
-|------|---------|-------------------|
-| Settings | SQLite singleton via `SettingsStore` (`flexi-pomodoro.sqlite3` under `DATA_DIR`) | — |
-| Session / phases | Write-through via `SessionStore` / `PhasesStore` (transactions on start, pause, phase transitions, complete); FR-FLOW-11 deletes decision on timeout; pause_slices + planned_work pause columns | Boot hydrate + wall-clock recovery (`tick` with recovery) |
-| Schema | Knex migration `20260909134105_initial_schema` | — |
-| Debug prefs | Browser `localStorage` (`flexi-pomodoro:debugFlags`) | Client-only |
-| UI prefs | Browser `localStorage` (`flexi-pomodoro:uiFlags`) | Client-only |
-| Alert watermark | Browser `localStorage` | Client-only |
-| Docker volume `/data` | Mounted; `DATA_DIR=/data` in compose | Non-root ownership (later plan group) |
+| Data | Status |
+|------|--------|
+| Settings | SQLite singleton via `SettingsStore` (`flexi-pomodoro.sqlite3` under `DATA_DIR`) |
+| Session / phases | Write-through via `SessionStore` / `PhasesStore` (transactions on start, pause, phase transitions, complete); FR-FLOW-11 deletes decision on timeout; pause_slices + planned_work pause columns |
+| Boot resume | `hydrateFromStore` rebuilds `ActiveSession` (incl. `alertSeq` + open pause); one `runRecoveryTick` closes overdue phases with `endedReason: "recovery"`; `CORRUPT_RUNTIME` → `abandonCorruptRuntime` (`interrupted`, clear runtime, idle notice) |
+| Schema | Knex migration `20260909134105_initial_schema` |
+| Debug prefs | Browser `localStorage` (`flexi-pomodoro:debugFlags`) — client-only |
+| UI prefs | Browser `localStorage` (`flexi-pomodoro:uiFlags`) — client-only |
+| Alert watermark | Browser `localStorage` — client-only |
+| Docker volume `/data` | Mounted; `DATA_DIR=/data` in compose; image runs as `USER node` with `/data` owned by `node` (FPMD-2) |

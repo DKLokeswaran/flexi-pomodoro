@@ -8,8 +8,7 @@ SQLite via Knex + `better-sqlite3`. File: `flexi-pomodoro.sqlite3` under the res
 
 - Singleton `settings` row (seeded from `DEFAULT_SETTINGS` on first boot; updated on every successful `PUT /api/settings`).
 - Session write-through: `sessions`, `session_runtime`, `phases` + detail tables, `pause_slices` updated on every engine transition (FR-FLOW-11 / FR-ACK-6 attribution rules).
-
-**Not yet:** boot hydrate of an in-flight session from `session_runtime` / open phase rows (crash recovery).
+- Boot hydrate from `session_runtime` + open phase rows; one recovery tick closes overdue phases with `endedReason: "recovery"`. Corrupt/inconsistent runtime marks the session `interrupted`, clears runtime, and surfaces `recoveryAbandonedMessage` on the idle snapshot.
 
 Docker Compose sets `DATA_DIR=/data` and mounts `${FPMD_DATA_DIR:-flexi-pomodoro-data}:/data`.
 
@@ -119,7 +118,7 @@ ActiveSession 1──1 Phase (current)
 ActiveSession 1──* AlertEvent (via alertLog / pendingAlerts)
 ```
 
-Runtime session state is still single-process / single active session (served from memory). The SQLite schema uses class-table inheritance for phases (`phases` + per-kind detail tables) with FK links for `session_runtime` / `pause_slices`. Decision timeout deletes the decision row and opens extended work from decision start (FR-FLOW-11).
+Runtime session state is single-process / single active session (served from memory after boot hydrate). The SQLite schema uses class-table inheritance for phases (`phases` + per-kind detail tables) with FK links for `session_runtime` / `pause_slices`. Decision timeout deletes the decision row and opens extended work from decision start (FR-FLOW-11).
 
 ---
 
@@ -131,7 +130,7 @@ Runtime session state is still single-process / single active session (served fr
 | `SessionOverrides` | start body fields | Partial `SessionParams` |
 | `StartSessionBody` | POST start | Overrides + optional `debug?: DebugFlags` |
 | `DebugFlags` | start body | Optional booleans per `DebugFeatureId`; strict object |
-| `SessionSnapshot` | REST + SSE | Idle or Active union |
+| `SessionSnapshot` | REST + SSE | Idle or Active union; idle may include `recoveryAbandonedMessage` |
 | `{ alertSeq }` | GET alert-seq | number |
 | `{ ok: true }` | health | |
 | `{ error, code }` | error responses | |
@@ -143,8 +142,8 @@ Runtime session state is still single-process / single active session (served fr
 Knex query builder over `better-sqlite3`. No ORM entities. Stores wrap table access:
 
 - `SettingsStore`: `load` / `save` / `ensureSeeded`
-- `SessionStore`: `transaction`, `insertSession`, `upsertRuntime`, `updateRuntimeStats`, `finalizeSession`, `clearRuntime`
-- `PhasesStore`: open/complete per kind, `deleteDecisionPhase`, pause slice open/close, list helpers for tests
+- `SessionStore`: `transaction`, `insertSession`, `upsertRuntime`, `updateRuntimeStats`, `finalizeSession`, `clearRuntime`, `getRuntime`, `getSession`, `markInterrupted`
+- `PhasesStore`: open/complete per kind, `deleteDecisionPhase`, pause slice open/close, `get*` loaders + `getOpenPauseSliceId` for hydrate, list helpers for tests
 
 ## SQLite tables (initial migration)
 

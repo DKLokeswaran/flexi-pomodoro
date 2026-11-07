@@ -62,9 +62,11 @@
 
 | Stage | Base | Actions |
 |-------|------|---------|
-| `deps` | `node:22-bookworm-slim` | Copy package manifests; `npm ci` |
-| `build` | from deps | Copy sources; build shared, web, server |
-| `runtime` | `node:22-bookworm-slim` | Prod `npm ci --omit=dev` for server+shared; copy dists; `EXPOSE 3847`; `VOLUME ["/data"]`; `CMD node dist/index.js` from `apps/server` |
+| `deps` | `node:22-bookworm-slim` | Install python3/make/g++ for `better-sqlite3`; copy package manifests; `npm ci` |
+| `build` | from deps | Copy sources; `rm -rf` host `dist` leftovers; build shared, web, server |
+| `runtime` | `node:22-bookworm-slim` | Prod `npm ci --omit=dev` (compile native deps, then purge build tools); copy dists; `mkdir`/`chown node:node` `/data`; `USER node`; `EXPOSE 3847`; `VOLUME ["/data"]`; `CMD node dist/index.js` from `apps/server` |
+
+`.dockerignore` excludes `**/node_modules` and `**/dist` so stale host build outputs are not copied into the image.
 
 ### docker-compose.yml
 
@@ -72,7 +74,7 @@
 |---------|-------|-----|---------|
 | `flexi-pomodoro` | `4000:3847` (host:container) | `TZ=Asia/Kolkata`, `PORT=3847`, `DATA_DIR=/data` | `${FPMD_DATA_DIR:-flexi-pomodoro-data}:/data` |
 
-`restart: unless-stopped`.
+`restart: unless-stopped`. Fresh named volumes inherit `node` ownership of `/data` from the image. Empty volumes left root-owned by older images should be deleted once before upgrading so SQLite can create files as `node`.
 
 ---
 

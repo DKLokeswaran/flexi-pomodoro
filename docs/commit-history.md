@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 48 |
+| Total commits | 52 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-10-11 |
+| Latest commit date | 2026-11-08 |
 | Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (48) |
+| Most active contributor | Lokeswaran DK (52) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` … `v0.0.2-alpha.3` |
 
@@ -21,7 +21,8 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | 2026-07 | 23 |
 | 2026-08 | 11 |
 | 2026-09 | 13 |
-| 2026-10 | 1 |
+| 2026-10 | 2 |
+| 2026-11 | 3 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -192,6 +193,28 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Persist sessions, runtime, phase detail rows, and pause slices on every engine transition.
 - Close ending phases in transactions; decision timeout deletes the decision row (FR-FLOW-11); short-rest ack outcomes follow FR-ACK-6.
 
+### 2026-10-12 — Store SQLite tests vs engine mocks
+
+- Move FR-FLOW-11 / FR-ACK-6 SQLite checks onto `PhasesStore` / `SessionStore` tests.
+- Keep `SessionService` unit tests on in-memory store doubles (`createMockSessionStores`).
+
+### 2026-11-08 — Boot hydrate + wall-clock recovery
+
+- Restore active sessions from SQLite on startup (`hydrateFromStore`), including `alertSeq` and open pause slices.
+- One boot `runRecoveryTick` catches up overdue phases with `endedReason: "recovery"`.
+- Corrupt runtime abandons to idle (`interrupted`, clear runtime, `recoveryAbandonedMessage` on idle snapshot + IdleStartForm notice).
+
+### 2026-11-08 — Non-root Docker (`USER node`)
+
+- Image installs/purges native build tools for `better-sqlite3`; ignores nested host `dist`.
+- Runtime `chown node:node /data` then `USER node` (FPMD-2).
+
+### 2026-11-08 — M3 tests-smoke
+
+- Segment attribution suite through the engine + SQLite.
+- Q9 S1–S8 recovery matrix (`hydrateFromStore` + `runRecoveryTick`).
+- Settings round-trip across a new service instance on the same DB.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -200,11 +223,16 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 - Alert sequence reset on session end (clients must sync watermark).
 - Path/file renames (`engine` → `session.service`, `api.ts` split, docs move) — import path breaks for external consumers of old layout.
 - Session pause endpoints renamed from `/api/session/soft-pause` and `/soft-resume` to `/pause` and `/resume`; planned-work phase fields renamed from `softPaused*` to strategy-neutral `paused*`.
+- Docker runtime no longer runs as root; empty root-owned `/data` volumes from older images need a one-time delete so `node` can write SQLite.
 
 ## Full commit log
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| cd0daec | Lokeswaran DK | 2026-11-08 | Cover M3 resume with attribution, Q9 S1–S8, and settings restart tests. |
+| 6d839bf | Lokeswaran DK | 2026-11-08 | Run the container as non-root with node-owned /data. |
+| f8a5957 | Lokeswaran DK | 2026-11-08 | Add boot hydrate and wall-clock recovery for mid-session resume. |
+| eb8d2d0 | Lokeswaran DK | 2026-10-12 | Split store SQLite tests from SessionService unit mocks. |
 | db6dbe2 | Lokeswaran DK | 2026-10-11 | Write session and phase segments through to SQLite on every transition. |
 | 7657c44 | Lokeswaran DK | 2026-09-23 | Add Knex/SQLite bootstrap and persist settings across restarts. |
 | a1823d0 | Lokeswaran DK | 2026-09-09 | Serialize session ticks and commands with AsyncMutex; scheduler uses tickIfIdle. |
@@ -254,4 +282,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: db6dbe2584211079c6a43bf660fe401cbab7e49e
+Last Synced Commit: cd0daec0ca8098cff0b2fbbdb3a85ed12a9f3d42

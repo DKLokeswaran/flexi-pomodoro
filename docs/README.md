@@ -62,7 +62,7 @@ flowchart LR
   Sched -->|"tickIfIdle(nowMs)"| Sess
 ```
 
-Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`) and by commands that tick under the mutex before mutating; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT.
+Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`), by commands that tick under the mutex before mutating, and by one boot `runRecoveryTick` after `hydrateFromStore`; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT. Mid-session resume survives container recreate when `/data` is kept.
 
 ## Documentation index
 

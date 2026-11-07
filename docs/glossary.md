@@ -32,7 +32,9 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **Cycle index** | 1-based work cycle counter within a session |
 | **Soft pause** | Pause during planned work that does **not** move `plannedEndAt`; accumulates `pausedSec`; `timerFrozenAt` stays null |
 | **Hard pause** | Experimental strategy (`workPauseStrategy: "hard"`). Freezes countdown via `timerFrozenAt`; shifts `plannedEndAt` on resume. Selected in Settings → Experimental features; locked at session start |
-| **Wall-clock catch-up** | Advance through all due phase boundaries based on real time (recovery policy). Production entry is `tickIfIdle` (scheduler, skip-if-busy); commands catch up via `tickUnlocked` while holding the session mutex |
+| **Wall-clock catch-up** | Advance through all due phase boundaries based on real time (recovery policy). Production entries: boot `runRecoveryTick` (closes with `endedReason: "recovery"`), scheduler `tickIfIdle` (skip-if-busy), and commands via `tickUnlocked` under the session mutex |
+| **Boot hydrate** | `hydrateFromStore` rebuilds the in-memory `ActiveSession` from `session_runtime` + open phase rows before the scheduler starts |
+| **Corrupt runtime abandon** | On `CORRUPT_RUNTIME`, clear runtime, mark session `interrupted`, stay idle, and set optional `recoveryAbandonedMessage` on the idle snapshot |
 | **Params locked** | Session uses resolved `SessionParams` for its lifetime; settings edits apply to future sessions |
 
 ## Alerts

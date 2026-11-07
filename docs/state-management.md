@@ -4,7 +4,7 @@
 
 | Layer | Mechanism |
 |-------|-----------|
-| Server session | In-memory `SessionService` singleton; mutations + ticks serialized by `AsyncMutex`; SQLite write-through on transitions |
+| Server session | In-memory `SessionService` singleton hydrated from SQLite at boot; mutations + ticks serialized by `AsyncMutex`; SQLite write-through on transitions |
 | Server settings | In-process cache hydrated from SQLite `SettingsStore`; `update` write-through |
 | Server → clients | SSE snapshots + REST |
 | Client server cache | TanStack React Query (`settings`, `health`) |
@@ -134,7 +134,7 @@ Transport (`connectSessionStream`):
 |-----------|-------|
 | `App` | `tab: Tab` |
 | `SettingsTab` | draft minutes/cycles/decision; `enableHardPause`; session-only `experimentalMode` gate; UI + debug flag toggles |
-| `IdleStartForm` | override draft (min or sec depending on shortDurations); own `useNow(IDLE_ESTIMATE_TICK_MS)` for estimated end |
+| `IdleStartForm` | override draft (min or sec depending on shortDurations); own `useNow(IDLE_ESTIMATE_TICK_MS)` for estimated end; shows optional `recoveryAbandonedMessage` from idle snapshot |
 | `ActiveTimer` | own `useNow(ACTIVE_UI_TICK_MS)` for countdown, live stats, and estimated end |
 | `AboutAccordion` | `open` |
 | `ToastProvider` | current toast |

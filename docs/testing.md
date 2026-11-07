@@ -114,6 +114,59 @@ SQLite attribution checks (FR-FLOW-11 / FR-ACK-6) via store APIs (not through `S
 | short_rest_ack outcomes | `acknowledged` vs `timeout_paused` |
 | `completeRest` | `completed` vs `long_rest_skipped_early` + `actualDurationSec` |
 
+### `apps/server/src/tests/services/session.attribution.test.ts`
+
+Engine + real SQLite: segment rows after live transitions (FR-FLOW-11 / FR-ACK-6).
+
+| Case | Asserts |
+|------|---------|
+| Decision timeout | Decision row deleted; extended opened from decision start |
+| `continueExtended` | Closed decision `continue`; extended `startedAt` = click |
+| `ackRest` | Closed decision `ack_rest`; short rest open |
+| Soft-paused through planned end | Auto-rest; no decision row |
+| short_rest_ack timeout | `timeout_paused`; next work paused |
+| short_rest_ack `ackWork` | `acknowledged`; next work running |
+| Long rest timer end | Rest `completed`; runtime cleared |
+| Early end long rest | `long_rest_skipped_early` |
+
+### `apps/server/src/tests/services/session.recovery.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| Mid planned work hydrate | Restores phase without advancing |
+| alertSeq restore | Runtime `alertSeq` rebuilt |
+| Recovery past planned end | Work closed with `endedReason: "recovery"` |
+| Through decision window | Extended opened; decision deleted |
+| recoveryTick flag reset | Later closes use live endedReason |
+| Session complete | Clears `session_runtime` |
+| Soft-paused hydrate | Open pause slice restored |
+| Hard-paused recovery | Does not advance past original planned end while frozen |
+| Hard ack timeout + long downtime | Stays frozen planned_work past next planned end |
+| Idle hydrate | Returns `false` when no runtime |
+| CORRUPT_RUNTIME abandon | Clears runtime; idle `recoveryAbandonedMessage` |
+
+### `apps/server/src/tests/services/session.recovery.matrix.test.ts`
+
+Q9 Option A S1–S8 via hydrate + `runRecoveryTick` on temp SQLite.
+
+| Case | Asserts |
+|------|---------|
+| S1 | Mid planned work → still planned_work with remaining time |
+| S2 | Past planned end inside decision → decision |
+| S3 | Through short rest → short_rest_ack (still in window) |
+| S4 | Through decision window → extended_work (overtime includes downtime) |
+| S5 | Through long rest end → idle session complete |
+| S6 | During extended → still extended; overtime includes downtime |
+| S7 | Soft-pause downtime included in `pausedSec` |
+| S8a | SHORT_REST_ACK inside window → restore ack |
+| S8b | Past SHORT_REST_ACK window → next work already paused |
+
+### `apps/server/src/tests/services/settings.service.persist.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| Restart round-trip | New `SettingsService` + same DB loads saved settings via `hydrate` |
+
 ### `apps/server/src/tests/helpers/mockSettingsStore.ts`
 
 In-memory `SettingsStore` double for service unit tests (`load` / `save` / `ensureSeeded` + optional `saves` spy).
@@ -203,7 +256,9 @@ Inline constants and helper factories only — no fixture files.
 
 ---
 
-## Manual smoke (M2.5 short-rest ack + live stats)
+## Manual smoke
+
+### M2.5 short-rest ack + live stats
 
 Operator checklist (not automated):
 
@@ -212,3 +267,7 @@ Operator checklist (not automated):
 3. Long rest completion → no ack prompt
 4. HUD Worked / Deliberation / Rest / Paused counters increment during session; reset on next start
 5. Hide Continue working (Browser preferences) → decision shows only Acknowledge rest; uncheck → Continue reappears
+
+### M3 Compose recreate
+
+Throwaway compose project with a named `/data` volume (no committed harness): start a session → `docker compose … up -d --force-recreate` → same session id resumes in `planned_work`. Fresh volume should be writable as `node` (UID 1000).

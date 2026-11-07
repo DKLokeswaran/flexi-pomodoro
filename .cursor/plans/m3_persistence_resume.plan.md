@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: non-root-docker
     content: Dockerfile mkdir/chown /data + USER node (FPMD-2); alpha upgrade note to delete empty root-owned volume; smoke fresh volume
-    status: pending
+    status: completed
   - id: tests-smoke
     content: Segment attribution tests + Q9 S1–S8 recovery matrix + Compose recreate smoke
     status: pending
@@ -39,7 +39,7 @@ Sources: [docs/product/PRD.md](docs/product/PRD.md) §4.1 (FR-HOST-2), §4.5 (FR
 - Engine `tick` / commands are **sync**; scheduler fires sync `onTick`.
 - `getSnapshot` currently calls `tick` (side effect on GET / SSE open).
 - In-process `tick` already walks due boundaries; there is **no** hydrate-from-disk + catch-up after downtime, no phase history rows, no `endedReason: "recovery"`.
-- Runtime still runs as root (FPMD-2). Existing alpha volumes under `/data` are root-owned (often empty).
+- Existing alpha volumes under `/data` may still be root-owned from older images (operators delete empty volumes once before upgrade).
 
 ## Scope
 

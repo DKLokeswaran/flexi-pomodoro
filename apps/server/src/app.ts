@@ -5,7 +5,10 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { openDatabase } from "./db/index.js";
 import { SettingsService } from "./services/settings.service.js";
-import { SessionService } from "./services/session.service.js";
+import {
+  SessionError,
+  SessionService,
+} from "./services/session.service.js";
 import { registerRoutes } from "./routes/index.js";
 import { IntervalScheduler } from "./scheduler.js";
 
@@ -53,6 +56,23 @@ export async function buildApp() {
     session: stores.session,
     phases: stores.phases,
   });
+  try {
+    await session.hydrateFromStore();
+    await session.runRecoveryTick(Date.now());
+  } catch (error) {
+    if (
+      error instanceof SessionError &&
+      error.code === "CORRUPT_RUNTIME"
+    ) {
+      app.log.error(
+        { err: error },
+        "corrupt session_runtime; abandoning interrupted session",
+      );
+      await session.abandonCorruptRuntime(Date.now());
+    } else {
+      throw error;
+    }
+  }
 
   await registerRoutes(app, { settings, session });
 

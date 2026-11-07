@@ -18,12 +18,17 @@ export function TimerTab({
   defaults: SessionTimingDefaults;
 }) {
   const activeSnapshot = snapshot?.status === "active" ? snapshot : null;
+  const recoveryAbandonedMessage =
+    snapshot?.status === "idle"
+      ? snapshot.recoveryAbandonedMessage
+      : undefined;
 
   return (
     <section className={styles.timerShell} aria-live="polite">
       {!activeSnapshot ? (
         <IdleStartForm
           defaults={defaults}
+          recoveryAbandonedMessage={recoveryAbandonedMessage}
           onStart={(body) => onAction(SESSION_API.start, body)}
         />
       ) : (

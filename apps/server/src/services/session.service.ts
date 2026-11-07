@@ -15,7 +15,7 @@ import {
 } from "@flexi-pomodoro/shared";
 import { randomUUID } from "node:crypto";
 import type { Knex } from "knex";
-import type { PhasesStore } from "../db/stores/phasesStore.js";
+import type { PhaseKind, PhasesStore } from "../db/stores/phasesStore.js";
 import type { SessionStore } from "../db/stores/sessionStore.js";
 import { SessionStore as SessionStoreClass } from "../db/stores/sessionStore.js";
 import {
@@ -146,11 +146,224 @@ export class SessionService {
   private currentPhaseId: string | null = null;
   /** DB id of the open pause_slices row, if any. */
   private openPauseSliceId: string | null = null;
+  /** Boot catch-up tick: closed phases use endedReason `"recovery"`. */
+  private recoveryTick = false;
+  /**
+   * One-shot idle notice after boot abandons a corrupt runtime.
+   * Cleared on the next successful {@link start}.
+   */
+  private recoveryAbandonedMessage: string | null = null;
 
   constructor(
     private readonly stores: SessionServiceStores,
     private readonly pauseRegistry: PauseStrategyRegistry = defaultPauseRegistry(),
   ) {}
+
+  /** Map live close reason → recovery when inside the boot recovery tick. */
+  private closeReason<T extends string>(live: T): T | "recovery" {
+    return this.recoveryTick ? "recovery" : live;
+  }
+
+  /**
+   * Rebuild in-memory session from `session_runtime` if present.
+   * Does not catch up wall clock — call {@link runRecoveryTick} after.
+   * @returns true when a session was restored
+   */
+  async hydrateFromStore(): Promise<boolean> {
+    return this.mutex.runExclusive(async () => {
+      if (this.session) {
+        throw new SessionError(
+          "A session is already active",
+          "SESSION_ACTIVE",
+        );
+      }
+      const runtime = await this.stores.session.getRuntime();
+      if (!runtime) return false;
+
+      const sessionRow = await this.stores.session.getSession(
+        runtime.sessionId,
+      );
+      if (!sessionRow || sessionRow.status !== "active") {
+        throw new SessionError(
+          "session_runtime points at a missing or inactive session",
+          "CORRUPT_RUNTIME",
+        );
+      }
+
+      const kind = await this.stores.phases.getPhaseKind(
+        runtime.currentPhaseId,
+      );
+      if (!kind) {
+        throw new SessionError(
+          "currentPhaseId has no phases row",
+          "CORRUPT_RUNTIME",
+        );
+      }
+
+      const phase = await this.loadPhaseFromStore(
+        runtime.currentPhaseId,
+        kind,
+      );
+      if (phase.kind === "planned_work" && phase.paused) {
+        this.openPauseSliceId =
+          await this.stores.phases.getOpenPauseSliceId(
+            runtime.currentPhaseId,
+          );
+      } else {
+        this.openPauseSliceId = null;
+      }
+
+      this.pausePlugin = this.pauseRegistry.get(sessionRow.pauseStrategy)!;
+      this.alertSeq = runtime.alertSeq;
+      this.alertLog = [];
+      this.currentPhaseId = runtime.currentPhaseId;
+      this.session = {
+        id: sessionRow.id,
+        status: "active",
+        startedAt: sessionRow.startedAt,
+        params: {
+          workDurationSec: sessionRow.workDurationSec,
+          shortRestDurationSec: sessionRow.shortRestDurationSec,
+          cyclesBeforeLongRest: sessionRow.cyclesBeforeLongRest,
+          longRestDurationSec: sessionRow.longRestDurationSec,
+          decisionWindowSec: sessionRow.decisionWindowSec,
+        },
+        pauseStrategy: sessionRow.pauseStrategy,
+        phase,
+        liveStats: {
+          workedSec: runtime.workedSec,
+          deliberationSec: runtime.deliberationSec,
+          restSec: runtime.restSec,
+          pausedSec: runtime.pausedSec,
+        },
+        pendingAlerts: [],
+        alertSeq: this.alertSeq,
+      };
+      return true;
+    });
+  }
+
+  /**
+   * Clear a corrupt `session_runtime`, mark the session interrupted when known,
+   * stay idle, and surface a user-visible notice on the next idle snapshot.
+   */
+  async abandonCorruptRuntime(nowMs: number = Date.now()): Promise<void> {
+    return this.mutex.runExclusive(async () => {
+      const runtime = await this.stores.session.getRuntime();
+      await this.stores.session.transaction(async (trx) => {
+        if (runtime) {
+          await this.stores.session.markInterrupted(
+            trx,
+            runtime.sessionId,
+            msToIso(nowMs),
+          );
+        }
+        await this.stores.session.clearRuntime(trx);
+      });
+      this.session = null;
+      this.pausePlugin = null;
+      this.currentPhaseId = null;
+      this.openPauseSliceId = null;
+      this.alertLog = [];
+      this.alertSeq = 0;
+      this.recoveryTick = false;
+      this.recoveryAbandonedMessage =
+        "The last interrupted session could not be recovered from the database cleanly.";
+    });
+  }
+
+  /**
+   * Boot wall-clock catch-up under the mutex with recovery endedReasons.
+   * No-op when idle. Scheduler ticks must not use this path.
+   */
+  async runRecoveryTick(nowMs: number = Date.now()): Promise<void> {
+    return this.mutex.runExclusive(async () => {
+      if (!this.session) return;
+      this.recoveryTick = true;
+      try {
+        await this.tickUnlocked(nowMs, true);
+      } finally {
+        this.recoveryTick = false;
+      }
+    });
+  }
+
+  /** Load open phase detail and map to the in-memory Phase shape. */
+  private async loadPhaseFromStore(
+    phaseId: string,
+    kind: PhaseKind,
+  ): Promise<Phase> {
+    switch (kind) {
+      case "planned_work": {
+        const row = await this.stores.phases.getPlannedWork(phaseId);
+        if (!row || row.endedAt) {
+          throw new SessionError(
+            "open planned_work row missing",
+            "CORRUPT_RUNTIME",
+          );
+        }
+        return {
+          kind: "planned_work",
+          cycleIndex: row.cycleIndex,
+          startedAt: row.startedAt,
+          plannedDurationSec: row.plannedDurationSec,
+          plannedEndAt: row.plannedEndAt,
+          paused: row.paused ?? false,
+          pausedSec: row.pausedSec ?? 0,
+          pauseStartedAt: row.pauseStartedAt ?? null,
+          timerFrozenAt: row.timerFrozenAt ?? null,
+        };
+      }
+      case "decision":
+      case "short_rest_ack": {
+        const row =
+          kind === "decision"
+            ? await this.stores.phases.getDecision(phaseId)
+            : await this.stores.phases.getShortRestAck(phaseId);
+        if (!row || row.endedAt) {
+          throw new SessionError(
+            `open ${kind} row missing`,
+            "CORRUPT_RUNTIME",
+          );
+        }
+        return {
+          kind,
+          cycleIndex: row.cycleIndex,
+          startedAt: row.startedAt,
+          decisionEndsAt: row.decisionEndsAt,
+          decisionWindowSec: row.decisionWindowSec,
+        };
+      }
+      case "extended_work": {
+        const row = await this.stores.phases.getExtendedWork(phaseId);
+        if (!row || row.endedAt) {
+          throw new SessionError(
+            "open extended_work row missing",
+            "CORRUPT_RUNTIME",
+          );
+        }
+        return {
+          kind: "extended_work",
+          cycleIndex: row.cycleIndex,
+          startedAt: row.startedAt,
+        };
+      }
+      case "short_rest":
+      case "long_rest": {
+        const row = await this.stores.phases.getRest(phaseId, kind);
+        if (!row || row.endedAt) {
+          throw new SessionError("open rest row missing", "CORRUPT_RUNTIME");
+        }
+        return {
+          kind,
+          cycleIndex: row.cycleIndex,
+          startedAt: row.startedAt,
+          plannedDurationSec: row.plannedDurationSec,
+          plannedEndAt: row.plannedEndAt,
+        };
+      }
+    }
+  }
 
   /** Register a snapshot listener and return an unsubscribe function. */
   subscribe(listener: SnapshotListener, sinceSeq = 0): () => void {
@@ -247,6 +460,9 @@ export class SessionService {
         serverNow: msToIso(nowMs),
         pendingAlerts,
         alertSeq: this.alertSeq,
+        ...(this.recoveryAbandonedMessage
+          ? { recoveryAbandonedMessage: this.recoveryAbandonedMessage }
+          : {}),
       };
     }
     return {
@@ -443,6 +659,7 @@ export class SessionService {
       if (this.session) {
         throw new SessionError("A session is already active", "SESSION_ACTIVE");
       }
+      this.recoveryAbandonedMessage = null;
       const seqAtStart = this.alertSeq;
       this.pausePlugin = this.pauseRegistry.get(pauseStrategy)!;
       const sessionId = randomUUID();
@@ -869,7 +1086,7 @@ export class SessionService {
         this.openPauseSliceId = null;
         await this.stores.phases.completePlannedWork(trx, plannedWorkPhaseId, {
           endedAt: msToIso(plannedEndMs),
-          endedReason: "soft_paused_auto_rest",
+          endedReason: this.closeReason("soft_paused_auto_rest"),
           pausedSec: phase.pausedSec,
           pauseStartedAt: phase.pauseStartedAt,
           timerFrozenAt: phase.timerFrozenAt,
@@ -897,7 +1114,7 @@ export class SessionService {
     await this.stores.session.transaction(async (trx) => {
       await this.stores.phases.completePlannedWork(trx, plannedWorkPhaseId, {
         endedAt: msToIso(plannedEndMs),
-        endedReason: "planned_complete",
+        endedReason: this.closeReason("planned_complete"),
         pausedSec: phase.pausedSec,
         pauseStartedAt: phase.pauseStartedAt,
         timerFrozenAt: phase.timerFrozenAt,
@@ -1019,7 +1236,7 @@ export class SessionService {
         await this.stores.phases.completeRest(trx, restPhaseId, {
           endedAt: msToIso(restEndedAtMs),
           actualDurationSec: phase.plannedDurationSec,
-          endedReason: "completed",
+          endedReason: this.closeReason("completed"),
         });
         await this.stores.phases.openShortRestAck(trx, {
           id: ackPhaseId,
@@ -1039,7 +1256,7 @@ export class SessionService {
       await this.stores.phases.completeRest(trx, restPhaseId, {
         endedAt: msToIso(restEndedAtMs),
         actualDurationSec: phase.plannedDurationSec,
-        endedReason: "completed",
+        endedReason: this.closeReason("completed"),
       });
       await this.syncRuntime(trx, session, restEndedAtMs, restPhaseId);
       await this.stores.session.finalizeSession(

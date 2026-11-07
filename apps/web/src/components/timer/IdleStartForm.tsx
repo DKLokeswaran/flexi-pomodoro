@@ -93,9 +93,11 @@ function toStartBody(
 export function IdleStartForm({
   defaults,
   onStart,
+  recoveryAbandonedMessage,
 }: {
   defaults: SessionTimingDefaults;
   onStart: (body: StartSessionBody) => void;
+  recoveryAbandonedMessage?: string;
 }) {
   const { isEnabled } = useDebugFlags();
   const shortDurations = isEnabled("shortDurations");
@@ -129,6 +131,11 @@ export function IdleStartForm({
       <p className={displayStyles.phaseLabel}>Ready</p>
       <div className={displayStyles.clock}>00:00</div>
       <p className={displayStyles.cycle}>Start a committed session</p>
+      {recoveryAbandonedMessage ? (
+        <p className={displayStyles.recoveryNotice} role="status">
+          {recoveryAbandonedMessage}
+        </p>
+      ) : null}
       <div className={displayStyles.estimatedEnd}>
         <p>
           Estimated end <strong>{estimatedEnd}</strong>

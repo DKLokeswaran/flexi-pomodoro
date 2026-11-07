@@ -283,10 +283,105 @@ export class PhasesStore {
     await trx("pause_slices").where({ id }).update(patch);
   }
 
-  /** Read helpers used by attribution tests. */
+  /** Read helpers used by attribution tests and boot hydrate. */
   async getPhaseKind(id: string): Promise<PhaseKind | undefined> {
     const row = await this.db("phases").where({ id }).first();
     return row?.kind as PhaseKind | undefined;
+  }
+
+  async getPlannedWork(
+    id: string,
+  ): Promise<(PlannedWorkOpenRow & { endedAt: string | null }) | null> {
+    const row = await this.db("planned_work").where({ id }).first();
+    if (!row) return null;
+    return {
+      id: row.id,
+      sessionId: row.sessionId,
+      cycleIndex: row.cycleIndex,
+      plannedDurationSec: row.plannedDurationSec,
+      plannedEndAt: row.plannedEndAt,
+      startedAt: row.startedAt,
+      endedAt: row.endedAt,
+      pausedSec: row.pausedSec,
+      pauseStartedAt: row.pauseStartedAt,
+      timerFrozenAt: row.timerFrozenAt,
+      paused: Boolean(row.paused),
+    };
+  }
+
+  async getDecision(
+    id: string,
+  ): Promise<(DecisionOpenRow & { endedAt: string | null }) | null> {
+    const row = await this.db("decision").where({ id }).first();
+    if (!row) return null;
+    return {
+      id: row.id,
+      sessionId: row.sessionId,
+      cycleIndex: row.cycleIndex,
+      startedAt: row.startedAt,
+      decisionEndsAt: row.decisionEndsAt,
+      decisionWindowSec: row.decisionWindowSec,
+      endedAt: row.endedAt ?? null,
+    };
+  }
+
+  async getShortRestAck(
+    id: string,
+  ): Promise<(DecisionOpenRow & { endedAt: string | null }) | null> {
+    const row = await this.db("short_rest_ack").where({ id }).first();
+    if (!row) return null;
+    return {
+      id: row.id,
+      sessionId: row.sessionId,
+      cycleIndex: row.cycleIndex,
+      startedAt: row.startedAt,
+      decisionEndsAt: row.decisionEndsAt,
+      decisionWindowSec: row.decisionWindowSec,
+      endedAt: row.endedAt ?? null,
+    };
+  }
+
+  async getExtendedWork(
+    id: string,
+  ): Promise<(ExtendedWorkOpenRow & { endedAt: string | null }) | null> {
+    const row = await this.db("extended_work").where({ id }).first();
+    if (!row) return null;
+    return {
+      id: row.id,
+      sessionId: row.sessionId,
+      cycleIndex: row.cycleIndex,
+      startedAt: row.startedAt,
+      endedAt: row.endedAt ?? null,
+    };
+  }
+
+  async getRest(
+    id: string,
+    kind: "short_rest" | "long_rest",
+  ): Promise<(RestOpenRow & { endedAt: string | null }) | null> {
+    const row = await this.db("rest").where({ id }).first();
+    if (!row) return null;
+    return {
+      id: row.id,
+      sessionId: row.sessionId,
+      cycleIndex: row.cycleIndex,
+      plannedDurationSec: row.plannedDurationSec,
+      plannedEndAt: row.plannedEndAt,
+      startedAt: row.startedAt,
+      kind,
+      endedAt: row.endedAt ?? null,
+    };
+  }
+
+  /** Open pause_slices row for a planned-work phase, if any. */
+  async getOpenPauseSliceId(
+    plannedWorkPhaseId: string,
+  ): Promise<string | null> {
+    const row = await this.db("pause_slices")
+      .where({ plannedWorkPhaseId })
+      .whereNull("endedAt")
+      .first();
+    return row?.id ?? null;
   }
 
   async listDecisionRows(sessionId: string): Promise<unknown[]> {

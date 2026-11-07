@@ -97,8 +97,31 @@ export class SessionStore {
     });
   }
 
+  /** Mark a session interrupted (corrupt runtime abandon at boot). */
+  async markInterrupted(
+    trx: Knex.Transaction | Knex,
+    sessionId: string,
+    completedAt: string,
+  ): Promise<void> {
+    await trx("sessions").where({ id: sessionId }).update({
+      status: "interrupted",
+      completedAt,
+    });
+  }
+
   async clearRuntime(trx: Knex.Transaction | Knex): Promise<void> {
     await trx("session_runtime").del();
+  }
+
+  /** Active runtime row if a session is in progress (at most one). */
+  async getRuntime(): Promise<SessionRuntimeRow | null> {
+    const row = await this.db("session_runtime").first();
+    return (row as SessionRuntimeRow | undefined) ?? null;
+  }
+
+  async getSession(id: string): Promise<SessionRow | null> {
+    const row = await this.db("sessions").where({ id }).first();
+    return (row as SessionRow | undefined) ?? null;
   }
 
   /** Locked params columns from in-memory SessionParams. */

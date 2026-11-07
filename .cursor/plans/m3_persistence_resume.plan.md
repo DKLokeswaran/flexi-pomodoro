@@ -15,8 +15,8 @@ todos:
     content: Write-through phase/session stores (close every ending phase; decision-timeout delete trx; pause via plugin diff + pause_slices/planned_work columns; FR-FLOW-11 / FR-ACK-6)
     status: completed
   - id: boot-recovery
-    content: "Hydrate alertSeq + ActiveSession; await tick(now, { recovery: true }); clear runtime on complete"
-    status: pending
+    content: "Hydrate alertSeq + ActiveSession; runRecoveryTick; clear runtime on complete; CORRUPT_RUNTIME → abandon"
+    status: completed
   - id: non-root-docker
     content: Dockerfile mkdir/chown /data + USER node (FPMD-2); alpha upgrade note to delete empty root-owned volume; smoke fresh volume
     status: pending
@@ -50,7 +50,7 @@ Sources: [docs/product/PRD.md](docs/product/PRD.md) §4.1 (FR-HOST-2), §4.5 (FR
 - FR-HOST-2: SQLite under `/data` via Knex + `better-sqlite3`; settings + active session + phase history survive recreate
 - Labeled phase/segment shapes per PRD §7.3 (class-table `phases` + detail tables)
 - FR-FLOW-11 / FR-ACK-6 attribution on write (not only liveStats)
-- Boot recovery: hydrate (including `alertSeq`) → `await tick(now, { recovery: true })` → closes in that tick use `endedReason: "recovery"`; cover Q9 S1–S8 including SHORT_REST_ACK
+- Boot recovery: hydrate (including `alertSeq`) → `runRecoveryTick` → closes in that tick use `endedReason: "recovery"`; cover Q9 S1–S8 including SHORT_REST_ACK; corrupt runtime abandons to idle with a user-visible notice
 - FPMD-2: non-root `USER node`; fresh `/data` node-owned; alpha upgrade documents deleting empty root-owned volumes
 - Unit/integration tests for segment attribution + S1–S8 recovery
 
@@ -87,7 +87,7 @@ flowchart TB
   scheduler["scheduler"] -->|"tick under mutex"| sessionSvc
 ```
 
-- [`buildApp`](apps/server/src/app.ts): open Knex (`DATA_DIR` / default `/data` in Docker, local `./data` in dev) → migrate → construct stores → inject into settings + session → hydrate → one `await tick(Date.now(), { recovery: true })` before scheduler starts.
+- [`buildApp`](apps/server/src/app.ts): open Knex (`DATA_DIR` / default `/data` in Docker, local `./data` in dev) → migrate → construct stores → inject into settings + session → `hydrateFromStore` → one `runRecoveryTick(Date.now())` before scheduler starts. On `CORRUPT_RUNTIME` during hydrate/recovery: abandon (clear runtime, mark session `interrupted`, idle + `recoveryAbandonedMessage`) instead of failing boot.
 - **Write-through:** every command and every `advanceOnce` transition that opens/closes a phase `await`s store work (in a transaction when multiple rows) before `notify()`. Idempotent closes (same phase id). Every phase end sets `endedAt` and the outcome / `endedReason` on that detail row before opening the next phase (or finalizing the session).
 - **Phase model:** parent table `phases (id, kind)` plus one detail table per kind. `phases.kind` is the **only** source of truth for phase type, including `short_rest` \| `long_rest` (no `kind` column on `rest`). On phase start: insert `phases` and the matching detail row (`endedAt` null). On phase end: update that detail row (`endedAt`, outcome / `endedReason`). No second history store and no phase JSON blob. `session_runtime.currentPhaseId` FK → `phases.id`. Locked session params are columns on `sessions`. liveStats and `alertSeq` are columns on `session_runtime`.
 - **Settings:** singleton row with one column per settings field; load into `SettingsService`, persist on `update`.
@@ -127,8 +127,9 @@ Keep engine policy in `SessionService`; stores only persistence. Prefer a small 
 
 1. If `session_runtime` exists, load it (including `alertSeq`) into the service **before** any catch-up tick.
 2. Resolve `currentPhaseId` → `phases.kind` → detail row; rebuild `ActiveSession` + pause plugin from `pauseStrategy`. Soft-pause downtime across restart works once `pauseStartedAt` (and other pause columns) are restored on the open planned-work row.
-3. `await tick(Date.now(), { recovery: true })` once under the mutex. Recovery is an **explicit boot flag**, not inferred from wall-clock skew. Phases closed in that tick get `endedReason: "recovery"` where applicable. Later scheduler/command ticks use normal reasons.
+3. `runRecoveryTick(Date.now())` once under the mutex (sets an internal recovery flag for that tick only). Recovery is an **explicit boot path**, not inferred from wall-clock skew. Phases closed in that tick get `endedReason: "recovery"` where applicable. Later scheduler/command ticks use normal reasons.
 4. Persist `alertSeq` whenever it advances during a live session (same as liveStats).
+5. If hydrate (or recovery) throws `CORRUPT_RUNTIME` (runtime/session/phase rows inconsistent): clear `session_runtime`, mark the session `interrupted` when known, stay idle, and set `recoveryAbandonedMessage` on the idle snapshot so the UI can tell the user the last session could not be recovered cleanly. Cleared on the next successful `start`.
 
 Alerts emitted during recovery: keep existing `pendingAlerts` behavior (clients that reconnect get deltas from watermark — acceptable for alpha).
 
@@ -150,7 +151,7 @@ Tables aligned to PRD §7.3 (separate work shapes; no single `WorkSegment` kind 
 **Other tables:**
 
 - `settings` — singleton row; columns: `workDurationSec`, `shortRestDurationSec`, `cyclesBeforeLongRest`, `longRestDurationSec`, `decisionWindowSec`, `alertsMuted`, `workPauseStrategy`, `updatedAt`
-- `sessions` — id, startedAt, completedAt, status (`active` \| `completed` \| `interrupted`; `interrupted` unused in M3 but kept), pauseStrategy, locked param columns (`workDurationSec`, `shortRestDurationSec`, `cyclesBeforeLongRest`, `longRestDurationSec`, `decisionWindowSec`); optional debug flags as needed
+- `sessions` — id, startedAt, completedAt, status (`active` \| `completed` \| `interrupted`), pauseStrategy, locked param columns (`workDurationSec`, `shortRestDurationSec`, `cyclesBeforeLongRest`, `longRestDurationSec`, `decisionWindowSec`); optional debug flags as needed. `interrupted` is set when boot abandons a corrupt `session_runtime`
 - `session_runtime` — at most one active row: `sessionId` FK, `currentPhaseId` FK → `phases.id`, liveStats columns (`workedSec`, `deliberationSec`, `restSec`, `pausedSec`), `alertSeq`, `updatedAt`
 - `planned_work` — id FK, sessionId, cycleIndex, plannedDurationSec, plannedEndAt, startedAt, endedAt, pausedSec, pauseStartedAt, timerFrozenAt, paused, endedReason
 - `decision` — id FK, sessionId, cycleIndex, startedAt, endedAt, decisionEndsAt, decisionWindowSec, durationSec, outcome (`ack_rest` \| `continue`)
@@ -202,8 +203,9 @@ On startup:
 
 1. Load settings from store
 2. If `session_runtime` exists: load `alertSeq` into the service, load phase by `currentPhaseId` + detail by `kind`, rebuild `ActiveSession` + pause plugin
-3. `await tick(Date.now(), { recovery: true })` under the mutex so S1–S8 land before the scheduler and first client
-4. Start scheduler with normal (non-recovery) ticks
+3. `runRecoveryTick(Date.now())` under the mutex so S1–S8 land before the scheduler and first client
+4. On `CORRUPT_RUNTIME`: abandon to idle (`interrupted` + clear runtime + `recoveryAbandonedMessage`); do not fail process boot
+5. Start scheduler with normal (non-recovery) ticks
 
 ### 6. Non-root container (FPMD-2)
 
@@ -386,9 +388,9 @@ Largest chunk: write-through on every transition, pause plugin diff, decision-ti
 
 ### Group 4 — `boot-recovery` (solo)
 
-Hydration and `tick(..., { recovery: true })` only matter once Group 3 persists state. Focused change to the `buildApp` startup path.
+Hydration and `runRecoveryTick` only matter once Group 3 persists state. Focused change to the `buildApp` startup path (including corrupt-runtime abandon).
 
-**Done when:** Mid-session DB reloads into the correct phase; recovery tick closes overdue phases with `endedReason: "recovery"`.
+**Done when:** Mid-session DB reloads into the correct phase; recovery tick closes overdue phases with `endedReason: "recovery"`; corrupt runtime abandons to idle with a user-visible notice.
 
 ### Group 5 — `non-root-docker` + `tests-smoke`
 

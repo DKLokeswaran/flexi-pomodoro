@@ -111,6 +111,13 @@ export function createMockSessionStores(): SessionServiceStores {
     async clearRuntime(_trx: Trx): Promise<void> {
       runtime = null;
     },
+    async getRuntime(): Promise<SessionRuntimeRow | null> {
+      return runtime ? { ...runtime } : null;
+    },
+    async getSession(id: string): Promise<SessionRow | null> {
+      const row = sessions.find((s) => s.id === id);
+      return row ? { ...row } : null;
+    },
   };
 
   const phasesStore = {
@@ -270,6 +277,88 @@ export function createMockSessionStores(): SessionServiceStores {
     },
     async getPhaseKind(id: string): Promise<PhaseKind | undefined> {
       return phaseKinds.get(id);
+    },
+    async getPlannedWork(id: string) {
+      const row = plannedWork.find((r) => r.id === id);
+      return row
+        ? {
+            id: row.id,
+            sessionId: row.sessionId,
+            cycleIndex: row.cycleIndex,
+            plannedDurationSec: row.plannedDurationSec,
+            plannedEndAt: row.plannedEndAt,
+            startedAt: row.startedAt,
+            endedAt: row.endedAt,
+            pausedSec: row.pausedSec,
+            pauseStartedAt: row.pauseStartedAt ?? null,
+            timerFrozenAt: row.timerFrozenAt ?? null,
+            paused: row.paused ?? false,
+          }
+        : null;
+    },
+    async getDecision(id: string) {
+      const row = decisions.find((r) => r.id === id);
+      return row
+        ? {
+            id: row.id,
+            sessionId: row.sessionId,
+            cycleIndex: row.cycleIndex,
+            startedAt: row.startedAt,
+            decisionEndsAt: row.decisionEndsAt,
+            decisionWindowSec: row.decisionWindowSec,
+            endedAt: row.endedAt,
+          }
+        : null;
+    },
+    async getShortRestAck(id: string) {
+      const row = shortRestAcks.find((r) => r.id === id);
+      return row
+        ? {
+            id: row.id,
+            sessionId: row.sessionId,
+            cycleIndex: row.cycleIndex,
+            startedAt: row.startedAt,
+            decisionEndsAt: row.decisionEndsAt,
+            decisionWindowSec: row.decisionWindowSec,
+            endedAt: row.endedAt,
+          }
+        : null;
+    },
+    async getExtendedWork(id: string) {
+      const row = extendedWork.find((r) => r.id === id);
+      return row
+        ? {
+            id: row.id,
+            sessionId: row.sessionId,
+            cycleIndex: row.cycleIndex,
+            startedAt: row.startedAt,
+            endedAt: row.endedAt,
+          }
+        : null;
+    },
+    async getRest(id: string, kind: "short_rest" | "long_rest") {
+      const row = rests.find((r) => r.id === id);
+      return row
+        ? {
+            id: row.id,
+            sessionId: row.sessionId,
+            cycleIndex: row.cycleIndex,
+            plannedDurationSec: row.plannedDurationSec,
+            plannedEndAt: row.plannedEndAt,
+            startedAt: row.startedAt,
+            kind,
+            endedAt: row.endedAt,
+          }
+        : null;
+    },
+    async getOpenPauseSliceId(
+      plannedWorkPhaseId: string,
+    ): Promise<string | null> {
+      const row = pauseSlices.find(
+        (r) =>
+          r.plannedWorkPhaseId === plannedWorkPhaseId && r.endedAt === null,
+      );
+      return row?.id ?? null;
     },
     async listDecisionRows(sessionId: string): Promise<unknown[]> {
       return decisions.filter((r) => r.sessionId === sessionId);

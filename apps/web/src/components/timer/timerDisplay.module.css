@@ -1,3 +1,25 @@
+.recoveryNotice {
+  margin: 0;
+  max-width: 28rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--danger, #b42318) 35%, transparent);
+  background: color-mix(in srgb, var(--danger, #b42318) 12%, transparent);
+  color: var(--text, inherit);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.recoveryNotice {
+  margin: 0;
+  max-width: 28rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--danger, #b42318) 35%, transparent);
+  background: color-mix(in srgb, var(--danger, #b42318) 12%, transparent);
+  color: var(--text, inherit);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
 .phaseLabel {
   text-transform: uppercase;
   letter-spacing: 0.14em;

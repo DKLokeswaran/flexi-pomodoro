@@ -188,6 +188,8 @@ export interface IdleSnapshot {
   serverNow: string;
   pendingAlerts: AlertEvent[];
   alertSeq: number;
+  /** Set when boot hydrate abandoned a corrupt interrupted session. */
+  recoveryAbandonedMessage?: string;
 }
 
 export interface ActiveSnapshot {

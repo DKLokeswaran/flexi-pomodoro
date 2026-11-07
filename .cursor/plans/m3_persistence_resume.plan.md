@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: tests-smoke
     content: Segment attribution tests + Q9 S1–S8 recovery matrix + Compose recreate smoke
-    status: pending
+    status: completed
 isProject: false
 ---
 

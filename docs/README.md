@@ -2,7 +2,7 @@
 
 # Flexi Pomodoro — Technical Documentation
 
-Self-hosted, flow-aware Pomodoro timer. This documentation set describes the current source tree on branch `master` (version `0.0.2-alpha.3`). Product requirements and roadmap live separately under [`product/`](./product/).
+Self-hosted, flow-aware Pomodoro timer. This documentation set describes the current source tree on branch `master` (version `0.0.3-alpha.0`). Product requirements and roadmap live separately under [`product/`](./product/).
 
 ## Quick start
 

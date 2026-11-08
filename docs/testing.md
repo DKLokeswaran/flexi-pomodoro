@@ -27,7 +27,7 @@ Server and web `tsconfig.json` files **exclude** `src/tests/**` from production 
 | Type | Present? |
 |------|----------|
 | Unit (server services, pause plugins, settings validation) | Yes |
-| Unit (web projection / liveStats helpers) | Yes |
+| Unit (web projection / liveStats / dialProgress helpers) | Yes |
 | Integration (HTTP Fastify inject) | Not found |
 | E2E / browser | Not found |
 | Snapshot tests | Not found |
@@ -234,6 +234,15 @@ Fabricated `ActiveSnapshot` fixtures only (no server imports).
 | Hard pause open / resume | Open pause adds time; shifted `plannedEndAt` keeps it after resume |
 | Short rest after deliberation | Anchor slip reflected |
 | Extended → rest ETA stability | Projection unchanged across the transition at the same slip |
+
+### `apps/web/src/tests/utils/dialProgress.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| Planned work remaining | Arc fraction shrinks with elapsed planned time |
+| Hard-pause freeze | Progress holds while `timerFrozenAt` is set |
+| Extended overtime | `remaining` stays 1; `overtimeLaps` grows in work-duration units |
+| `cycleDotStates` | Earlier cycles done, current live, later pending |
 
 ---
 

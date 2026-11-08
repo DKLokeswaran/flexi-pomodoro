@@ -1,6 +1,6 @@
 # Module & Component Inventory
 
-Every committed TypeScript/TSX source file with exported symbols, key types, dependencies, and side effects. CSS modules export class-name maps only (omitted field-by-field). Binary WAVs omitted.
+Every committed TypeScript/TSX source file with exported symbols, key types, dependencies, and side effects. shadcn `components/ui/*` primitives are summarized (not every prop). Binary WAVs and vendored `.agents` skills omitted.
 
 ---
 
@@ -319,7 +319,7 @@ No exports. **Side effects:** mounts React root; `UiFlagsProvider` + `DebugFlags
 
 | Export | Props / notes |
 |--------|----------------|
-| `App()` | Tab state; settings query; session stream; renders tabs |
+| `App()` | Header `Logo` + title; tab state; settings query; session stream; renders tabs |
 
 ### `src/vite-env.d.ts`
 
@@ -338,7 +338,7 @@ Declares `__APP_VERSION__: string`.
 
 ### `src/constants/about.ts`
 
-Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, …), and data arrays including `FEATURES` (Hard pause, Short-rest acknowledgement, Live session stats → `available`).
+Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, …), data arrays including `FEATURES` (Hard pause, Short-rest acknowledgement, Live session stats → `available`), `FONT_CREDITS`, `DESIGN_CREDIT` (Quiet Dark / flavors.design), and `CREDITS`.
 
 ---
 
@@ -416,6 +416,24 @@ Internal helpers `pad2` and `splitSec` back both formatters.
 | `alertsFromSnapshot(snapshot)` | extract pendingAlerts |
 
 **Side effects:** Audio playback; advances watermark. Missing asset files fail silently in `audio.play()`.
+
+### `src/utils/phaseClock.ts`
+
+| Export | Kind |
+|--------|------|
+| `CountdownPhase` | type — `Phase` without `extended_work` |
+| `phaseEndAt(phase)` | ISO end for countdown phases |
+| `phaseDurationSec(phase)` | planned length in seconds |
+| `phaseClockMs(phase, nowMs)` | clock anchor (respects hard-pause freeze) |
+
+### `src/utils/dialProgress.ts`
+
+| Export | Kind |
+|--------|------|
+| `DialProgress` | type `{ remaining; overtimeLaps }` |
+| `CycleDotState` | `"done" \| "current" \| "pending"` |
+| `dialProgress(phase, params, nowMs)` | main-arc fraction + overtime laps |
+| `cycleDotStates(currentCycle, totalCycles)` | per-cycle dot states |
 
 ---
 
@@ -507,9 +525,9 @@ Exports: `DEBUG_FEATURE_IDS`, `DEBUG_FEATURE_META`, re-exported types.
 | `DebugFlagsProvider` | provider (`hasGate: true`, key `flexi-pomodoro:debugFlags`) |
 | `useDebugFlags()` | `{ debugMode, setDebugMode, flags, setFlag, isEnabled }` |
 
-### `ui/catalog.ts` + `ui/features/hideContinueButton.ts`
+### `ui/catalog.ts` + `ui/features/classicTimer.ts` + `ui/features/hideContinueButton.ts`
 
-Web UI preference catalog (plain TS, no Zod).
+Web UI preference catalog (plain TS, no Zod). Features: `classicTimer` (plain clock instead of dial), `hideContinueButton`.
 
 Exports: `UI_FEATURE_IDS`, `UI_FEATURE_META`, `UiFeatureId`, `UiFlags`.
 
@@ -532,7 +550,23 @@ Exports: `UI_FEATURE_IDS`, `UI_FEATURE_META`, `UiFeatureId`, `UiFlags`.
 
 ---
 
+## Lib
+
+### `src/lib/utils.ts`
+
+| Export | Kind |
+|--------|------|
+| `cn` | re-export from `cn` package for Tailwind class merging |
+
+---
+
 ## Components
+
+### `src/components/Logo.tsx`
+
+| Export | Props |
+|--------|-------|
+| `Logo` | `{ size: number \| string; className? }` — decorative `/logo.svg`; pair with visible app name text |
 
 ### `src/components/Nav.tsx`
 
@@ -572,7 +606,7 @@ Exports: `UI_FEATURE_IDS`, `UI_FEATURE_META`, `UiFeatureId`, `UiFlags`.
 | `SessionTimingDefaults` | type (duration fields) |
 | `IdleStartForm` | props `{ defaults, onStart }` |
 
-Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and approximate duration from per-session overrides via `sessionProjection`.
+Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and approximate duration from per-session overrides via `sessionProjection`. Default layout uses a still `TimerDial` full ring; `classicTimer` UI flag keeps the plain clock.
 
 ### `src/components/timer/ActiveTimer.tsx`
 
@@ -581,9 +615,24 @@ Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and appr
 | `snapshot` | `ActiveSnapshot` |
 | `onAction` | `(path: string) => void` |
 
-Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Renders phase label, countdown (`formatMmSs`), cycle, estimated end (`activeEstimatedSessionEndMs`), hint, actions, and live-stats HUD (`liveStatsAt`: Worked / Deliberation / Rest / Paused via `formatHhMmSs`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
+Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Default layout: `TimerDial` with `dialProgress` / `cycleDotStates`, phase eyebrow, countdown, overtime comet, and Cycle / Phase ends / Estimated end readouts. Classic layout (`classicTimer` flag): plain `formatMmSs` clock via `timerDisplay` classes. Also renders hint, actions, and live-stats HUD (`liveStatsAt`: Worked / Deliberation / Rest / Paused via `formatHhMmSs`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
 
-Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button label and phase suffix follow `snapshot.session.pauseStrategy`.
+Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button label and phase suffix follow `snapshot.session.pauseStrategy`. Phase end/duration/clock helpers come from `phaseClock`.
+
+### `src/components/timer/TimerDial.tsx`
+
+| Export | Kind |
+|--------|------|
+| `DialReadout` | type `{ label; value }` |
+| `TimerDial` | props `{ progress, eyebrow, clock, clockSuffix?, cycleDots?, readouts }` |
+
+Internal: `DialFace`, `OvertimeComet`, `CycleDots`, `DialReadouts` (not exported).
+
+### `src/components/timer/timerDisplay.ts`
+
+| Export | Kind |
+|--------|------|
+| `timerDisplay` | const map of shared Tailwind class strings for idle/active timer chrome |
 
 ### `src/components/SettingsTab.tsx`
 
@@ -602,7 +651,11 @@ Draft includes timing fields plus `enableHardPause` (maps to `workPauseStrategy`
 |--------|-------|
 | `AboutTab` | none (uses health query + toast) |
 
-Internal helpers: `StatusPill`, `CreditRow`, `healthUi`, `healthClassName`, `buildDiagnostics` (not exported).
+Shows `Logo`, diagnostics, link cards, and credits (including Quiet Dark / flavors.design). Internal helpers: `StatusPill`, `CreditRow`, `healthUi`, `healthClassName`, `buildDiagnostics` (not exported).
+
+### `src/components/ui/*` (shadcn)
+
+Committed primitives in use: `badge`, `button`, `card`, `checkbox`, `collapsible`, `field`, `input`, `label`, `separator`. Generated/adapted for base-nova; compose via Tailwind + `cn`.
 
 ### `src/components/about/AboutAccordion.tsx`
 
@@ -634,12 +687,12 @@ Internal helpers: `StatusPill`, `CreditRow`, `healthUi`, `healthClassName`, `bui
 
 ---
 
-## CSS modules (committed)
+## Styles
 
-`App.module.css`, `Nav.module.css`, `NumberField.module.css`, `TimerTab.module.css`, `SettingsTab.module.css`, `AboutTab.module.css`, `timer/timerDisplay.module.css`, `about/AboutAccordion.module.css`, `about/LinkCard.module.css`, `providers/ToastProvider.module.css`, plus global `styles.css`.
+Global `styles.css` only (Tailwind + Quiet Dark theme + type utilities). No CSS modules remain.
 
 ---
 
 ## Config / non-TS
 
-Workspace manifests, Docker files, `vite.config.ts` (defines `__APP_VERSION__`, proxy), HTML shell — see [build-and-deploy.md](./build-and-deploy.md) and [structure.md](./structure.md).
+Workspace manifests, Docker files, `apps/web/DESIGN.md`, `components.json`, `vite.config.ts` (Tailwind plugin, `@` alias, `__APP_VERSION__`, proxy), HTML shell + public logo/favicons — see [build-and-deploy.md](./build-and-deploy.md) and [structure.md](./structure.md).

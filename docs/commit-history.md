@@ -6,13 +6,13 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 52 |
+| Total commits | 55 |
 | First commit date | 2026-07-12 |
 | Latest commit date | 2026-11-08 |
-| Active contributors | 1 |
-| Most active contributor | Lokeswaran DK (52) |
+| Active contributors | 2 |
+| Most active contributor | Lokeswaran DK (53) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
-| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` … `v0.0.2-alpha.3` |
+| Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` … `v0.0.2-alpha.3` (workspace version field `0.0.3-alpha.0`) |
 
 ## Commit velocity
 
@@ -22,7 +22,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | 2026-08 | 11 |
 | 2026-09 | 13 |
 | 2026-10 | 2 |
-| 2026-11 | 3 |
+| 2026-11 | 6 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -215,6 +215,21 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Q9 S1–S8 recovery matrix (`hydrateFromStore` + `runRecoveryTick`).
 - Settings round-trip across a new service instance on the same DB.
 
+### 2026-11-08 — Technical docs sync (M3)
+
+- Bring architecture, deploy, testing, structure, and related technical docs in line with boot hydrate / recovery, non-root Docker, and the M3 tests-smoke coverage.
+
+### 2026-11-08 — Quiet Dark restyle + timer dial (`#1`)
+
+- Adopt Tailwind CSS v4 and shadcn/ui (base-nova); map Quiet Dark tokens from `apps/web/DESIGN.md` into the theme; replace CSS modules with Tailwind classes (layout/behavior unchanged).
+- Add timer dial (countdown arc, overtime comet, cycle dots, Cycle / Phase ends / Estimated end); dial is default, classic plain clock via `classicTimer` UI flag.
+- Shared `phaseClock` / `dialProgress` helpers and dial unit tests; About credits Quiet Dark from flavors.design; root `AGENTS.md` for DESIGN.md reading rules; vendored shadcn skill under `.agents/skills`.
+
+### 2026-11-08 — App logo + `0.0.3-alpha.0` (`#2`)
+
+- Add `public/logo.svg` with raster favicon fallbacks; show `Logo` in the header and About tab.
+- Bump workspace version to `0.0.3-alpha.0`.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -224,11 +239,15 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 - Path/file renames (`engine` → `session.service`, `api.ts` split, docs move) — import path breaks for external consumers of old layout.
 - Session pause endpoints renamed from `/api/session/soft-pause` and `/soft-resume` to `/pause` and `/resume`; planned-work phase fields renamed from `softPaused*` to strategy-neutral `paused*`.
 - Docker runtime no longer runs as root; empty root-owned `/data` volumes from older images need a one-time delete so `node` can write SQLite.
+- Web styling moved from co-located CSS modules to Tailwind + shadcn; old `*.module.css` imports no longer exist. Timer dial is the default surface; opt out with `classicTimer`.
 
 ## Full commit log
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 0aeee54 | DKLokeswaran | 2026-11-08 | Add the app logo to the favicon, header, About tab and docs (#2) |
+| 28ff5d0 | DKLokeswaran | 2026-11-08 | Restyle the web app to Quiet Dark with shadcn/ui and add the timer dial (#1) |
+| da9ee9c | Lokeswaran DK | 2026-11-08 | Sync technical docs with M3 boot resume, non-root Docker, and test coverage. |
 | cd0daec | Lokeswaran DK | 2026-11-08 | Cover M3 resume with attribution, Q9 S1–S8, and settings restart tests. |
 | 6d839bf | Lokeswaran DK | 2026-11-08 | Run the container as non-root with node-owned /data. |
 | f8a5957 | Lokeswaran DK | 2026-11-08 | Add boot hydrate and wall-clock recovery for mid-session resume. |
@@ -282,4 +301,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: cd0daec0ca8098cff0b2fbbdb3a85ed12a9f3d42
+Last Synced Commit: 0aeee54d43e291d4106e64a4338d57bc1b42d399

@@ -4,15 +4,17 @@ Annotated layout of the source tree (binary alert WAVs listed by pattern only).
 
 ```
 flexi-pomodoro/
-├── package.json                 # Workspace root: scripts, engines node>=20, version 0.0.1-alpha.4
+├── package.json                 # Workspace root: scripts, engines node>=20, version 0.0.3-alpha.0
 ├── package-lock.json
+├── AGENTS.md                    # Agent rules: read apps/web/DESIGN.md before frontend work
 ├── Dockerfile                   # Multi-stage: deps → build → runtime as USER node (port 3847)
 ├── docker-compose.yml           # Single service; DATA_DIR=/data; FPMD_DATA_DIR bind or named volume
 ├── .dockerignore
 ├── .gitignore
 ├── .prettierrc
-├── .prettierignore
+├── .prettierignore              # Also skips vendored .agents skills
 ├── .git-blame-ignore-revs        # Skip the Prettier format commit in git blame
+├── .agents/skills/shadcn/       # Vendored shadcn skill (linked from .claude/skills)
 ├── .cursor/plans/
 │   ├── m1_timer_core.plan.md    # M1 implementation plan notes
 │   ├── m2_pause_modules.plan.md # M2 pause plugin plan notes
@@ -91,10 +93,12 @@ flexi-pomodoro/
 │   │           └── utils/
 │   │               └── asyncMutex.test.ts
 │   └── web/                     # @flexi-pomodoro/web
-│       ├── index.html
+│       ├── index.html           # favicon links; font CSS via fontsource imports in styles.css
 │       ├── package.json
-│       ├── vite.config.ts       # proxy /api → :3847; __APP_VERSION__
-│       ├── tsconfig.json        # excludes src/tests/**
+│       ├── components.json      # shadcn/ui (base-nova) config
+│       ├── DESIGN.md            # Quiet Dark flavor tokens + prose (authoritative for frontend)
+│       ├── vite.config.ts       # Tailwind plugin; @ → src; proxy /api → :3847; __APP_VERSION__
+│       ├── tsconfig.json        # excludes src/tests/**; paths @/*
 │       ├── tsconfig.node.json
 │       ├── public/
 │       │   ├── alerts/          # placeholder-*.wav (one per AlertId; 8 files)
@@ -103,22 +107,25 @@ flexi-pomodoro/
 │       │   └── apple-touch-icon.png
 │       └── src/
 │           ├── main.tsx
-│           ├── App.tsx / App.module.css
-│           ├── styles.css       # global tokens + shared utility classes
+│           ├── App.tsx
+│           ├── styles.css       # Tailwind + Quiet Dark theme tokens + type utilities
 │           ├── vite-env.d.ts
-│           ├── components/      # tabs + shared fields
-│           ├── components/timer/
+│           ├── lib/utils.ts     # cn() re-export for shadcn class merging
+│           ├── components/      # tabs + Logo + NumberField + Stubs
+│           ├── components/ui/   # shadcn primitives in use (button, card, field, …)
+│           ├── components/timer/  # IdleStartForm, ActiveTimer, TimerDial, timerDisplay
 │           ├── components/about/
 │           ├── constants/
 │           ├── hooks/           # useNow, useSessionStream, SSE transport
-│           ├── browserFlags/    # createFlagCatalog, createFlagStore, debug/, ui/
+│           ├── browserFlags/    # createFlagCatalog, createFlagStore, debug/, ui/ (classicTimer, hideContinueButton)
 │           ├── providers/       # Toast
 │           ├── queries/         # fetch helpers + React Query hooks
-│           ├── utils/           # time, liveStats, sessionProjection, activeSessionProjection, fetchJson, alerts, errorMessage
+│           ├── utils/           # time, liveStats, dialProgress, phaseClock, projections, alerts, …
 │           └── tests/
 │               └── utils/
 │                   ├── sessionProjection.test.ts
 │                   ├── activeSessionProjection.test.ts
+│                   ├── dialProgress.test.ts
 │                   └── liveStats.test.ts
 ```
 
@@ -127,22 +134,26 @@ flexi-pomodoro/
 | Path | Role |
 |------|------|
 | `apps/server` | HTTP/SSE API, session engine, SQLite settings + session write-through + boot resume, optional static host |
-| `apps/web` | React UI |
+| `apps/web` | React UI (Quiet Dark / shadcn + timer dial) |
 | `packages/shared` | Cross-cutting domain contract |
 | `docs/product` | Product PRD and roadmap |
+| `AGENTS.md` / `apps/web/DESIGN.md` | Frontend design authority for agents and humans |
+| `.agents/skills` | Vendored agent skills (e.g. shadcn); ignored by Prettier |
 | `.cursor/plans` | Internal planning artifacts (M1–M3) |
 
 ## Language composition (committed files)
 
+Counts exclude `node_modules`, build artifacts, and vendored `.agents` skill trees.
+
 | Extension | Count |
 |-----------|------:|
-| `.ts` | 79 |
-| `.tsx` | 17 |
-| `.css` | 11 |
-| `.json` | 22 |
+| `.ts` | 103 |
+| `.tsx` | 28 |
+| `.css` | 1 |
+| `.json` | 23 |
 | `.wav` | 8 |
-| `.md` | 21 |
-| Other (yml, html, Docker, ignore) | — |
+| `.md` | 23 |
+| Other (yml, html, Docker, ignore, svg/png) | — |
 
 ## Where to add new code
 
@@ -160,7 +171,7 @@ flexi-pomodoro/
 | Browser UI preference | New feature under `browserFlags/ui/features/`; register in `browserFlags/ui/catalog.ts` |
 | UI tab / panel | `apps/web/src/components/`; wire in `App.tsx` + `Nav.tsx` |
 | API client call | `apps/web/src/queries/<domain>.api.ts` + hook in `useSessionApi.ts` / dedicated query hook |
-| Co-located styles | `<Component>.module.css` beside the component; shared tokens in `styles.css` |
+| Styling / new UI primitive | Read `DESIGN.md` first; Tailwind classes on components; add shadcn pieces under `components/ui/` via the project `components.json`; theme tokens in `styles.css` |
 
 ## Test location convention
 

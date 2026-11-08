@@ -11,7 +11,10 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **M2** | Pause modules — soft and hard `WorkPauseStrategy` plugins; hard pause experimental via Settings |
 | **M2.5** | Short-rest acknowledgement + in-memory live session stats on the active timer surface |
 | **M3** | Persistence & analytics milestone (SQLite, decision segments, recovery) |
-| **Alpha** | Current release channel (`0.0.2-alpha.*`) |
+| **Alpha** | Current release channel (`0.0.3-alpha.*`) |
+| **Quiet Dark** | Web visual flavor from flavors.design; tokens live in `apps/web/DESIGN.md` and map into Tailwind / shadcn theme variables |
+| **Timer dial** | Default active/idle timer surface: countdown arc, overtime comet, cycle dots, and Cycle / Phase ends / Estimated end readouts |
+| **Classic timer** | Plain clock layout; opt-in via the `classicTimer` browser UI flag |
 | **N / cyclesBeforeLongRest** | Number of work cycles before a long rest |
 
 ## Session & phases
@@ -63,6 +66,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **Debug mode** | Client gate unlocking per-feature debug flags (localStorage `flexi-pomodoro:debugFlags`) |
 | **Browser preferences / UI flags** | Client-only toggles in Settings → Browser preferences (localStorage `flexi-pomodoro:uiFlags`); not sent to the server |
 | **hideContinueButton** | UI flag that removes the Continue action during the work-decision phase |
+| **classicTimer** | UI flag that shows the plain clock instead of the timer dial |
 | **Experimental features** | Settings UI gate; when enabled, shows **Enable hard pause (experimental)** (maps to `workPauseStrategy`) |
 | **shortDurations** | Debug feature allowing ≥1s work/rest/decision on **start** only |
 | **alertsMuted** | Settings boolean (schema); curated mute UX still “soon” |

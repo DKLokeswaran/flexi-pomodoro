@@ -6,7 +6,7 @@ Inventory from committed `package.json` files and lockfile versions for direct p
 
 | Package | Version field | Role |
 |---------|---------------|------|
-| `flexi-pomodoro` (root) | `0.0.1-alpha.4` | Workspaces orchestrator |
+| `flexi-pomodoro` (root) | `0.0.3-alpha.0` | Workspaces orchestrator |
 | `@flexi-pomodoro/shared` | `0.0.0` private | Domain contract |
 | `@flexi-pomodoro/server` | `0.0.0` private | API |
 | `@flexi-pomodoro/web` | `0.0.0` private | SPA |
@@ -32,6 +32,23 @@ Internal deps use `"@flexi-pomodoro/shared": "*"`.
 |---------|----------|--------|-------|
 | `lucide-react` | ^1.25.0 | 1.25.0 | web prod |
 | `simple-icons` | ^16.27.0 | 16.27.0 | web prod (GitHub glyph) |
+| `@fontsource/instrument-serif` | ^5.3.0 | 5.3.0 | web prod |
+| `@fontsource-variable/inter` | ^5.3.0 | 5.3.0 | web prod |
+| `@fontsource-variable/jetbrains-mono` | ^5.3.0 | 5.3.0 | web prod |
+
+Static logo/favicons live under `apps/web/public/` (not npm packages).
+
+### Styling / UI kit
+
+| Package | Declared | Locked | Scope |
+|---------|----------|--------|-------|
+| `tailwindcss` | ^4.3.3 | 4.3.3 | web dev |
+| `@tailwindcss/vite` | ^4.3.3 | 4.3.3 | web dev |
+| `shadcn` | ^4.22.1 | 4.22.1 | web prod (CLI / kit) |
+| `@base-ui/react` | ^1.9.0 | 1.9.0 | web prod (shadcn base-nova primitives) |
+| `class-variance-authority` | ^0.7.1 | 0.7.1 | web prod |
+| `cn` | ^0.5.0 | 0.5.0 | web prod (`@/lib/utils` re-export) |
+| `tw-animate-css` | ^1.4.0 | 1.4.0 | web prod |
 
 ### State / data fetching
 
@@ -73,7 +90,7 @@ Internal deps use `"@flexi-pomodoro/shared": "*"`.
 
 | Package | Declared | Locked | Scope |
 |---------|----------|--------|-------|
-| `@types/node` | ^22.15.30 | 22.20.1 | server dev |
+| `@types/node` | ^22.15.30 | 22.20.1 | server + web dev |
 
 ### Auth / extra test libs
 
@@ -101,4 +118,4 @@ No ESLint package or config committed.
 
 ## Transitive dependencies
 
-Hundreds via `package-lock.json` (3863 lines). Prefer lockfile for exact transitive versions; only direct packages are tabulated above.
+Hundreds via `package-lock.json` (~7600 lines). Prefer lockfile for exact transitive versions; only direct packages are tabulated above.

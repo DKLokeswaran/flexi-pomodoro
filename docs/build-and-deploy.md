@@ -91,7 +91,7 @@
 | `v0.0.1-alpha.2` | 2026-07-16 |
 | `v0.0.1-alpha.1` | 2026-07-14 |
 
-Root package version string: `0.0.1-alpha.4`.
+Root package version string: `0.0.3-alpha.0` (git tags through `v0.0.2-alpha.3` still present; no `v0.0.3-*` tag yet).
 
 ---
 

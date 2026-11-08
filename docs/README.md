@@ -36,7 +36,7 @@ docker compose up --build
 | Monorepo | npm workspaces (`apps/*`, `packages/*`) |
 | Shared types/validation | TypeScript, Zod (`@flexi-pomodoro/shared`) |
 | Server | Fastify 5, `@fastify/static`, Knex + better-sqlite3, Node 20+/22 |
-| Web | React 19, Vite 6, TanStack Query 5, CSS modules |
+| Web | React 19, Vite 6, TanStack Query 5, Tailwind CSS v4, shadcn/ui (base-nova / Quiet Dark) |
 | Tests | Node.js built-in test runner (`node:test`) |
 | Deploy | Multi-stage Dockerfile, docker-compose |
 

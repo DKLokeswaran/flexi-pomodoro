@@ -12,7 +12,7 @@ Flexi Pomodoro is an **npm-workspace monorepo** with three packages:
 
 Backend style is **layered**: composition root (`app.ts`) → routes → services → pause plugins → Knex/SQLite stores. Settings load and save through `SettingsStore`. The session engine is an **in-memory state machine** advanced by wall-clock ticks (`IntervalScheduler`), with transactional write-through to `SessionStore` / `PhasesStore` on every transition. On boot, `buildApp` calls `hydrateFromStore` then one `runRecoveryTick` before the scheduler starts; corrupt runtime abandons to idle with a user-visible notice. Pause policy is injected as a `WorkPauseStrategy` plugin, not inlined in the engine.
 
-Frontend style is **feature-oriented folders** under `apps/web/src`: components (by tab/feature), providers, queries (API + React Query hooks), hooks (SSE stream), utils, constants. Tab switching is local React state (no client router).
+Frontend style is **feature-oriented folders** under `apps/web/src`: components (by tab/feature), providers, queries (API + React Query hooks), hooks (SSE stream), utils, `lib/`, constants. Styling is Tailwind CSS v4 + shadcn/ui (base-nova) mapped from `apps/web/DESIGN.md` (Quiet Dark). Tab switching is local React state (no client router).
 
 ## Layer diagram
 
@@ -168,11 +168,13 @@ main.tsx
     UiFlagsProvider
       DebugFlagsProvider
         ToastProvider
-          App
+          App (header Logo + title)
           Nav
           TimerTab | SettingsTab | AnalyticsStub | AboutTab
             TimerTab → IdleStartForm | ActiveTimer
-            AboutTab → AboutAccordion, LinkCard, AboutIcon
+              ActiveTimer / IdleStartForm → TimerDial (default) or classic clock
+            AboutTab → Logo, AboutAccordion, LinkCard, AboutIcon
+            Shared primitives → components/ui/* (shadcn)
 ```
 
 ### Smart vs presentational
@@ -180,7 +182,7 @@ main.tsx
 | Kind | Examples |
 |------|----------|
 | Container / smart | `App` (queries + stream + mutations), `SettingsTab` (draft + browser prefs + debug), `AboutTab` (health + clipboard), `useSessionStream` |
-| Presentational | `Nav`, `NumberField`, `LinkCard`, `AboutAccordion`, `ActiveTimer` (receives `ActiveSnapshot`; owns its own `useNow` tick) |
+| Presentational | `Nav`, `NumberField`, `Logo`, `LinkCard`, `AboutAccordion`, `TimerDial`, `ActiveTimer` (receives `ActiveSnapshot`; owns its own `useNow` tick) |
 
 ### Routing
 
@@ -189,10 +191,12 @@ No React Router. `App` holds `tab: "timer" | "settings" | "analytics" | "about"`
 ### Real-time / countdown
 
 - **Authoritative phase changes**: SSE (`/api/session/events`) + hybrid poll fallback (`sessionStream.sse.ts`).
-- **UI countdown**: each leaf owns its clock. `ActiveTimer` uses `useNow(ACTIVE_UI_TICK_MS)` (250ms) for remaining/overtime from ISO anchors — no sub-second API polling. Hard pause uses `timerFrozenAt` as the clock anchor while paused. `IdleStartForm` uses `useNow(IDLE_ESTIMATE_TICK_MS)` (60s) only for the absolute estimated-end label.
+- **UI countdown**: each leaf owns its clock. `ActiveTimer` uses `useNow(ACTIVE_UI_TICK_MS)` (250ms) for remaining/overtime from ISO anchors — no sub-second API polling. Hard pause uses `timerFrozenAt` as the clock anchor while paused. Shared `phaseClock` helpers (`phaseEndAt` / `phaseDurationSec` / `phaseClockMs`) back both dial and classic layouts. `IdleStartForm` uses `useNow(IDLE_ESTIMATE_TICK_MS)` (60s) only for the absolute estimated-end label.
+- **Timer dial (default)**: `TimerDial` renders a countdown arc (`dialProgress`), overtime comet, cycle dots (`cycleDotStates`), and Cycle / Phase ends / Estimated end readouts. Idle shows a still full ring. Opt out with the `classicTimer` UI flag to keep the plain clock.
 - **Estimated session end**: idle shows locale wall-clock end plus approximate duration (`sessionProjection` — nominal path: `N×work + (N−1)×short rest + long rest`, no decision windows). Active shows a live end time via `activeEstimatedSessionEndMs` (forward remainder from current phase anchors; deliberation, extended work, and hard-pause slip shift the projection).
 - **Live stats HUD**: `ActiveTimer` shows Worked / Deliberation / Rest / Paused counters formatted with `formatHhMmSs` (`mm:ss` under one hour, `hh:mm:ss` after). `liveStatsAt(snapshot, now)` strips in-phase progress at `serverNow` and re-adds at local `now`. Worked/paused formulas use shared `plannedWorkSecAt` / `pausedSecAt`. While planned work is paused, the client freezes **worked** at pause start (`timerFrozenAt ?? pauseStartedAt`); **paused** keeps advancing on the wall clock (soft and hard).
-- **Browser preferences**: `hideContinueButton` UI flag (localStorage `flexi-pomodoro:uiFlags`) omits the Continue action during the work-decision phase.
+- **Browser preferences**: `classicTimer` and `hideContinueButton` UI flags (localStorage `flexi-pomodoro:uiFlags`). Classic timer swaps dial for plain clock; hide Continue omits that action during the work-decision phase.
+- **Brand assets**: `public/logo.svg` (plus raster favicons) via `Logo`; header and About use it. About credits Quiet Dark from flavors.design.
 - **Corrupt-runtime notice**: idle snapshots may include `recoveryAbandonedMessage`; `IdleStartForm` shows it until the next successful start.
 - **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`. Label and phase suffix follow the locked session strategy (`Soft pause` vs `Hard pause (experimental)`). Toasts mirror the same strategy.
 - **Settings**: Experimental features gate exposes **Enable hard pause (experimental)**; unchecked maps to `workPauseStrategy: "soft"`, checked to `"hard"`. Saved with **Save defaults**; locked while a session is active.

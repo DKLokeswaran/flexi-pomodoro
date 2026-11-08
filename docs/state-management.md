@@ -75,15 +75,16 @@ Session live state is **not** stored in the query cache; mutations push into the
 
 ```ts
 {
-  flags: UiFlags;              // e.g. { hideContinueButton?: boolean }
+  flags: UiFlags;              // e.g. { classicTimer?: boolean; hideContinueButton?: boolean }
   setFlag: (id, enabled) => void;
   isEnabled: (id) => boolean;  // always gate-on (hasGate: false)
 }
 ```
 
 - Plain TypeScript catalog (no Zod). Preferences always visible in Settings → **Browser preferences**.
+- `classicTimer` swaps the default timer dial for the plain clock in `ActiveTimer` and `IdleStartForm`.
 - `hideContinueButton` omits Continue during the work-decision phase in `ActiveTimer`.
-- Consumed by `SettingsTab`, `ActiveTimer`.
+- Consumed by `SettingsTab`, `ActiveTimer`, `IdleStartForm`.
 
 ### `ToastProvider`
 
@@ -135,7 +136,7 @@ Transport (`connectSessionStream`):
 | `App` | `tab: Tab` |
 | `SettingsTab` | draft minutes/cycles/decision; `enableHardPause`; session-only `experimentalMode` gate; UI + debug flag toggles |
 | `IdleStartForm` | override draft (min or sec depending on shortDurations); own `useNow(IDLE_ESTIMATE_TICK_MS)` for estimated end; shows optional `recoveryAbandonedMessage` from idle snapshot |
-| `ActiveTimer` | own `useNow(ACTIVE_UI_TICK_MS)` for countdown, live stats, and estimated end |
+| `ActiveTimer` | own `useNow(ACTIVE_UI_TICK_MS)` for countdown, dial/classic layout, live stats, and estimated end |
 | `AboutAccordion` | `open` |
 | `ToastProvider` | current toast |
 
@@ -146,8 +147,8 @@ Transport (`connectSessionStream`):
 No dedicated selector library. Inline derivation examples:
 
 - `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`
-- `ActiveTimer`: `displayClock`, `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`), `phaseHint`, `liveStatsAt` HUD (Worked / Deliberation / Rest / Paused), `activeEstimatedSessionEndMs`, strategy-aware pause labels
-- `IdleStartForm`: `estimatedSessionEndMs` / `nominalSessionDurationSec` from override draft
+- `ActiveTimer`: dial vs classic via `classicTimer`; `dialProgress` / `cycleDotStates`; `displayClock`; `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`); `phaseHint`; `liveStatsAt` HUD (Worked / Deliberation / Rest / Paused); `activeEstimatedSessionEndMs`; strategy-aware pause labels
+- `IdleStartForm`: still dial ring vs classic via `classicTimer`; `estimatedSessionEndMs` / `nominalSessionDurationSec` from override draft
 - `AboutTab`: feature available/soon counts; health UI mapping
 
 ---

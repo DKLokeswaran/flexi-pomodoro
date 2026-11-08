@@ -12,8 +12,8 @@ Derived from committed patterns (not aspirational rules).
 | Tests | `<module>.test.ts` under `src/tests/<area>/` (mirrors source; not colocated) | `tests/services/session.service.test.ts`, `tests/utils/liveStats.test.ts` |
 | Pause plugins | `pause/<id>Pause.ts` plus `types.ts` / `registry.ts` | `softPause.ts`, `hardPause.ts` |
 | React components | PascalCase file matching export | `ActiveTimer.tsx` |
-| CSS modules | `<Component>.module.css` | `AboutTab.module.css` |
-| Shared timer display CSS | `timerDisplay.module.css` | used by Idle + Active |
+| shadcn primitives | `components/ui/<name>.tsx` | `button.tsx`, `field.tsx` |
+| Shared timer Tailwind maps | `timerDisplay.ts` object of class strings | used by Idle + Active |
 | Hooks | `use*` | `useSessionStream`, `useNow` |
 | API modules | `<domain>.api.ts` | `session.api.ts` |
 | Constants / labels | camelCase exports | `DECISION_WINDOW_LABEL` |
@@ -26,8 +26,8 @@ Derived from committed patterns (not aspirational rules).
 ## File organization
 
 - Server: `routes/` + `services/` + `pause/` + `utils/` + `tests/services/` (layer-based after 6df9a85).
-- Web: `components/` (tabs + `timer/` + `about/`), `providers/`, `queries/`, `hooks/`, `utils/`, `constants/`.
-- Styles: CSS modules co-located; global tokens/utilities in `styles.css`.
+- Web: `components/` (tabs + `timer/` + `about/` + `ui/`), `providers/`, `queries/`, `hooks/`, `utils/`, `lib/`, `constants/`.
+- Styles: Tailwind utility classes on components; Quiet Dark / shadcn tokens and type utilities in `styles.css`; design authority in `DESIGN.md`.
 - Barrel files: route registration via `routes/index.ts`; pause plugins via `pause/index.ts`; shared via `packages/shared/src/index.ts`. Web API monolith barrel was removed (split into queries).
 
 ## Code structure within files
@@ -36,7 +36,7 @@ Derived from committed patterns (not aspirational rules).
 - **Exports:** named exports preferred for components/hooks (`export function App`); default exports uncommon.
 - **Functions:** mix of `function` declarations and arrow functions for small callbacks; classes for `SessionService`, `SettingsService`, `IntervalScheduler`, `AlertSeqStore`, `PauseStrategyRegistry`.
 - **Async:** `async/await` for fetch and `buildApp`; fire-and-forget `void audio.play().catch`; SSE setup uses async `openSse`.
-- Observed large files: `session.service.ts` (~470 lines), About tab (~237), shared `index.ts` (~242).
+- Observed large files: `session.service.ts`, `AboutTab.tsx`, `ActiveTimer.tsx` / `TimerDial.tsx`, shared `index.ts`.
 
 ## Async & cancellation
 
@@ -52,7 +52,7 @@ Derived from committed patterns (not aspirational rules).
 
 ## Formatting
 
-Root `.prettierrc`: 2-space indent, double quotes, semicolons, trailing commas (`all`), print width 80. `.prettierignore` excludes `node_modules`, `dist`, `build`, `coverage`, `data`, `package-lock.json`, `.pi`, and `*.md`. Scripts: `npm run format` (`prettier --write .`), `npm run format:check`. `.git-blame-ignore-revs` skips the wholesale format commit so blame keeps original authors.
+Root `.prettierrc`: 2-space indent, double quotes, semicolons, trailing commas (`all`), print width 80. `.prettierignore` excludes `node_modules`, `dist`, `build`, `coverage`, `data`, `package-lock.json`, `.pi`, `.agents`, and `*.md`. Scripts: `npm run format` (`prettier --write .`), `npm run format:check`. `.git-blame-ignore-revs` skips the wholesale format commit so blame keeps original authors.
 
 | Rule | Value |
 |------|-------|
@@ -62,16 +62,17 @@ Root `.prettierrc`: 2-space indent, double quotes, semicolons, trailing commas (
 | Trailing commas | All |
 | Print width | 80 |
 | Modules | ESM (`"type": "module"`); server/shared use `.js` extensions in relative imports |
-| Path aliases | Not configured; relative imports |
+| Path aliases | Web: `@/*` → `apps/web/src/*` (Vite + tsconfig); server/shared use relative imports |
 
 No ESLint config committed.
 
 ## UI / CSS conventions
 
-- Design tokens on `:root` (`--bg0`, `--accent`, `--font-display`, phase colors `--rest`, `--decision`, `--extended`).
-- Shared utility classes: `.panel`, `.btn`, `.btn-primary`, `.form-grid`, `.actions`, `.stub`, `.lead`.
-- Phase label uses `data-phase={phase.kind}` for styling hooks.
-- Fonts: Fraunces + Source Sans 3 (Google Fonts in `index.html`).
+- **Design authority:** `apps/web/DESIGN.md` (Quiet Dark). YAML tokens and hand-written prose win over generated shadcn kit defaults; see root `AGENTS.md`.
+- Theme CSS variables on `:root` / `.dark` in `styles.css` (shadcn slots such as `--primary` for brand gold, plus flavor extras `--fg-soft`, `--border-strong`, `--ease`).
+- Components use Tailwind utility classes and shadcn primitives under `components/ui/`; class merging via `cn` from `@/lib/utils`.
+- Shared timer class maps live in `timer/timerDisplay.ts` (not CSS modules).
+- Fonts: Instrument Serif + Inter Variable + JetBrains Mono Variable via `@fontsource*` imports in `styles.css`.
 
 ## TypeScript
 

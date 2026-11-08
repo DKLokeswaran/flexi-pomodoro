@@ -1,17 +1,19 @@
-/** Decorative app logo; pair it with visible text that names the app. */
+/**
+ * Decorative app logo; pair it with visible text that names the app.
+ * `size` is pixels as a number, or any CSS length such as "1.2em".
+ */
 export function Logo({
   size,
   className,
 }: {
-  size: number;
+  size: number | string;
   className?: string;
 }) {
   return (
     <img
       src="/logo.svg"
       alt=""
-      width={size}
-      height={size}
+      style={{ width: size, height: size }}
       className={className}
     />
   );

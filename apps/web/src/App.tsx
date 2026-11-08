@@ -28,7 +28,7 @@ export function App() {
   return (
     <div className="mx-auto flex min-h-screen max-w-[42rem] flex-col gap-7 px-5 pt-10 pb-12">
       <h1 className="animate-rise type-display flex items-center gap-3 text-[clamp(2.25rem,6vw,3.25rem)]">
-        <Logo size={40} />
+        <Logo size="1.2em" />
         <span>
           <em className="type-serif-italic">Flexi</em> Pomodoro
         </span>

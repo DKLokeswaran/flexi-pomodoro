@@ -1,4 +1,4 @@
-import styles from "./Nav.module.css";
+import { cn } from "@/lib/utils";
 
 type Tab = "timer" | "settings" | "analytics" | "about";
 
@@ -18,13 +18,20 @@ export function Nav({
   onChange: (tab: Tab) => void;
 }) {
   return (
-    <nav className={styles.nav} aria-label="Primary">
+    <nav
+      className="flex flex-wrap gap-6 border-b border-border"
+      aria-label="Primary"
+    >
       {TABS.map(({ id, label }) => (
         <button
           key={id}
           type="button"
           aria-current={tab === id ? "page" : undefined}
           onClick={() => onChange(id)}
+          className={cn(
+            "type-label -mb-px cursor-pointer border-b border-transparent py-3 text-muted-foreground transition-colors duration-[340ms] ease-quiet hover:text-foreground",
+            tab === id && "border-primary text-fg-bright",
+          )}
         >
           {label}
         </button>

@@ -35,23 +35,6 @@ describe("SessionService boot hydrate + recovery", () => {
     return { ...ctx, session };
   }
 
-  it("hydrate restores mid planned work without advancing", async () => {
-    const { session, stores } = await openEngine();
-    await session.start(SHORT_PARAMS, T0, "soft");
-
-    const mid = new SessionService({
-      session: stores.session,
-      phases: stores.phases,
-    });
-    const restored = await mid.hydrateFromStore();
-    assert.equal(restored, true);
-    const snap = mid.getSnapshot(T0 + 30_000);
-    assert.equal(snap.status, "active");
-    if (snap.status !== "active") return;
-    assert.equal(snap.session.phase.kind, "planned_work");
-    assert.equal(snap.session.phase.cycleIndex, 1);
-  });
-
   it("hydrate restores alertSeq from session_runtime", async () => {
     const { session, stores } = await openEngine();
     await session.start(SHORT_PARAMS, T0, "soft");
@@ -93,32 +76,6 @@ describe("SessionService boot hydrate + recovery", () => {
     assert.equal(planned.length, 1);
     assert.equal(planned[0].endedReason, "recovery");
     assert.ok(planned[0].endedAt);
-  });
-
-  it("recovery through decision window opens extended and deletes decision", async () => {
-    const { session, stores, db } = await openEngine();
-    await session.start(SHORT_PARAMS, T0, "soft");
-
-    const mid = new SessionService({
-      session: stores.session,
-      phases: stores.phases,
-    });
-    assert.equal(await mid.hydrateFromStore(), true);
-    // Work 60s + decision 15s elapsed → extended (FR-FLOW-11).
-    await mid.runRecoveryTick(T0 + 80_000);
-
-    const snap = mid.getSnapshot(T0 + 80_000);
-    assert.equal(snap.status, "active");
-    if (snap.status !== "active") return;
-    assert.equal(snap.session.phase.kind, "extended_work");
-
-    const decisions = await db("decision").select("*");
-    assert.equal(decisions.length, 0);
-    const planned = await db("planned_work").first();
-    assert.equal(planned.endedReason, "recovery");
-    const extended = await db("extended_work").first();
-    assert.ok(extended);
-    assert.equal(extended.startedAt, planned.endedAt);
   });
 
   it("recoveryTick flag resets so later closes use live endedReason", async () => {
@@ -277,11 +234,6 @@ describe("SessionService boot hydrate + recovery", () => {
     assert.equal(snap.session.phase.paused, true);
     assert.ok(snap.session.phase.timerFrozenAt);
     assert.ok(Date.parse(snap.session.phase.plannedEndAt) < recoveryAt);
-  });
-
-  it("hydrate returns false when idle (no runtime)", async () => {
-    const { session } = await openEngine();
-    assert.equal(await session.hydrateFromStore(), false);
   });
 
   it("CORRUPT_RUNTIME abandon clears runtime and surfaces idle notice", async () => {

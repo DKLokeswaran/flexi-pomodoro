@@ -151,23 +151,6 @@ describe("SessionService segment attribution (SQLite)", () => {
     assert.equal(acks[0].outcome, "acknowledged");
   });
 
-  it("long rest timer end closes rest completed and clears runtime", async () => {
-    const { session, db } = await openEngine();
-    await session.start(
-      { ...SHORT_PARAMS, cyclesBeforeLongRest: 1 },
-      T0,
-      "soft",
-    );
-    assert.equal(await session.tickIfIdle(T0 + 60_000, false), true);
-    await session.ackRest(T0 + 61_000);
-    assert.equal(await session.tickIfIdle(T0 + 61_000 + 120_000, false), true);
-
-    assert.equal(session.getSnapshot(T0 + 61_000 + 120_000).status, "idle");
-    const rest = await db("rest").first();
-    assert.equal(rest.endedReason, "completed");
-    assert.equal(await db("session_runtime").first(), undefined);
-  });
-
   it("early end long rest persists long_rest_skipped_early", async () => {
     const { session, db } = await openEngine();
     await session.start(

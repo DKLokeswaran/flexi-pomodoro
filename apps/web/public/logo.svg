@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Flexi Pomodoro">
+  <defs>
+    <filter id="soften" filterUnits="userSpaceOnUse" x="-20" y="-20" width="80" height="80">
+      <feGaussianBlur stdDeviation="0.8"/>
+    </filter>
+    <clipPath id="tomato">
+      <circle cx="16" cy="18.5" r="9.5"/>
+    </clipPath>
+    <mask id="left-of-split" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+      <path d="M16 -6V9C23 13.5 9 23.5 16 28V40H-12V-6Z" fill="#fff" filter="url(#soften)"/>
+    </mask>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#1a1815"/>
+  <g clip-path="url(#tomato)">
+    <rect x="4" y="7" width="24" height="24" fill="#c94f35"/>
+    <path d="M16 -6V9C23 13.5 9 23.5 16 28V40H44V-6Z" fill="#d4a054" filter="url(#soften)"/>
+  </g>
+  <path d="M16 10.5V5.5M16 10.5L11 8.5M16 10.5L21 8.5" stroke="#7f9a5a" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+  <path d="M13 14.5H21.5" stroke="#c94f35" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M13 14.5H21.5" stroke="#f2e6d0" stroke-width="2.8" stroke-linecap="round" mask="url(#left-of-split)"/>
+  <path d="M13 24V14.5M13 19H18.5" fill="none" stroke="#f2e6d0" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -54,7 +54,7 @@ flowchart TB
 
 | Pattern | Where | Notes |
 |---------|-------|-------|
-| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates settings, builds `AnalyticsService`, hydrates session (`hydrateFromStore` → `runRecoveryTick`), injects stores into `SessionService` + `IntervalScheduler`; returns `{ app }` |
+| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates settings, builds `AnalyticsService`, hydrates session (`hydrateFromStore` → `runRecoveryTick`), registers routes, runs `finalizeDueDays` once, starts `IntervalScheduler` (session tick + client-day rollover finalize); returns `{ app }` |
 | **Repository / store** | `db/stores/*` | Purpose-split Knex stores; settings + session/phase write-through; analytics overlapping reads + `daily_stats`; session/phase reads for boot hydrate |
 | **Service layer** | `SettingsService`, `SessionService`, `AnalyticsService` | Business rules and state; routes stay thin |
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
@@ -88,10 +88,16 @@ try {
   // CORRUPT_RUNTIME → abandonCorruptRuntime (idle + notice)
 }
 await registerRoutes(app, { settings, session, analytics });
+await analytics.finalizeDueDays();
+let lastSeenClientDate = clientDateAt(Date.now(), settings.get().timezone);
 const scheduler = new IntervalScheduler({
   intervalMs: 250,
   onTick: async (nowMs) => {
     await session.tickIfIdle(nowMs, true);
+    const clientDate = clientDateAt(nowMs, settings.get().timezone);
+    if (clientDate === lastSeenClientDate) return;
+    lastSeenClientDate = clientDate;
+    await analytics.finalizeDueDays();
   },
 });
 // onClose: scheduler.stop(); await db.destroy();
@@ -219,7 +225,7 @@ Not found in committed history (no `React.lazy` / dynamic import of routes).
 |------|--------|
 | Settings | SQLite singleton via `SettingsStore` (`flexi-pomodoro.sqlite3` under `DATA_DIR`); includes IANA `timezone` |
 | Session / phases | Write-through via `SessionStore` / `PhasesStore` (transactions on start, pause, phase transitions, complete); FR-FLOW-11 deletes decision on timeout; pause_slices + planned_work pause columns |
-| Analytics day rolls | `AnalyticsStore` + `AnalyticsService` overlap-clip closed phases for a client-timezone day; `daily_stats` materializes finalized past days (`finalizeDueDays` exists; scheduler hook + HTTP today route still pending) |
+| Analytics day rolls | `AnalyticsStore` + `AnalyticsService` overlap-clip closed phases for a client-timezone day; `GET /api/analytics/today` serves open-day totals; `finalizeDueDays` runs at boot and when the scheduler observes a client-date change |
 | Boot resume | `hydrateFromStore` rebuilds `ActiveSession` (incl. `alertSeq` + open pause); one `runRecoveryTick` closes overdue phases with `endedReason: "recovery"`; `CORRUPT_RUNTIME` → `abandonCorruptRuntime` (`interrupted`, clear runtime, idle notice) |
 | Schema | Knex migrations `20260909134105_initial_schema`, `20261109143000_settings_timezone`, `20261109180000_daily_stats` |
 | Debug prefs | Browser `localStorage` (`flexi-pomodoro:debugFlags`) — client-only |

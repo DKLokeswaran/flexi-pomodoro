@@ -65,7 +65,8 @@ flexi-pomodoro/
 │   │       │   ├── index.ts
 │   │       │   ├── health.routes.ts
 │   │       │   ├── settings.routes.ts
-│   │       │   └── session.routes.ts
+│   │       │   ├── session.routes.ts
+│   │       │   └── analytics.routes.ts  # GET /api/analytics/today
 │   │       ├── services/
 │   │       │   ├── settings.service.ts
 │   │       │   ├── session.service.ts

@@ -12,6 +12,7 @@ import {
 } from "./services/session.service.js";
 import { registerRoutes } from "./routes/index.js";
 import { IntervalScheduler } from "./scheduler.js";
+import { clientDateAt } from "./utils/clientDay.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -78,10 +79,18 @@ export async function buildApp() {
 
   await registerRoutes(app, { settings, session, analytics });
 
+  // Catch up any client-timezone days missed while the process was down.
+  await analytics.finalizeDueDays();
+  let lastSeenClientDate = clientDateAt(Date.now(), settings.get().timezone);
+
   const scheduler = new IntervalScheduler({
     intervalMs: 250,
     onTick: async (nowMs) => {
       await session.tickIfIdle(nowMs, true);
+      const clientDate = clientDateAt(nowMs, settings.get().timezone);
+      if (clientDate === lastSeenClientDate) return;
+      lastSeenClientDate = clientDate;
+      await analytics.finalizeDueDays();
     },
   });
   scheduler.start();

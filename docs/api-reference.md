@@ -24,7 +24,7 @@ Base URL (dev): Vite proxies `/api` → `http://127.0.0.1:3847`. Production: sam
 | POST | `/api/session/pause` | Pause planned work (active pause strategy) |
 | POST | `/api/session/resume` | Resume planned work (active pause strategy) |
 | POST | `/api/session/end-long-rest` | End session early from long rest |
-| GET | `/api/analytics/today` | Closed-phase today totals (`ANALYTICS_API.today`; HTTP route registration still pending) |
+| GET | `/api/analytics/today` | Closed-phase today totals (`ANALYTICS_API.today`; day bounds from `settings.timezone`) |
 
 ---
 
@@ -216,11 +216,11 @@ Error body shape: `{ error: string; code: string }`.
 
 ## GET `/api/analytics/today`
 
-Shared path: `ANALYTICS_API.today`. Day bounds are owned by the server from `settings.timezone` (no day query params).
+Shared path: `ANALYTICS_API.today`. Day bounds are owned by the server from `settings.timezone` (no day query params; any such query keys are ignored).
 
-**Wire response** `200` (when registered): `TodayStatsResponse` — closed-phase overlap-clipped totals for the current client-timezone day, plus `clientDate` / `dayStart` / `dayEnd` so clients can clip open phases without re-deriving TZ.
+**Response** `200`: `TodayStatsResponse` — closed-phase overlap-clipped totals for the current client-timezone day, plus `clientDate` / `dayStart` / `dayEnd` so clients can clip open phases without re-deriving TZ.
 
-**Implementation status:** `AnalyticsService.todayStats()` / `dayStats()` and `daily_stats` persistence exist; `RouteDeps` already includes `analytics`, but `registerRoutes` does not yet mount this handler (HTTP still pending).
+Handled by `registerAnalyticsRoutes` → `AnalyticsService.todayStats()`.
 
 ---
 

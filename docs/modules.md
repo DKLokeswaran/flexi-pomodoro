@@ -89,9 +89,9 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 |--------|------|
 | `buildApp()` | async → `{ app }` |
 
-**Side effects:** opens SQLite (`openDatabase`), hydrates settings, constructs `AnalyticsService`, injects session/phases stores into `SessionService`, `hydrateFromStore` + `runRecoveryTick` (or `abandonCorruptRuntime` on `CORRUPT_RUNTIME`), Fastify logger, starts scheduler, may register static files; `onClose` stops scheduler and `db.destroy()`.
+**Side effects:** opens SQLite (`openDatabase`), hydrates settings, constructs `AnalyticsService`, injects session/phases stores into `SessionService`, `hydrateFromStore` + `runRecoveryTick` (or `abandonCorruptRuntime` on `CORRUPT_RUNTIME`), Fastify logger, registers routes, boot `finalizeDueDays`, starts scheduler (session `tickIfIdle` + client-day rollover `finalizeDueDays`), may register static files; `onClose` stops scheduler and `db.destroy()`.
 
-**Deps:** `fastify`, `@fastify/static`, `node:path`/`fs`/`url`, `db`, services, routes, scheduler.
+**Deps:** `fastify`, `@fastify/static`, `node:path`/`fs`/`url`, `db`, services, routes, scheduler, `clientDay`.
 
 ### `src/db/index.ts`
 
@@ -162,7 +162,7 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 | Export | Kind |
 |--------|------|
 | `RouteDeps` | `{ settings, session, analytics }` |
-| `registerRoutes(app, deps)` | registers health/settings/session (`analytics` deps ready; today route not mounted yet) |
+| `registerRoutes(app, deps)` | registers health/settings/session/analytics |
 
 ### `src/routes/health.routes.ts`
 
@@ -187,6 +187,12 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 **Side effects:** hijacks reply for SSE; heartbeats; subscribe/unsubscribe.
 
 **Deps:** `errorReply` from `../utils/errorReply.js`.
+
+### `src/routes/analytics.routes.ts`
+
+| Export | Kind |
+|--------|------|
+| `registerAnalyticsRoutes(app, analytics)` | GET `ANALYTICS_API.today` → `analytics.todayStats()` |
 
 ### `src/pause/types.ts`
 

@@ -68,7 +68,7 @@ flowchart LR
   Sched -->|"tickIfIdle(nowMs)"| Sess
 ```
 
-Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`), by commands that tick under the mutex before mutating, and by one boot `runRecoveryTick` after `hydrateFromStore`; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT. `AnalyticsService` aggregates client-timezone day totals from closed phase rows (`daily_stats` for finalized past days); `GET /api/analytics/today` path is defined in shared but HTTP registration is still pending. Mid-session resume survives container recreate when `/data` is kept.
+Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`), by commands that tick under the mutex before mutating, and by one boot `runRecoveryTick` after `hydrateFromStore`; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT. `GET /api/analytics/today` returns closed-phase client-timezone day totals via `AnalyticsService`; boot and client-day rollover call `finalizeDueDays` to materialize past days into `daily_stats`. Mid-session resume survives container recreate when `/data` is kept.
 
 ## Documentation index
 

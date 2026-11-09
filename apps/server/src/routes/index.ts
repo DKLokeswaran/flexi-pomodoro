@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { AnalyticsService } from "../services/analytics.service.js";
 import type { SettingsService } from "../services/settings.service.js";
 import type { SessionService } from "../services/session.service.js";
 import { registerHealthRoutes } from "./health.routes.js";
@@ -8,6 +9,7 @@ import { registerSettingsRoutes } from "./settings.routes.js";
 export interface RouteDeps {
   settings: SettingsService;
   session: SessionService;
+  analytics: AnalyticsService;
 }
 
 /** Register health, settings, and session HTTP routes. */

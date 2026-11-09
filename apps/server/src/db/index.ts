@@ -1,5 +1,6 @@
 import type { Knex } from "knex";
 import { createKnex, migrateLatest, resolveDataDir } from "./knex.js";
+import { AnalyticsStore } from "./stores/analyticsStore.js";
 import { PhasesStore } from "./stores/phasesStore.js";
 import { SessionStore } from "./stores/sessionStore.js";
 import { SettingsStore } from "./stores/settingsStore.js";
@@ -10,6 +11,7 @@ export {
   resolveDataDir,
   sqlitePath,
 } from "./knex.js";
+export { AnalyticsStore } from "./stores/analyticsStore.js";
 export { PhasesStore } from "./stores/phasesStore.js";
 export { SessionStore } from "./stores/sessionStore.js";
 export { SettingsStore } from "./stores/settingsStore.js";
@@ -19,6 +21,7 @@ export type AppStores = {
   settings: SettingsStore;
   session: SessionStore;
   phases: PhasesStore;
+  analytics: AnalyticsStore;
 };
 
 /** Construct purpose-split stores over a shared Knex client. */
@@ -27,6 +30,7 @@ export function createStores(db: Knex): AppStores {
     settings: new SettingsStore(db),
     session: new SessionStore(db),
     phases: new PhasesStore(db),
+    analytics: new AnalyticsStore(db),
   };
 }
 

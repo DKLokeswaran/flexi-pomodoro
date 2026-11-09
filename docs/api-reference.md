@@ -1,6 +1,6 @@
 # API Reference
 
-All paths are defined once in `@flexi-pomodoro/shared` as `SESSION_API`. There is **no authentication** on any endpoint in committed history.
+Session paths live in `@flexi-pomodoro/shared` as `SESSION_API`. Analytics paths live as `ANALYTICS_API` (day bounds come from `settings.timezone` — callers must not send `dayStart` / `dayEnd` query params). There is **no authentication** on any endpoint in committed history.
 
 Base URL (dev): Vite proxies `/api` → `http://127.0.0.1:3847`. Production: same origin as the static app (port `3847` by default).
 
@@ -24,6 +24,7 @@ Base URL (dev): Vite proxies `/api` → `http://127.0.0.1:3847`. Production: sam
 | POST | `/api/session/pause` | Pause planned work (active pause strategy) |
 | POST | `/api/session/resume` | Resume planned work (active pause strategy) |
 | POST | `/api/session/end-long-rest` | End session early from long rest |
+| GET | `/api/analytics/today` | Closed-phase today totals (`ANALYTICS_API.today`; HTTP route registration still pending) |
 
 ---
 
@@ -68,6 +69,14 @@ Discriminated by `status`:
 | `alertSeq` | number | High-water |
 
 `SessionLiveStats`: `{ workedSec: number; deliberationSec: number; restSec: number; pausedSec: number }` — planned focus + extended (excl. pause interruption), decision + ack windows, rest time, and soft/hard pause interruption respectively.
+
+`TodayStats` is an alias of `SessionLiveStats` for open-day / finalized-day buckets. `TodayStatsResponse` extends it with the client-timezone day window:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `clientDate` | `YYYY-MM-DD` | Calendar date in `settings.timezone` |
+| `dayStart` / `dayEnd` | ISO instants | Half-open `[dayStart, dayEnd)` used for overlap clipping |
+| `workedSec` / `deliberationSec` / `restSec` / `pausedSec` | number | Closed-phase totals for that window |
 
 `AlertEvent`: `{ seq: number; id: AlertId }`.
 
@@ -202,6 +211,16 @@ Status mapping in `errorReply.ts`:
 | `SettingsError` / Zod | 400 |
 
 Error body shape: `{ error: string; code: string }`.
+
+---
+
+## GET `/api/analytics/today`
+
+Shared path: `ANALYTICS_API.today`. Day bounds are owned by the server from `settings.timezone` (no day query params).
+
+**Wire response** `200` (when registered): `TodayStatsResponse` — closed-phase overlap-clipped totals for the current client-timezone day, plus `clientDate` / `dayStart` / `dayEnd` so clients can clip open phases without re-deriving TZ.
+
+**Implementation status:** `AnalyticsService.todayStats()` / `dayStats()` and `daily_stats` persistence exist; `RouteDeps` already includes `analytics`, but `registerRoutes` does not yet mount this handler (HTTP still pending).
 
 ---
 

@@ -131,6 +131,7 @@ Runtime session state is single-process / single active session (served from mem
 | `StartSessionBody` | POST start | Overrides + optional `debug?: DebugFlags` |
 | `DebugFlags` | start body | Optional booleans per `DebugFeatureId`; strict object |
 | `SessionSnapshot` | REST + SSE | Idle or Active union; idle may include `recoveryAbandonedMessage` |
+| `TodayStats` / `TodayStatsResponse` | Analytics today | Alias of `SessionLiveStats` + `clientDate` / `dayStart` / `dayEnd` |
 | `{ alertSeq }` | GET alert-seq | number |
 | `{ ok: true }` | health | |
 | `{ error, code }` | error responses | |
@@ -144,6 +145,11 @@ Knex query builder over `better-sqlite3`. No ORM entities. Stores wrap table acc
 - `SettingsStore`: `load` / `save` / `ensureSeeded`
 - `SessionStore`: `transaction`, `insertSession`, `upsertRuntime`, `updateRuntimeStats`, `finalizeSession`, `clearRuntime`, `getRuntime`, `getSession`, `markInterrupted`
 - `PhasesStore`: open/complete per kind, `deleteDecisionPhase`, pause slice open/close, `get*` loaders + `getOpenPauseSliceId` for hydrate, list helpers for tests
+- `AnalyticsStore`: closed overlapping phase/slice lists for a day window; `daily_stats` upsert/get; earliest closed-phase start for finalize backfill
+
+### `AnalyticsService`
+
+Reads `settings.timezone`, computes client-timezone day bounds via Luxon helpers (`clientDay`), overlap-clips closed phases into `TodayStats`, and can finalize past days into `daily_stats` (`finalizeDueDays`). Kept out of `SessionService`.
 
 ## SQLite tables (initial migration)
 
@@ -156,9 +162,16 @@ Knex query builder over `better-sqlite3`. No ORM entities. Stores wrap table acc
 | `session_runtime` | Current phase id, liveStats counters, `alertSeq` |
 | `pause_slices` | Soft/hard pause intervals linked to planned work |
 
+### Later tables
+
+| Table | Role |
+|-------|------|
+| `daily_stats` | Materialized completed client-timezone days (`clientDate` PK, `dayStart`/`dayEnd`, live-stats totals, `finalizedAt`) for M3.5 / M4 |
+
 ## Migration history
 
 | Migration | Purpose |
 |-----------|---------|
 | `20260909134105_initial_schema` | Creates the tables above |
 | `20261109143000_settings_timezone` | Adds `settings.timezone` (IANA, not null, default `UTC`) for analytics local-day bounds (M3.5 / FR-AN-9) |
+| `20261109180000_daily_stats` | Creates `daily_stats` for finalized client-timezone day aggregates |

@@ -1,6 +1,6 @@
 # Dependencies
 
-Inventory from committed `package.json` files and lockfile versions for direct packages (`package-lock.json` at `HEAD`).
+Inventory from workspace `package.json` files and lockfile versions for direct packages (includes current working-tree dependency edits).
 
 ## Workspace packages
 
@@ -85,6 +85,13 @@ Static logo/favicons live under `apps/web/public/` (not npm packages).
 | `better-sqlite3` | ^13.0.3 | 13.0.3 | server prod |
 | `knex` | ^3.3.0 | 3.3.0 | server prod |
 | `@types/better-sqlite3` | ^9.6.0 | 9.6.0 | server dev |
+
+### Date / timezone
+
+| Package | Declared | Locked | Scope |
+|---------|----------|--------|-------|
+| `luxon` | ^3.7.2 | 3.7.2 | server prod (client-timezone day bounds for analytics) |
+| `@types/luxon` | ^3.7.6 | 3.7.6 | server dev |
 
 ### Types
 

@@ -4,6 +4,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { openDatabase } from "./db/index.js";
+import { AnalyticsService } from "./services/analytics.service.js";
 import { SettingsService } from "./services/settings.service.js";
 import {
   SessionError,
@@ -52,6 +53,7 @@ export async function buildApp() {
   const { db, stores } = await openDatabase();
   const settings = new SettingsService(stores.settings);
   await settings.hydrate();
+  const analytics = new AnalyticsService(stores.analytics, settings);
   const session = new SessionService({
     session: stores.session,
     phases: stores.phases,
@@ -74,7 +76,7 @@ export async function buildApp() {
     }
   }
 
-  await registerRoutes(app, { settings, session });
+  await registerRoutes(app, { settings, session, analytics });
 
   const scheduler = new IntervalScheduler({
     intervalMs: 250,

@@ -197,15 +197,15 @@ export interface SessionLiveStats {
 export type TodayStats = SessionLiveStats;
 
 /**
- * `GET /api/analytics/today` body: closed-phase today totals plus the local-day
- * window the server used (for client open-phase clipping).
+ * `GET /api/analytics/today` body: closed-phase today totals plus the
+ * client-timezone day window (for open-phase clipping).
  */
 export interface TodayStatsResponse extends TodayStats {
-  /** `YYYY-MM-DD` in `settings.timezone`. */
-  localDate: string;
-  /** Inclusive start of the local day (ISO instant). */
+  /** `YYYY-MM-DD` in the client timezone (`settings.timezone`). */
+  clientDate: string;
+  /** Inclusive start of that client day (ISO instant). */
   dayStart: string;
-  /** Exclusive end of the local day (ISO instant). */
+  /** Exclusive end of that client day (ISO instant). */
   dayEnd: string;
 }
 

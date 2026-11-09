@@ -11,7 +11,9 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **M2** | Pause modules — soft and hard `WorkPauseStrategy` plugins; hard pause experimental via Settings |
 | **M2.5** | Short-rest acknowledgement + in-memory live session stats on the active timer surface |
 | **M3** | Persistence & analytics milestone (SQLite, decision segments, recovery) |
-| **M3.5** | Idle today stats — current local-day aggregates from persisted history (FR-AN-9); uses `settings.timezone` for day bounds |
+| **M3.5** | Idle today stats — current client-timezone day aggregates from persisted history (FR-AN-9); uses `settings.timezone` for day bounds |
+| **Today stats** | Closed-phase `TodayStats` totals for one client-timezone calendar day (`TodayStatsResponse` adds `clientDate` / `dayStart` / `dayEnd`) |
+| **daily_stats** | SQLite table of finalized past client-timezone days for M4 rollups |
 | **Alpha** | Current release channel (`0.0.3-alpha.*`) |
 | **Quiet Dark** | Web visual flavor from flavors.design; tokens live in `apps/web/DESIGN.md` and map into Tailwind / shadcn theme variables |
 | **Timer dial** | Default active/idle timer surface: countdown arc, overtime comet, cycle dots, and Cycle / Phase ends / Estimated end readouts |

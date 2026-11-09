@@ -91,7 +91,17 @@ Uses temp `DATA_DIR` via `openDatabase(tempDir)`.
 | `ensureSeeded` | Writes `DEFAULT_SETTINGS` once; second call returns same |
 | save / load | Round-trip across process reopen (incl. `timezone`) |
 | migration defaults timezone | Seeded `timezone` is `UTC`; column present after migrations |
-| initial migration | Expected tables present (`settings`, `sessions`, `phases`, detail tables, `pause_slices`, …) |
+| initial migration | Expected tables present (`settings`, `sessions`, `phases`, detail tables, `pause_slices`, `daily_stats`, …); `stores.analytics` present |
+
+### `apps/server/src/tests/db/analyticsStore.test.ts`
+
+Uses temp migrated SQLite.
+
+| Case | Asserts |
+|------|---------|
+| migration | `daily_stats` table + expected columns |
+| overlapping lists | Closed planned-work (and related) rows filtered by day window |
+| upsert / get | Idempotent `upsertDailyStats`; `getDailyStats` / `getLatestFinalizedClientDate` |
 
 ### `apps/server/src/tests/db/sessionStore.test.ts`
 
@@ -207,6 +217,22 @@ Isolated `hardPauseStrategy` unit tests:
 |------|---------|
 | `runExclusive` | Overlapping work runs serially (FIFO) |
 | `tryRunExclusive` | Returns `null` / skips while locked |
+
+### `apps/server/src/tests/utils/clientDay.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| `clientDateAt` / `dayBoundsIso` | Client-timezone calendar date and half-open UTC window |
+| `addClientDays` | Calendar-day arithmetic |
+| `overlapSec` | Whole-second overlap clipping |
+
+### `apps/server/src/tests/services/analytics.service.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| `dayStats` | Returns `clientDate` bounds + closed-phase aggregates (incl. pause subtraction from worked) |
+| `todayStats` | Matches `dayStats` for the current client date |
+| `finalizeDueDays` | Backfills missing `daily_stats` through yesterday; leaves today open |
 
 ### `apps/web/src/tests/utils/liveStats.test.ts`
 

@@ -48,11 +48,13 @@ flexi-pomodoro/
 │   │       │   ├── knex.ts          # resolveDataDir, createKnex, migrateLatest
 │   │       │   ├── migrations/
 │   │       │   │   ├── 20260909134105_initial_schema.ts
-│   │       │   │   └── 20261109143000_settings_timezone.ts  # settings.timezone (IANA)
+│   │       │   │   ├── 20261109143000_settings_timezone.ts  # settings.timezone (IANA)
+│   │       │   │   └── 20261109180000_daily_stats.ts        # daily_stats (client-day rollups)
 │   │       │   └── stores/
 │   │       │       ├── settingsStore.ts  # singleton settings load/save/seed
 │   │       │       ├── sessionStore.ts   # sessions + session_runtime write-through
-│   │       │       └── phasesStore.ts    # phase/segment + pause_slices write-through
+│   │       │       ├── phasesStore.ts    # phase/segment + pause_slices write-through
+│   │       │       └── analyticsStore.ts # overlapping closed rows + daily_stats
 │   │       ├── pause/
 │   │       │   ├── index.ts         # Barrel: registry, soft strategy, types
 │   │       │   ├── types.ts         # WorkPauseStrategy plugin contract
@@ -66,17 +68,20 @@ flexi-pomodoro/
 │   │       │   └── session.routes.ts
 │   │       ├── services/
 │   │       │   ├── settings.service.ts
-│   │       │   └── session.service.ts
+│   │       │   ├── session.service.ts
+│   │       │   └── analytics.service.ts  # today / dayStats / finalizeDueDays
 │   │       ├── utils/
 │   │       │   ├── errorReply.ts         # HTTP mapping for SettingsError / SessionError
 │   │       │   ├── settingsValidation.ts # SettingsPatchSchema, parse/merge start+settings bodies
+│   │       │   ├── clientDay.ts          # Luxon client-timezone day bounds + overlapSec
 │   │       │   ├── iso.ts                # msToIso / parseIso helpers
 │   │       │   └── asyncMutex.ts         # runExclusive / tryRunExclusive for session ticks
 │   │       └── tests/
 │   │           ├── db/
 │   │           │   ├── settingsStore.test.ts
 │   │           │   ├── sessionStore.test.ts
-│   │           │   └── phasesStore.test.ts
+│   │           │   ├── phasesStore.test.ts
+│   │           │   └── analyticsStore.test.ts
 │   │           ├── helpers/
 │   │           │   ├── mockSettingsStore.ts
 │   │           │   ├── mockSessionStores.ts  # in-memory SessionStore + PhasesStore
@@ -90,9 +95,11 @@ flexi-pomodoro/
 │   │           │   ├── session.service.test.ts
 │   │           │   ├── session.attribution.test.ts
 │   │           │   ├── session.recovery.test.ts
-│   │           │   └── session.recovery.matrix.test.ts
+│   │           │   ├── session.recovery.matrix.test.ts
+│   │           │   └── analytics.service.test.ts
 │   │           └── utils/
-│   │               └── asyncMutex.test.ts
+│   │               ├── asyncMutex.test.ts
+│   │               └── clientDay.test.ts
 │   └── web/                     # @flexi-pomodoro/web
 │       ├── index.html           # favicon links; font CSS via fontsource imports in styles.css
 │       ├── package.json

@@ -54,9 +54,9 @@ flowchart TB
 
 | Pattern | Where | Notes |
 |---------|-------|-------|
-| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates settings + session (`hydrateFromStore` → `runRecoveryTick`), injects stores into `SessionService` + `IntervalScheduler`; returns `{ app }` |
-| **Repository / store** | `db/stores/*` | Purpose-split Knex stores; settings + session/phase write-through; session/phase reads for boot hydrate |
-| **Service layer** | `SettingsService`, `SessionService` | Business rules and state; routes stay thin |
+| **Composition root / manual DI** | `apps/server/src/app.ts` `buildApp()` | Opens SQLite via `openDatabase()`, hydrates settings, builds `AnalyticsService`, hydrates session (`hydrateFromStore` → `runRecoveryTick`), injects stores into `SessionService` + `IntervalScheduler`; returns `{ app }` |
+| **Repository / store** | `db/stores/*` | Purpose-split Knex stores; settings + session/phase write-through; analytics overlapping reads + `daily_stats`; session/phase reads for boot hydrate |
+| **Service layer** | `SettingsService`, `SessionService`, `AnalyticsService` | Business rules and state; routes stay thin |
 | **Observer / pub-sub** | `SessionService.subscribe` / `notify` | SSE clients receive snapshot deltas |
 | **Strategy (scheduler interface)** | `Scheduler` + `IntervalScheduler` | Comment in `scheduler.ts`: swap for deadline-based scheduler later; `onTick` may return a Promise |
 | **Mutex / skip-if-busy** | `AsyncMutex` in `SessionService` | Commands use `runExclusive`; scheduler uses `tickIfIdle` → `tryRunExclusive` so intervals do not queue behind a long command |
@@ -76,6 +76,7 @@ No DI container. Wiring is explicit:
 const { db, stores } = await openDatabase();
 const settings = new SettingsService(stores.settings);
 await settings.hydrate();
+const analytics = new AnalyticsService(stores.analytics, settings);
 const session = new SessionService({
   session: stores.session,
   phases: stores.phases,
@@ -86,7 +87,7 @@ try {
 } catch (error) {
   // CORRUPT_RUNTIME → abandonCorruptRuntime (idle + notice)
 }
-await registerRoutes(app, { settings, session });
+await registerRoutes(app, { settings, session, analytics });
 const scheduler = new IntervalScheduler({
   intervalMs: 250,
   onTick: async (nowMs) => {
@@ -218,8 +219,9 @@ Not found in committed history (no `React.lazy` / dynamic import of routes).
 |------|--------|
 | Settings | SQLite singleton via `SettingsStore` (`flexi-pomodoro.sqlite3` under `DATA_DIR`); includes IANA `timezone` |
 | Session / phases | Write-through via `SessionStore` / `PhasesStore` (transactions on start, pause, phase transitions, complete); FR-FLOW-11 deletes decision on timeout; pause_slices + planned_work pause columns |
+| Analytics day rolls | `AnalyticsStore` + `AnalyticsService` overlap-clip closed phases for a client-timezone day; `daily_stats` materializes finalized past days (`finalizeDueDays` exists; scheduler hook + HTTP today route still pending) |
 | Boot resume | `hydrateFromStore` rebuilds `ActiveSession` (incl. `alertSeq` + open pause); one `runRecoveryTick` closes overdue phases with `endedReason: "recovery"`; `CORRUPT_RUNTIME` → `abandonCorruptRuntime` (`interrupted`, clear runtime, idle notice) |
-| Schema | Knex migrations `20260909134105_initial_schema`, `20261109143000_settings_timezone` |
+| Schema | Knex migrations `20260909134105_initial_schema`, `20261109143000_settings_timezone`, `20261109180000_daily_stats` |
 | Debug prefs | Browser `localStorage` (`flexi-pomodoro:debugFlags`) — client-only |
 | UI prefs | Browser `localStorage` (`flexi-pomodoro:uiFlags`) — client-only |
 | Timezone seed gate | Browser `localStorage` (`flexi-pomodoro:tzSeeded`) — client-only; one-shot browser IANA seed |

@@ -80,6 +80,7 @@ describe("SettingsStore (SQLite)", () => {
       assert.ok(stores.settings);
       assert.ok(stores.session);
       assert.ok(stores.phases);
+      assert.ok(stores.analytics);
       const tables = await db.raw(
         "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
       );
@@ -95,6 +96,7 @@ describe("SettingsStore (SQLite)", () => {
         "extended_work",
         "rest",
         "pause_slices",
+        "daily_stats",
       ]) {
         assert.ok(names.includes(name), `missing table ${name}`);
       }

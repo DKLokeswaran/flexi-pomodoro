@@ -55,6 +55,7 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 |--------|------|
 | `AlertIdSchema` / `AlertId` | Zod enum / type |
 | `SESSION_API` | path constants object |
+| `ANALYTICS_API` | `{ today: "/api/analytics/today" }` — day bounds from settings timezone (no day query params) |
 | `WorkPauseStrategySchema` / `WorkPauseStrategy` | `"soft" \| "hard"` |
 | `sessionParamsSchemaForBounds(bounds)` | Zod object for session timing fields |
 | `SessionParamsSchema` / `SessionParams` | production-bounds Zod / type |
@@ -67,6 +68,7 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 | phase interfaces, `Phase` | types (`Phase["kind"]` for the kind union) |
 | `SessionStatus` | `"idle"\|"active"\|"completed"` |
 | `SessionLiveStats` | type (`workedSec`, `deliberationSec`, `restSec`, `pausedSec`) |
+| `TodayStats` / `TodayStatsResponse` | day-bucket alias of live stats + `clientDate` / `dayStart` / `dayEnd` |
 | `pausedSecAt`, `plannedWorkSecAt` | Planned-work progress helpers (`liveStatsProgress.ts`) |
 | `AlertEvent`, `ActiveSession` | types |
 | `IdleSnapshot`, `ActiveSnapshot`, `SessionSnapshot` | types (`IdleSnapshot.recoveryAbandonedMessage?`) |
@@ -87,7 +89,7 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 |--------|------|
 | `buildApp()` | async → `{ app }` |
 
-**Side effects:** opens SQLite (`openDatabase`), hydrates settings, injects session/phases stores into `SessionService`, `hydrateFromStore` + `runRecoveryTick` (or `abandonCorruptRuntime` on `CORRUPT_RUNTIME`), Fastify logger, starts scheduler, may register static files; `onClose` stops scheduler and `db.destroy()`.
+**Side effects:** opens SQLite (`openDatabase`), hydrates settings, constructs `AnalyticsService`, injects session/phases stores into `SessionService`, `hydrateFromStore` + `runRecoveryTick` (or `abandonCorruptRuntime` on `CORRUPT_RUNTIME`), Fastify logger, starts scheduler, may register static files; `onClose` stops scheduler and `db.destroy()`.
 
 **Deps:** `fastify`, `@fastify/static`, `node:path`/`fs`/`url`, `db`, services, routes, scheduler.
 
@@ -95,7 +97,7 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 
 | Export | Kind |
 |--------|------|
-| `AppStores` | type (`settings` / `session` / `phases`) |
+| `AppStores` | type (`settings` / `session` / `phases` / `analytics`) |
 | `createStores(db)` | builds purpose-split stores |
 | `openDatabase(dataDir?)` | create Knex, migrate, return `{ db, stores, dataDir }` |
 | re-exports | `createKnex`, `migrateLatest`, `resolveDataDir`, `sqlitePath`, store classes |
@@ -136,6 +138,15 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 
 **Public methods:** `openPlannedWork` / `completePlannedWork` / `updatePlannedWorkPause`; `openDecision` / `completeDecision` / `deleteDecisionPhase`; `openShortRestAck` / `completeShortRestAck`; `openExtendedWork` / `completeExtendedWork`; `openRest` / `completeRest`; `openPauseSlice` / `closePauseSlice`; hydrate loaders (`getPlannedWork`, `getDecision`, `getShortRestAck`, `getExtendedWork`, `getRest`, `getOpenPauseSliceId`); list helpers (`listDecisionRows`, `listPlannedWork`, …) and `getPhaseKind`.
 
+### `src/db/stores/analyticsStore.ts`
+
+| Export | Kind |
+|--------|------|
+| `AnalyticsStore` | class |
+| `DailyStatsRow` / `TimedClosedRow` / `PlannedWorkClosedRow` / `PauseSliceClosedRow` | types |
+
+**Public methods:** overlapping closed-row lists (`listClosedPlannedWorkOverlapping`, pause slices, extended work, decisions, short-rest acks, rests); `upsertDailyStats`, `getLatestFinalizedClientDate`, `getDailyStats`, `getEarliestClosedPhaseStartedAt`.
+
 ### `src/scheduler.ts`
 
 | Export | Kind |
@@ -150,8 +161,8 @@ No exports. **Side effects:** reads `PORT`/`HOST`, `buildApp()`, `listen`.
 
 | Export | Kind |
 |--------|------|
-| `RouteDeps` | `{ settings, session }` |
-| `registerRoutes(app, deps)` | registers health/settings/session |
+| `RouteDeps` | `{ settings, session, analytics }` |
+| `registerRoutes(app, deps)` | registers health/settings/session (`analytics` deps ready; today route not mounted yet) |
 
 ### `src/routes/health.routes.ts`
 
@@ -253,6 +264,18 @@ Unknown errors are rethrown.
 
 **Used by:** `SessionService` to serialize ticks and mutating commands.
 
+### `src/utils/clientDay.ts`
+
+| Export | Kind |
+|--------|------|
+| `clientDateAt(ms, timeZone)` | `YYYY-MM-DD` in client timezone |
+| `addClientDays(clientDate, deltaDays)` | calendar-day arithmetic |
+| `dayBoundsIso(clientDate, timeZone)` | half-open UTC ISO + ms bounds |
+| `ClientDayBounds` | type |
+| `overlapSec(startedAt, endedAt, windowStartMs, windowEndMs)` | whole-second overlap |
+
+**Deps:** `luxon`.
+
 ### `src/services/settings.service.ts`
 
 | Export | Kind |
@@ -270,6 +293,15 @@ Unknown errors are rethrown.
 | `get()` | `Settings` copy |
 | `update(partial)` | `Promise<Settings>` — validate, persist, return copy |
 | `resolveSessionParams(overrides?, debug?)` | `SessionParams` |
+
+### `src/services/analytics.service.ts`
+
+| Export | Kind |
+|--------|------|
+| `AnalyticsService` | class |
+| `EMPTY_TODAY_STATS` | zeroed `TodayStats` |
+
+**Public methods:** `todayStats()`, `dayStats(clientDate)`, `finalizeDueDays()` — overlap-clip closed phases via `AnalyticsStore` + Luxon day bounds; finalize catch-up writes `daily_stats` through yesterday.
 
 ### `src/services/session.service.ts`
 
@@ -307,7 +339,7 @@ Unknown errors are rethrown.
 
 ### Tests
 
-`src/tests/services/{session,settings}.service.test.ts`, `session.attribution.test.ts`, `session.recovery.test.ts`, `session.recovery.matrix.test.ts`, `settings.service.persist.test.ts`, `src/tests/db/{settings,session,phases}Store.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase}.ts`, `src/tests/pause/*`, `src/tests/utils/asyncMutex.test.ts` — no production exports (see [testing.md](./testing.md)).
+`src/tests/services/{session,settings,analytics}.service.test.ts`, `session.attribution.test.ts`, `session.recovery.test.ts`, `session.recovery.matrix.test.ts`, `settings.service.persist.test.ts`, `src/tests/db/{settings,session,phases,analytics}Store.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase}.ts`, `src/tests/pause/*`, `src/tests/utils/{asyncMutex,clientDay}.test.ts` — no production exports (see [testing.md](./testing.md)).
 ---
 
 ## `apps/web` — entry & shell

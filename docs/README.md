@@ -35,7 +35,7 @@ docker compose up --build
 |-------|--------|
 | Monorepo | npm workspaces (`apps/*`, `packages/*`) |
 | Shared types/validation | TypeScript, Zod (`@flexi-pomodoro/shared`) |
-| Server | Fastify 5, `@fastify/static`, Knex + better-sqlite3, Node 20+/22 |
+| Server | Fastify 5, `@fastify/static`, Knex + better-sqlite3, Luxon (analytics day bounds), Node 20+/22 |
 | Web | React 19, Vite 6, TanStack Query 5, Tailwind CSS v4, shadcn/ui (base-nova / Quiet Dark) |
 | Tests | Node.js built-in test runner (`node:test`) |
 | Deploy | Multi-stage Dockerfile, docker-compose |
@@ -50,6 +50,7 @@ flowchart LR
   Sched["IntervalScheduler 250ms"]
   Sess["SessionService"]
   Sett["SettingsService"]
+  Anal["AnalyticsService"]
   Store["Knex stores / SQLite"]
   Pause["PauseStrategyRegistry"]
 
@@ -58,13 +59,16 @@ flowchart LR
   API -.-> Shared
   API --> Sett
   API --> Sess
+  API --> Anal
   Sett --> Store
   Sess --> Store
+  Anal --> Store
+  Anal --> Sett
   Sess --> Pause
   Sched -->|"tickIfIdle(nowMs)"| Sess
 ```
 
-Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`), by commands that tick under the mutex before mutating, and by one boot `runRecoveryTick` after `hydrateFromStore`; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT. Mid-session resume survives container recreate when `/data` is kept.
+Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`), by commands that tick under the mutex before mutating, and by one boot `runRecoveryTick` after `hydrateFromStore`; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT. `AnalyticsService` aggregates client-timezone day totals from closed phase rows (`daily_stats` for finalized past days); `GET /api/analytics/today` path is defined in shared but HTTP registration is still pending. Mid-session resume survives container recreate when `/data` is kept.
 
 ## Documentation index
 

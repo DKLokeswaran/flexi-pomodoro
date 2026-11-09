@@ -50,6 +50,14 @@ export const SESSION_API = {
   endLongRest: "/api/session/end-long-rest",
 } as const;
 
+/**
+ * Analytics HTTP paths. Day bounds come from `settings.timezone` on the server —
+ * callers must not send `dayStart` / `dayEnd` query params.
+ */
+export const ANALYTICS_API = {
+  today: "/api/analytics/today",
+} as const;
+
 export const WorkPauseStrategySchema = z.enum(["soft", "hard"]);
 export type WorkPauseStrategy = z.infer<typeof WorkPauseStrategySchema>;
 
@@ -183,6 +191,22 @@ export interface SessionLiveStats {
   restSec: number;
   /** Soft/hard pause interruption time (closed slices + open pause elapsed). */
   pausedSec: number;
+}
+
+/** Open-day (or finalized-day) bucket totals — same shape as session live stats. */
+export type TodayStats = SessionLiveStats;
+
+/**
+ * `GET /api/analytics/today` body: closed-phase today totals plus the local-day
+ * window the server used (for client open-phase clipping).
+ */
+export interface TodayStatsResponse extends TodayStats {
+  /** `YYYY-MM-DD` in `settings.timezone`. */
+  localDate: string;
+  /** Inclusive start of the local day (ISO instant). */
+  dayStart: string;
+  /** Exclusive end of the local day (ISO instant). */
+  dayEnd: string;
 }
 
 export interface AlertEvent {

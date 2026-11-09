@@ -80,7 +80,7 @@ Imports parsers from `utils/settingsValidation.ts`.
 |-------|-------|
 | `parseStartSessionBody` | Accepts 1s with flag; rejects 1s without; rejects unknown debug keys (`ZodError`) |
 | `parseSettingsPatch` | Rejects sub-minute work |
-| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; `update` calls `store.save`; seed when store empty; load existing row on hydrate |
+| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; accept valid IANA `timezone`; reject invalid IANA; `update` calls `store.save`; seed when store empty; load existing row on hydrate |
 
 ### `apps/server/src/tests/db/settingsStore.test.ts`
 
@@ -89,7 +89,8 @@ Uses temp `DATA_DIR` via `openDatabase(tempDir)`.
 | Case | Asserts |
 |------|---------|
 | `ensureSeeded` | Writes `DEFAULT_SETTINGS` once; second call returns same |
-| save / load | Round-trip across process reopen |
+| save / load | Round-trip across process reopen (incl. `timezone`) |
+| migration defaults timezone | Seeded `timezone` is `UTC`; column present after migrations |
 | initial migration | Expected tables present (`settings`, `sessions`, `phases`, detail tables, `pause_slices`, …) |
 
 ### `apps/server/src/tests/db/sessionStore.test.ts`
@@ -243,6 +244,15 @@ Fabricated `ActiveSnapshot` fixtures only (no server imports).
 | Hard-pause freeze | Progress holds while `timerFrozenAt` is set |
 | Extended overtime | `remaining` stays 1; `overtimeLaps` grows in work-duration units |
 | `cycleDotStates` | Earlier cycles done, current live, later pending |
+
+### `apps/web/src/tests/utils/seedTimezone.test.ts`
+
+Uses an in-memory `localStorage` stand-in (no browser globals).
+
+| Case | Asserts |
+|------|---------|
+| First visit with UTC defaults | PUTs browser IANA once (no-op save when browser is already UTC); sets `TZ_SEEDED_KEY`; later calls are gated |
+| Non-UTC stored timezone | Does not overwrite; still sets the gate |
 
 ---
 

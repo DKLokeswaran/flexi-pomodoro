@@ -3,6 +3,14 @@ import { type Settings } from "@flexi-pomodoro/shared";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
+import {
   Field,
   FieldContent,
   FieldDescription,
@@ -21,6 +29,7 @@ import {
   useUiFlags,
 } from "../browserFlags/ui";
 import { DECISION_WINDOW_LABEL } from "../constants/labels";
+import { ianaTimeZones } from "../utils/ianaTimeZones";
 import { minutesToSec, secToMinutes } from "../utils/time";
 import { NumberField } from "./NumberField";
 
@@ -31,6 +40,7 @@ type SettingsDraft = {
   cyclesBeforeLongRest: number;
   decisionWindowSec: number;
   enableHardPause: boolean;
+  timezone: string;
 };
 
 /** Convert persisted seconds into the minutes-based settings form draft. */
@@ -42,6 +52,7 @@ function draftFromSettings(settings: Settings): SettingsDraft {
     cyclesBeforeLongRest: settings.cyclesBeforeLongRest,
     decisionWindowSec: settings.decisionWindowSec,
     enableHardPause: settings.workPauseStrategy === "hard",
+    timezone: settings.timezone,
   };
 }
 
@@ -55,7 +66,60 @@ function settingsFromDraft(settings: Settings, draft: SettingsDraft): Settings {
     cyclesBeforeLongRest: draft.cyclesBeforeLongRest,
     decisionWindowSec: draft.decisionWindowSec,
     workPauseStrategy: draft.enableHardPause ? "hard" : "soft",
+    timezone: draft.timezone,
   };
+}
+
+/** Searchable IANA timezone combobox for analytics day bounds. */
+function TimezoneField({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const inputId = useId();
+
+  return (
+    <Field className="gap-2 text-left" data-disabled={disabled}>
+      <FieldLabel
+        htmlFor={inputId}
+        className="type-label font-normal text-muted-foreground"
+      >
+        Timezone
+      </FieldLabel>
+      <Combobox
+        items={ianaTimeZones}
+        value={value}
+        disabled={disabled}
+        onValueChange={(next) => {
+          if (typeof next === "string") onChange(next);
+        }}
+      >
+        <ComboboxInput
+          id={inputId}
+          placeholder="Search timezones"
+          showClear={false}
+          className="h-10 w-full"
+        />
+        <ComboboxContent className="shadow-none">
+          <ComboboxEmpty>No timezone found.</ComboboxEmpty>
+          <ComboboxList>
+            {(zone) => (
+              <ComboboxItem key={zone} value={zone}>
+                {zone}
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      <FieldDescription className="text-[13px]">
+        IANA zone for today&apos;s day boundaries (e.g. Asia/Kolkata).
+      </FieldDescription>
+    </Field>
+  );
 }
 
 /** Mono uppercase label above a group of settings. */
@@ -197,6 +261,12 @@ export function SettingsTab({
           onChange={(value) => setRoundedField("decisionWindowSec", value)}
         />
       </div>
+
+      <TimezoneField
+        value={draft.timezone}
+        disabled={locked}
+        onChange={(timezone) => setDraft((current) => ({ ...current, timezone }))}
+      />
 
       <SectionTitle>Experimental features</SectionTitle>
       <FlagList>

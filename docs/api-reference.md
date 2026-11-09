@@ -91,8 +91,9 @@ Settings additionally:
 |-------|------|-------|
 | `alertsMuted` | boolean | Present in schema; mute UX not fully wired in M1 UI |
 | `workPauseStrategy` | `"soft" \| "hard"` | Default `"soft"`. PUT accepts either value. `POST /api/session/start` reads persisted settings and locks the chosen strategy on `ActiveSession.pauseStrategy` |
+| `timezone` | IANA string | Analytics local-day bounds (e.g. `Asia/Kolkata`). Validated via `TimeZoneSchema` / `Intl.DateTimeFormat`. Install default `"UTC"`; the web app may seed the browser zone once on first settings load |
 
-Defaults (`DEFAULT_SETTINGS`): 25×60 / 5×60 / N=4 / 15×60 / decision 15 / `alertsMuted: false` / `workPauseStrategy: "soft"`.
+Defaults (`DEFAULT_SETTINGS`): 25×60 / 5×60 / N=4 / 15×60 / decision 15 / `alertsMuted: false` / `workPauseStrategy: "soft"` / `timezone: "UTC"`.
 
 ---
 

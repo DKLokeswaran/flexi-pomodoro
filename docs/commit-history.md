@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 55 |
+| Total commits | 57 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-11-08 |
+| Latest commit date | 2026-11-09 |
 | Active contributors | 2 |
-| Most active contributor | Lokeswaran DK (53) |
+| Most active contributor | Lokeswaran DK (55) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` … `v0.0.2-alpha.3` (workspace version field `0.0.3-alpha.0`) |
 
@@ -22,7 +22,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | 2026-08 | 11 |
 | 2026-09 | 13 |
 | 2026-10 | 2 |
-| 2026-11 | 6 |
+| 2026-11 | 8 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -230,6 +230,14 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 - Add `public/logo.svg` with raster favicon fallbacks; show `Logo` in the header and About tab.
 - Bump workspace version to `0.0.3-alpha.0`.
 
+### 2026-11-08 — Docs sync after Quiet Dark + logo
+
+- Bring technical docs in line with Tailwind/shadcn Quiet Dark restyle, timer dial defaults, logo/About credits, and related module/structure/testing notes.
+
+### 2026-11-09 — M3.5 idle today stats plan
+
+- Add `.cursor/plans/m3.5_idle_today_stats.plan.md` covering FR-AN-9: timezone setting, server-owned local day, overlap-clipped today aggregates, `daily_stats` midnight finalize, and idle/active Today UI.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -245,6 +253,8 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| bfa4d34 | Lokeswaran DK | 2026-11-09 | Add the M3.5 idle today stats implementation plan. |
+| e04b947 | Lokeswaran DK | 2026-11-08 | Sync technical docs with Quiet Dark restyle, timer dial, and app logo. |
 | 0aeee54 | DKLokeswaran | 2026-11-08 | Add the app logo to the favicon, header, About tab and docs (#2) |
 | 28ff5d0 | DKLokeswaran | 2026-11-08 | Restyle the web app to Quiet Dark with shadcn/ui and add the timer dial (#1) |
 | da9ee9c | Lokeswaran DK | 2026-11-08 | Sync technical docs with M3 boot resume, non-root Docker, and test coverage. |
@@ -301,4 +311,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: 0aeee54d43e291d4106e64a4338d57bc1b42d399
+Last Synced Commit: bfa4d34ffd417175bc82400be4699666248c78db

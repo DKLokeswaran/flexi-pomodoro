@@ -9,7 +9,7 @@
 | Server → clients | SSE snapshots + REST |
 | Client server cache | TanStack React Query (`settings`, `health`) |
 | Client live session | `useState` in `useSessionStream` (not React Query) |
-| Client preferences | `localStorage` via providers/stores |
+| Client preferences | `localStorage` via providers/stores (incl. one-shot `flexi-pomodoro:tzSeeded` timezone seed gate) |
 | Client UI chrome | Local `useState` (tab, drafts, accordion) |
 
 There is **no** Redux, Zustand, Jotai, or Recoil in committed history.
@@ -134,7 +134,7 @@ Transport (`connectSessionStream`):
 | Component | State |
 |-----------|-------|
 | `App` | `tab: Tab` |
-| `SettingsTab` | draft minutes/cycles/decision; `enableHardPause`; session-only `experimentalMode` gate; UI + debug flag toggles |
+| `SettingsTab` | draft minutes/cycles/decision; `timezone`; `enableHardPause`; session-only `experimentalMode` gate; UI + debug flag toggles |
 | `IdleStartForm` | override draft (min or sec depending on shortDurations); own `useNow(IDLE_ESTIMATE_TICK_MS)` for estimated end; shows optional `recoveryAbandonedMessage` from idle snapshot |
 | `ActiveTimer` | own `useNow(ACTIVE_UI_TICK_MS)` for countdown, dial/classic layout, live stats, and estimated end |
 | `AboutAccordion` | `open` |
@@ -146,7 +146,7 @@ Transport (`connectSessionStream`):
 
 No dedicated selector library. Inline derivation examples:
 
-- `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`
+- `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`; `useSeedTimezone` after settings load
 - `ActiveTimer`: dial vs classic via `classicTimer`; `dialProgress` / `cycleDotStates`; `displayClock`; `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`); `phaseHint`; `liveStatsAt` HUD (Worked / Deliberation / Rest / Paused); `activeEstimatedSessionEndMs`; strategy-aware pause labels
 - `IdleStartForm`: still dial ring vs classic via `classicTimer`; `estimatedSessionEndMs` / `nominalSessionDurationSec` from override draft
 - `AboutTab`: feature available/soon counts; health UI mapping
@@ -159,6 +159,7 @@ No dedicated selector library. Inline derivation examples:
 |------|--------|---------|
 | `useNow(intervalMs)` | `number \| null` (`ACTIVE_UI_TICK_MS` / `IDLE_ESTIMATE_TICK_MS` / `null`) | `number` (Date.now at that cadence; frozen when `null`) |
 | `useSessionStream()` | — | `{ snapshot, setSnapshot }` |
+| `useSeedTimezone(settings)` | `Settings \| undefined` | void — one-shot browser IANA seed via `seedTimezoneIfNeeded` + settings query cache update |
 | `useDebugFlags()` | — | debug flag store (throws if missing) |
 | `useUiFlags()` | — | UI preference store (throws if missing) |
 | `useToast()` | — | `{ pushToast }` |

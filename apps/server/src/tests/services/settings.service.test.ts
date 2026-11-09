@@ -95,6 +95,31 @@ describe("SettingsService", () => {
     );
   });
 
+  it("rejects an invalid IANA timezone", async () => {
+    const store = createMockSettingsStore();
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    const savesBefore = store.saved.length;
+    await assert.rejects(
+      () => settings.update({ timezone: "Not/AZone" }),
+      (error: unknown) => {
+        assert.ok(error instanceof SettingsError);
+        assert.equal(error.code, "INVALID_SETTINGS");
+        return true;
+      },
+    );
+    assert.equal(store.saved.length, savesBefore);
+  });
+
+  it("accepts a valid IANA timezone", async () => {
+    const store = createMockSettingsStore();
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    const next = await settings.update({ timezone: "Asia/Kolkata" });
+    assert.equal(next.timezone, "Asia/Kolkata");
+    assert.equal(store.saved.at(-1)?.timezone, "Asia/Kolkata");
+  });
+
   it("hydrate loads seeded defaults from the store", async () => {
     const store = createMockSettingsStore(null);
     const settings = new SettingsService(store);

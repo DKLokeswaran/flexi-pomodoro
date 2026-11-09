@@ -93,9 +93,28 @@ export type SessionParams = z.infer<typeof SessionParamsSchema>;
 export const SessionOverridesSchema = SessionParamsSchema.partial();
 export type SessionOverrides = z.infer<typeof SessionOverridesSchema>;
 
+/** True when `timeZone` is accepted by `Intl.DateTimeFormat` (IANA). */
+export function isValidIanaTimeZone(timeZone: string): boolean {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const TimeZoneSchema = z
+  .string({ error: "timezone must be a string" })
+  .min(1, { error: "timezone must be a non-empty IANA time zone" })
+  .refine(isValidIanaTimeZone, {
+    error: "timezone must be a valid IANA time zone",
+  });
+
 export const SettingsSchema = SessionParamsSchema.extend({
   alertsMuted: z.boolean(),
   workPauseStrategy: WorkPauseStrategySchema,
+  /** IANA zone used for analytics local-day bounds (e.g. Asia/Kolkata). */
+  timezone: TimeZoneSchema,
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
@@ -112,6 +131,7 @@ export const DEFAULT_SETTINGS: Settings = {
   decisionWindowSec: 15,
   alertsMuted: false,
   workPauseStrategy: "soft",
+  timezone: "UTC",
 };
 
 export interface PlannedWorkPhase {

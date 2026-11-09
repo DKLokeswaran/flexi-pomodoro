@@ -11,6 +11,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | **M2** | Pause modules — soft and hard `WorkPauseStrategy` plugins; hard pause experimental via Settings |
 | **M2.5** | Short-rest acknowledgement + in-memory live session stats on the active timer surface |
 | **M3** | Persistence & analytics milestone (SQLite, decision segments, recovery) |
+| **M3.5** | Idle today stats — current local-day aggregates from persisted history (FR-AN-9); uses `settings.timezone` for day bounds |
 | **Alpha** | Current release channel (`0.0.3-alpha.*`) |
 | **Quiet Dark** | Web visual flavor from flavors.design; tokens live in `apps/web/DESIGN.md` and map into Tailwind / shadcn theme variables |
 | **Timer dial** | Default active/idle timer surface: countdown arc, overtime comet, cycle dots, and Cycle / Phase ends / Estimated end readouts |
@@ -62,6 +63,7 @@ Terms from shared types, APIs, UI copy, and commit messages.
 | Term | Meaning |
 |------|---------|
 | **Defaults / settings** | SQLite-backed preferences (singleton row) used when starting without overrides; cached in-process after hydrate |
+| **timezone** | Settings IANA zone (e.g. `Asia/Kolkata`) for analytics local-day bounds; install default `UTC`; browser may seed once via `flexi-pomodoro:tzSeeded` |
 | **Overrides** | Per-start session param fields on POST start |
 | **Debug mode** | Client gate unlocking per-feature debug flags (localStorage `flexi-pomodoro:debugFlags`) |
 | **Browser preferences / UI flags** | Client-only toggles in Settings → Browser preferences (localStorage `flexi-pomodoro:uiFlags`); not sent to the server |

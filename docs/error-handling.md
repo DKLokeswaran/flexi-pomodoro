@@ -62,7 +62,7 @@
 | Schema / parser | Where applied | Rules |
 |-----------------|---------------|-------|
 | `SessionParamsSchema` | Shared type source / production bounds | Integer bounds from `SETTINGS_BOUNDS` |
-| `SettingsSchema` | Shared type source; re-validated on settings patch | Params + `alertsMuted` + `workPauseStrategy: "soft" \| "hard"` |
+| `SettingsSchema` | Shared type source; re-validated on settings patch | Params + `alertsMuted` + `workPauseStrategy: "soft" \| "hard"` + IANA `timezone` (`TimeZoneSchema`) |
 | `SettingsPatchSchema` | Server `settingsValidation.ts` — PUT settings | `SettingsSchema.partial()` |
 | `parseStartSessionBody` | Server `settingsValidation.ts` — POST start | Strict `debug`; overrides against debug-aware bounds |
 | `parseDebugFlags` | Shared — POST start `debug` + debug localStorage restore | Strict; unknown keys fail |

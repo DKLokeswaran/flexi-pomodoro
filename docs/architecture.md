@@ -199,7 +199,7 @@ No React Router. `App` holds `tab: "timer" | "settings" | "analytics" | "about"`
 - **Brand assets**: `public/logo.svg` (plus raster favicons) via `Logo`; header and About use it. About credits Quiet Dark from flavors.design.
 - **Corrupt-runtime notice**: idle snapshots may include `recoveryAbandonedMessage`; `IdleStartForm` shows it until the next successful start.
 - **Pause actions**: planned-work buttons call `SESSION_API.pause` / `SESSION_API.resume`. Label and phase suffix follow the locked session strategy (`Soft pause` vs `Hard pause (experimental)`). Toasts mirror the same strategy.
-- **Settings**: Experimental features gate exposes **Enable hard pause (experimental)**; unchecked maps to `workPauseStrategy: "soft"`, checked to `"hard"`. Saved with **Save defaults**; locked while a session is active.
+- **Settings**: Experimental features gate exposes **Enable hard pause (experimental)**; unchecked maps to `workPauseStrategy: "soft"`, checked to `"hard"`. Searchable IANA timezone combobox persists `settings.timezone` for analytics day bounds. Saved with **Save defaults**; locked while a session is active. On first successful settings load, `useSeedTimezone` may `PUT` the browser zone once when the stored value is still install-default `UTC` (gate: `flexi-pomodoro:tzSeeded`).
 
 ### Code splitting
 
@@ -216,11 +216,12 @@ Not found in committed history (no `React.lazy` / dynamic import of routes).
 
 | Data | Status |
 |------|--------|
-| Settings | SQLite singleton via `SettingsStore` (`flexi-pomodoro.sqlite3` under `DATA_DIR`) |
+| Settings | SQLite singleton via `SettingsStore` (`flexi-pomodoro.sqlite3` under `DATA_DIR`); includes IANA `timezone` |
 | Session / phases | Write-through via `SessionStore` / `PhasesStore` (transactions on start, pause, phase transitions, complete); FR-FLOW-11 deletes decision on timeout; pause_slices + planned_work pause columns |
 | Boot resume | `hydrateFromStore` rebuilds `ActiveSession` (incl. `alertSeq` + open pause); one `runRecoveryTick` closes overdue phases with `endedReason: "recovery"`; `CORRUPT_RUNTIME` → `abandonCorruptRuntime` (`interrupted`, clear runtime, idle notice) |
-| Schema | Knex migration `20260909134105_initial_schema` |
+| Schema | Knex migrations `20260909134105_initial_schema`, `20261109143000_settings_timezone` |
 | Debug prefs | Browser `localStorage` (`flexi-pomodoro:debugFlags`) — client-only |
 | UI prefs | Browser `localStorage` (`flexi-pomodoro:uiFlags`) — client-only |
+| Timezone seed gate | Browser `localStorage` (`flexi-pomodoro:tzSeeded`) — client-only; one-shot browser IANA seed |
 | Alert watermark | Browser `localStorage` — client-only |
 | Docker volume `/data` | Mounted; `DATA_DIR=/data` in compose; image runs as `USER node` with `/data` owned by `node` (FPMD-2) |

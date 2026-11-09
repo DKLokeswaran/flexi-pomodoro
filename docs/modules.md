@@ -59,10 +59,11 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 | `sessionParamsSchemaForBounds(bounds)` | Zod object for session timing fields |
 | `SessionParamsSchema` / `SessionParams` | production-bounds Zod / type |
 | `SessionOverridesSchema` / `SessionOverrides` | partial params |
-| `SettingsSchema` / `Settings` | params + mute + strategy |
+| `isValidIanaTimeZone` / `TimeZoneSchema` | IANA timezone check via `Intl.DateTimeFormat` |
+| `SettingsSchema` / `Settings` | params + mute + strategy + `timezone` |
 | `SettingsPatch` | `Partial<Settings>` |
 | `StartSessionBody` | type overrides + `debug?` |
-| `DEFAULT_SETTINGS` | Settings |
+| `DEFAULT_SETTINGS` | Settings (`timezone: "UTC"`) |
 | phase interfaces, `Phase` | types (`Phase["kind"]` for the kind union) |
 | `SessionStatus` | `"idle"\|"active"\|"completed"` |
 | `SessionLiveStats` | type (`workedSec`, `deliberationSec`, `restSec`, `pausedSec`) |
@@ -319,7 +320,7 @@ No exports. **Side effects:** mounts React root; `UiFlagsProvider` + `DebugFlags
 
 | Export | Props / notes |
 |--------|----------------|
-| `App()` | Header `Logo` + title; tab state; settings query; session stream; renders tabs |
+| `App()` | Header `Logo` + title; tab state; settings query; `useSeedTimezone`; session stream; renders tabs |
 
 ### `src/vite-env.d.ts`
 
@@ -356,6 +357,19 @@ Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `Ab
 | `remainingSecFromIso(iso, nowMs)` | non-negative countdown seconds |
 | `formatLocalTime(ms)` | locale wall-clock label (hour + minute) |
 | `formatApproxDuration(totalSec)` | approximate duration (`~2h 15m`) |
+
+### `src/utils/ianaTimeZones.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `ianaTimeZones` | `Intl.supportedValuesOf("timeZone")` when available; else `["UTC"]` |
+
+### `src/utils/seedTimezone.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `TZ_SEEDED_KEY` | localStorage gate `flexi-pomodoro:tzSeeded` |
+| `seedTimezoneIfNeeded(settings, save)` | One-shot: if settings still `"UTC"` and browser IANA ≠ UTC, `PUT` browser zone; always sets the gate after a successful pass |
 
 Internal helpers `pad2` and `splitSec` back both formatters.
 
@@ -463,6 +477,12 @@ Internal helpers `pad2` and `splitSec` back both formatters.
 | `useSessionStream()` | `{ snapshot, setSnapshot }` |
 
 Uses `useEffectEvent` for snapshot/idle handlers.
+
+### `src/hooks/useSeedTimezone.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `useSeedTimezone(settings)` | After first settings fetch, runs `seedTimezoneIfNeeded` once; updates React Query cache on success |
 
 ---
 
@@ -643,7 +663,7 @@ Internal: `DialFace`, `OvertimeComet`, `CycleDots`, `DialReadouts` (not exported
 | `locked` | boolean |
 | `saving?` | boolean |
 
-Draft includes timing fields plus `enableHardPause` (maps to `workPauseStrategy`). Sections: **Save defaults**, **Browser preferences** (UI flags), **Debug** (gated debug flags). **Experimental features** gate reveals **Enable hard pause (experimental)**; auto-opens when saved defaults use `"hard"`.
+Draft includes timing fields, `timezone`, and `enableHardPause` (maps to `workPauseStrategy`). Sections: **Save defaults** (includes searchable IANA timezone combobox for analytics day bounds), **Browser preferences** (UI flags), **Debug** (gated debug flags). **Experimental features** gate reveals **Enable hard pause (experimental)**; auto-opens when saved defaults use `"hard"`.
 
 ### `src/components/AboutTab.tsx`
 
@@ -655,7 +675,7 @@ Shows `Logo`, diagnostics, link cards, and credits (including Quiet Dark / flavo
 
 ### `src/components/ui/*` (shadcn)
 
-Committed primitives in use: `badge`, `button`, `card`, `checkbox`, `collapsible`, `field`, `input`, `label`, `separator`. Generated/adapted for base-nova; compose via Tailwind + `cn`.
+Committed primitives in use: `badge`, `button`, `card`, `checkbox`, `collapsible`, `combobox`, `field`, `input`, `input-group`, `label`, `separator`, `textarea`. Generated/adapted for base-nova; compose via Tailwind + `cn`.
 
 ### `src/components/about/AboutAccordion.tsx`
 

@@ -44,6 +44,7 @@ describe("SettingsStore (SQLite)", () => {
         workDurationSec: 30 * 60,
         workPauseStrategy: "hard",
         alertsMuted: true,
+        timezone: "Asia/Kolkata",
       });
     } finally {
       await first.db.destroy();
@@ -55,8 +56,21 @@ describe("SettingsStore (SQLite)", () => {
       assert.equal(loaded?.workDurationSec, 30 * 60);
       assert.equal(loaded?.workPauseStrategy, "hard");
       assert.equal(loaded?.alertsMuted, true);
+      assert.equal(loaded?.timezone, "Asia/Kolkata");
     } finally {
       await second.db.destroy();
+    }
+  });
+
+  it("migration defaults timezone to UTC", async () => {
+    const { db, stores } = await openDatabase(await tempDataDir());
+    try {
+      const seeded = await stores.settings.ensureSeeded();
+      assert.equal(seeded.timezone, "UTC");
+      const columns = await db("settings").columnInfo();
+      assert.ok("timezone" in columns);
+    } finally {
+      await db.destroy();
     }
   });
 

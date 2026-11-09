@@ -126,7 +126,7 @@ Runtime session state is single-process / single active session (served from mem
 
 | Name | Direction | Definition |
 |------|-----------|------------|
-| `Settings` / `SettingsPatch` | REST settings | Zod `SettingsSchema` / `Partial<Settings>` |
+| `Settings` / `SettingsPatch` | REST settings | Zod `SettingsSchema` / `Partial<Settings>` (session params + `alertsMuted` + `workPauseStrategy` + IANA `timezone`) |
 | `SessionOverrides` | start body fields | Partial `SessionParams` |
 | `StartSessionBody` | POST start | Overrides + optional `debug?: DebugFlags` |
 | `DebugFlags` | start body | Optional booleans per `DebugFeatureId`; strict object |
@@ -161,3 +161,4 @@ Knex query builder over `better-sqlite3`. No ORM entities. Stores wrap table acc
 | Migration | Purpose |
 |-----------|---------|
 | `20260909134105_initial_schema` | Creates the tables above |
+| `20261109143000_settings_timezone` | Adds `settings.timezone` (IANA, not null, default `UTC`) for analytics local-day bounds (M3.5 / FR-AN-9) |

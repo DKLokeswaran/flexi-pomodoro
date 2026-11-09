@@ -11,6 +11,7 @@ import {
   useSessionActionMutation,
   useSettingsQuery,
 } from "./queries/useSessionApi";
+import { useSeedTimezone } from "./hooks/useSeedTimezone";
 import { useSessionStream } from "./hooks/useSessionStream";
 import { errorMessage } from "./utils/errorMessage";
 
@@ -21,6 +22,8 @@ export function App() {
   const settingsQuery = useSettingsQuery();
   const saveSettings = useSaveSettingsMutation();
   const sessionAction = useSessionActionMutation(setSnapshot);
+
+  useSeedTimezone(settingsQuery.data);
 
   const settings = settingsQuery.data ?? DEFAULT_SETTINGS;
   const sessionIsActive = snapshot?.status === "active";

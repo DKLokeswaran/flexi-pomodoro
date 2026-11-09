@@ -47,7 +47,8 @@ flexi-pomodoro/
 │   │       │   ├── index.ts         # openDatabase, createStores, AppStores
 │   │       │   ├── knex.ts          # resolveDataDir, createKnex, migrateLatest
 │   │       │   ├── migrations/
-│   │       │   │   └── 20260909134105_initial_schema.ts
+│   │       │   │   ├── 20260909134105_initial_schema.ts
+│   │       │   │   └── 20261109143000_settings_timezone.ts  # settings.timezone (IANA)
 │   │       │   └── stores/
 │   │       │       ├── settingsStore.ts  # singleton settings load/save/seed
 │   │       │       ├── sessionStore.ts   # sessions + session_runtime write-through
@@ -116,17 +117,18 @@ flexi-pomodoro/
 │           ├── components/timer/  # IdleStartForm, ActiveTimer, TimerDial, timerDisplay
 │           ├── components/about/
 │           ├── constants/
-│           ├── hooks/           # useNow, useSessionStream, SSE transport
+│           ├── hooks/           # useNow, useSessionStream, useSeedTimezone, SSE transport
 │           ├── browserFlags/    # createFlagCatalog, createFlagStore, debug/, ui/ (classicTimer, hideContinueButton)
 │           ├── providers/       # Toast
 │           ├── queries/         # fetch helpers + React Query hooks
-│           ├── utils/           # time, liveStats, dialProgress, phaseClock, projections, alerts, …
+│           ├── utils/           # time, liveStats, dialProgress, phaseClock, projections, alerts, ianaTimeZones, seedTimezone, …
 │           └── tests/
 │               └── utils/
 │                   ├── sessionProjection.test.ts
 │                   ├── activeSessionProjection.test.ts
 │                   ├── dialProgress.test.ts
-│                   └── liveStats.test.ts
+│                   ├── liveStats.test.ts
+│                   └── seedTimezone.test.ts
 ```
 
 ## Top-level folder roles
@@ -139,7 +141,7 @@ flexi-pomodoro/
 | `docs/product` | Product PRD and roadmap |
 | `AGENTS.md` / `apps/web/DESIGN.md` | Frontend design authority for agents and humans |
 | `.agents/skills` | Vendored agent skills (e.g. shadcn); ignored by Prettier |
-| `.cursor/plans` | Internal planning artifacts (M1–M3) |
+| `.cursor/plans` | Internal planning artifacts (M1–M3.5) |
 
 ## Language composition (committed files)
 

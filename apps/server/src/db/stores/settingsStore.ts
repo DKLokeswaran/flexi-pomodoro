@@ -27,6 +27,7 @@ export class SettingsStore {
       decisionWindowSec: row.decisionWindowSec,
       alertsMuted: Boolean(row.alertsMuted),
       workPauseStrategy: row.workPauseStrategy,
+      timezone: row.timezone,
     });
   }
 
@@ -41,6 +42,7 @@ export class SettingsStore {
       decisionWindowSec: settings.decisionWindowSec,
       alertsMuted: settings.alertsMuted,
       workPauseStrategy: settings.workPauseStrategy,
+      timezone: settings.timezone,
       updatedAt: new Date(updatedAtMs).toISOString(),
     };
     const existing = await this.db("settings")

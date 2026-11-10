@@ -17,9 +17,11 @@ export {
 } from "./debug/features/shortDurations.js";
 export {
   pausedSecAt,
+  plannedWorkProgressClockMs,
   plannedWorkSecAt,
   type PlannedWorkProgressPhase,
 } from "./liveStatsProgress.js";
+export { overlapSec, overlapSecFromIso } from "./overlapSec.js";
 
 export const AlertIdSchema = z.enum([
   "work_planned_end",

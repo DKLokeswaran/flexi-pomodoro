@@ -29,7 +29,8 @@ export const FEATURES: AboutFeature[] = [
   { label: "Hard pause (experimental)", status: "available" },
   { label: "Short-rest acknowledgement", status: "available" },
   { label: "Live session stats", status: "available" },
-  { label: "SQLite persistence & crash recovery", status: "soon" },
+  { label: "Idle today stats", status: "available" },
+  { label: "SQLite persistence & crash recovery", status: "available" },
   { label: "Analytics dashboard", status: "soon" },
   { label: "Curated alert sounds & mute", status: "soon" },
   { label: "Browser notifications", status: "soon" },
@@ -157,7 +158,7 @@ export const LINKS_COMING_SOON: SoonLinkCard[] = [
 
 export const LEGAL_NOTES = [
   "Self-hosted single-user app — session data stays on your instance.",
-  "Persistence across restarts — coming soon.",
+  "Persistence across restarts — available on this instance.",
   "Privacy policy and terms of use — coming soon.",
 ] as const;
 

@@ -1,6 +1,7 @@
-import type {
-  TodayStats,
-  TodayStatsResponse,
+import {
+  overlapSecFromIso,
+  type TodayStats,
+  type TodayStatsResponse,
 } from "@flexi-pomodoro/shared";
 import type { AnalyticsStore } from "../db/stores/analyticsStore.js";
 import type { SettingsService } from "./settings.service.js";
@@ -8,7 +9,6 @@ import {
   addClientDays,
   clientDateAt,
   dayBoundsIso,
-  overlapSec,
   type ClientDayBounds,
 } from "../utils/clientDay.js";
 import { msToIso } from "../utils/iso.js";
@@ -99,7 +99,7 @@ export class AnalyticsService {
     const pauseByPlannedWork = new Map<string, number>();
     let pausedSec = 0;
     for (const slice of pauseSlices) {
-      const clipped = overlapSec(
+      const clipped = overlapSecFromIso(
         slice.startedAt,
         slice.endedAt,
         dayStartMs,
@@ -114,12 +114,17 @@ export class AnalyticsService {
 
     let workedSec = 0;
     for (const row of plannedWork) {
-      const wall = overlapSec(row.startedAt, row.endedAt, dayStartMs, dayEndMs);
+      const wall = overlapSecFromIso(
+        row.startedAt,
+        row.endedAt,
+        dayStartMs,
+        dayEndMs,
+      );
       const paused = pauseByPlannedWork.get(row.id) ?? 0;
       workedSec += Math.max(0, wall - paused);
     }
     for (const row of extendedWork) {
-      workedSec += overlapSec(
+      workedSec += overlapSecFromIso(
         row.startedAt,
         row.endedAt,
         dayStartMs,
@@ -129,7 +134,7 @@ export class AnalyticsService {
 
     let deliberationSec = 0;
     for (const row of decisions) {
-      deliberationSec += overlapSec(
+      deliberationSec += overlapSecFromIso(
         row.startedAt,
         row.endedAt,
         dayStartMs,
@@ -137,7 +142,7 @@ export class AnalyticsService {
       );
     }
     for (const row of acks) {
-      deliberationSec += overlapSec(
+      deliberationSec += overlapSecFromIso(
         row.startedAt,
         row.endedAt,
         dayStartMs,
@@ -147,7 +152,12 @@ export class AnalyticsService {
 
     let restSec = 0;
     for (const row of rests) {
-      restSec += overlapSec(row.startedAt, row.endedAt, dayStartMs, dayEndMs);
+      restSec += overlapSecFromIso(
+        row.startedAt,
+        row.endedAt,
+        dayStartMs,
+        dayEndMs,
+      );
     }
 
     return { workedSec, deliberationSec, restSec, pausedSec };

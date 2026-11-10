@@ -7,6 +7,7 @@ import type {
 import { SESSION_API } from "@flexi-pomodoro/shared";
 import { fetchSettings, saveSettings } from "./settings.api";
 import { postAction } from "./session.api";
+import { todayStatsQueryKey } from "./useTodayStatsQuery";
 import { alertsFromSnapshot, playAlerts } from "../utils/playAlerts";
 import { REQUEST_FAILED } from "../constants/labels";
 import { errorMessage } from "../utils/errorMessage";
@@ -53,6 +54,7 @@ export function useSaveSettingsMutation() {
     mutationFn: (patch: SettingsPatch) => saveSettings(patch),
     onSuccess: (data) => {
       queryClient.setQueryData(settingsQueryKey, data);
+      void queryClient.invalidateQueries({ queryKey: todayStatsQueryKey });
       pushToast({ kind: "success", message: "Defaults saved" });
     },
     onError: (error) => {
@@ -68,6 +70,7 @@ export function useSaveSettingsMutation() {
 export function useSessionActionMutation(
   onSnapshot: (snapshot: SessionSnapshot) => void,
 ) {
+  const queryClient = useQueryClient();
   const { pushToast } = useToast();
   return useMutation({
     mutationFn: ({ path, body }: { path: string; body?: StartSessionBody }) =>
@@ -75,6 +78,7 @@ export function useSessionActionMutation(
     onSuccess: (snapshot, variables) => {
       onSnapshot(snapshot);
       playAlerts(alertsFromSnapshot(snapshot));
+      void queryClient.invalidateQueries({ queryKey: todayStatsQueryKey });
       const message = actionSuccessMessage(variables.path, snapshot);
       if (message) {
         pushToast({ kind: "success", message });

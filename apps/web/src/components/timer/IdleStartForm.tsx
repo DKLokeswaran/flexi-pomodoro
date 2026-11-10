@@ -15,11 +15,13 @@ import {
   minutesToSec,
   secToMinutes,
 } from "../../utils/time";
+import { useTodayDisplayStats } from "../../queries/useTodayStatsQuery";
 import { NumberField } from "../NumberField";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { DialProgress } from "../../utils/dialProgress";
 import { TimerDial } from "./TimerDial";
+import { TodayStatsRow } from "./TodayStatsRow";
 import { timerDisplay } from "./timerDisplay";
 
 /** Idle dial: a full, still ring. */
@@ -124,6 +126,7 @@ export function IdleStartForm({
 
   const durationParams = durationParamsFromDraft(overrides, shortDurations);
   const durationUnit = shortDurations ? "sec" : "min";
+  const todayStats = useTodayDisplayStats(null, now);
   const estimatedEnd = formatLocalTime(
     estimatedSessionEndMs(durationParams, now),
   );
@@ -207,6 +210,7 @@ export function IdleStartForm({
           Start session
         </Button>
       </div>
+      <TodayStatsRow stats={todayStats} />
     </>
   );
 }

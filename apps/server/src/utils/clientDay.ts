@@ -60,20 +60,3 @@ export function dayBoundsIso(
     dayEndMs: end.toMillis(),
   };
 }
-
-/**
- * Overlap of `[startedAt, endedAt]` with `[windowStartMs, windowEndMs)` in whole seconds.
- */
-export function overlapSec(
-  startedAt: string,
-  endedAt: string,
-  windowStartMs: number,
-  windowEndMs: number,
-): number {
-  const startedMs = Date.parse(startedAt);
-  const endedMs = Date.parse(endedAt);
-  if (!Number.isFinite(startedMs) || !Number.isFinite(endedMs)) return 0;
-  const overlapStart = Math.max(startedMs, windowStartMs);
-  const overlapEnd = Math.min(endedMs, windowEndMs);
-  return Math.max(0, Math.floor((overlapEnd - overlapStart) / 1000));
-}

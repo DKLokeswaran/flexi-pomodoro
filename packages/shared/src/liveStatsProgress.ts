@@ -12,6 +12,19 @@ function elapsedSecFromIso(startedAt: string, nowMs: number): number {
   return Math.max(0, Math.floor((nowMs - Date.parse(startedAt)) / 1000));
 }
 
+/**
+ * Clock for worked progress while paused: freeze at pause start.
+ * Soft has no timerFrozenAt; hard sets both. Paused totals still use wall clock.
+ */
+export function plannedWorkProgressClockMs(
+  phase: PlannedWorkProgressPhase,
+  nowMs: number,
+): number {
+  if (!phase.paused) return nowMs;
+  const frozenIso = phase.timerFrozenAt ?? phase.pauseStartedAt;
+  return frozenIso ? Date.parse(frozenIso) : nowMs;
+}
+
 /** Closed + open pause seconds in planned work up to endMs. */
 export function pausedSecAt(
   phase: PlannedWorkProgressPhase,

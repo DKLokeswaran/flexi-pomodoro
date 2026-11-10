@@ -1,9 +1,9 @@
 import {
   pausedSecAt,
+  plannedWorkProgressClockMs,
   plannedWorkSecAt,
   type ActiveSnapshot,
   type Phase,
-  type PlannedWorkPhase,
   type RestPhase,
   type SessionLiveStats,
 } from "@flexi-pomodoro/shared";
@@ -12,19 +12,6 @@ import { elapsedFromIso } from "./time";
 function restSecAt(phase: RestPhase, endMs: number): number {
   const clockMs = Math.min(endMs, Date.parse(phase.plannedEndAt));
   return elapsedFromIso(phase.startedAt, clockMs);
-}
-
-/**
- * Clock for worked progress while paused: freeze at pause start.
- * Soft has no timerFrozenAt; hard sets both. Paused totals still use wall clock.
- */
-function plannedWorkProgressClockMs(
-  phase: PlannedWorkPhase,
-  nowMs: number,
-): number {
-  if (!phase.paused) return nowMs;
-  const frozenIso = phase.timerFrozenAt ?? phase.pauseStartedAt;
-  return frozenIso ? Date.parse(frozenIso) : nowMs;
 }
 
 /** Add or subtract in-phase progress (sign = 1 add, −1 subtract). */

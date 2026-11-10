@@ -1,16 +1,15 @@
 import type {
   ActiveSnapshot,
   Phase,
-  SessionLiveStats,
   WorkPauseStrategy,
 } from "@flexi-pomodoro/shared";
 import { SESSION_API } from "@flexi-pomodoro/shared";
 import { useUiFlags } from "../../browserFlags/ui";
 import { ACTIVE_UI_TICK_MS, useNow } from "../../hooks/useNow";
+import { useTodayDisplayStats } from "../../queries/useTodayStatsQuery";
 import {
   elapsedFromIso,
   formatLocalTime,
-  formatHhMmSs,
   formatMmSs,
   remainingSecFromIso,
 } from "../../utils/time";
@@ -20,6 +19,7 @@ import { liveStatsAt } from "../../utils/liveStats";
 import { phaseClockMs, phaseEndAt } from "../../utils/phaseClock";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { StatsCounters, TodayStatsRow } from "./TodayStatsRow";
 import { TimerDial } from "./TimerDial";
 import { timerDisplay } from "./timerDisplay";
 
@@ -214,26 +214,6 @@ function PhaseLabel({
   );
 }
 
-/** Live session counters below the phase actions. */
-function LiveStatsRow({ liveStats }: { liveStats: SessionLiveStats }) {
-  return (
-    <p className={timerDisplay.liveStats}>
-      <span>
-        Worked <strong>{formatHhMmSs(liveStats.workedSec)}</strong>
-      </span>
-      <span>
-        Deliberation <strong>{formatHhMmSs(liveStats.deliberationSec)}</strong>
-      </span>
-      <span>
-        Rest <strong>{formatHhMmSs(liveStats.restSec)}</strong>
-      </span>
-      <span>
-        Paused <strong>{formatHhMmSs(liveStats.pausedSec)}</strong>
-      </span>
-    </p>
-  );
-}
-
 /** Running-session display: phase, clock, cycle, stats, hints, and phase actions. */
 export function ActiveTimer({
   snapshot,
@@ -246,6 +226,7 @@ export function ActiveTimer({
   const { phase, params, pauseStrategy } = snapshot.session;
   const { isEnabled } = useUiFlags();
   const liveStats = liveStatsAt(snapshot, now);
+  const todayStats = useTodayDisplayStats(phase, now);
   const actions = actionsForPhase(snapshot, isEnabled("hideContinueButton"));
   const hint = phaseHint(phase, now);
   const estimatedEnd = formatLocalTime(
@@ -314,7 +295,8 @@ export function ActiveTimer({
           </Button>
         ))}
       </div>
-      <LiveStatsRow liveStats={liveStats} />
+      <StatsCounters stats={liveStats} />
+      <TodayStatsRow stats={todayStats} />
     </>
   );
 }

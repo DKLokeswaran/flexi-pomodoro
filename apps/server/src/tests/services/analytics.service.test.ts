@@ -43,6 +43,26 @@ describe("AnalyticsService", () => {
     return { ...ctx, settings, analytics };
   }
 
+  it("dayStats returns zeros for an empty day", async () => {
+    const { analytics } = await setup();
+    const day = await analytics.dayStats("2026-11-09");
+    assert.equal(day.clientDate, "2026-11-09");
+    assert.deepEqual(
+      {
+        workedSec: day.workedSec,
+        deliberationSec: day.deliberationSec,
+        restSec: day.restSec,
+        pausedSec: day.pausedSec,
+      },
+      {
+        workedSec: 0,
+        deliberationSec: 0,
+        restSec: 0,
+        pausedSec: 0,
+      },
+    );
+  });
+
   it("dayStats returns client-date bounds and closed aggregates", async () => {
     const { db, stores, analytics } = await setup();
     const bounds = dayBoundsIso("2026-11-09", TZ);
@@ -67,6 +87,85 @@ describe("AnalyticsService", () => {
     assert.equal(day.dayEnd, bounds.dayEnd);
     assert.equal(day.workedSec, 300);
     assert.equal(day.pausedSec, 0);
+  });
+
+  it("dayStats attributes full buckets for a phase fully inside the day", async () => {
+    const { db, stores, analytics } = await setup();
+
+    await db.transaction(async (trx) => {
+      await stores.phases.openPlannedWork(trx, {
+        id: "pw-full",
+        sessionId: SESSION_ID,
+        cycleIndex: 1,
+        plannedDurationSec: 600,
+        plannedEndAt: "2026-11-09T10:10:00.000Z",
+        startedAt: "2026-11-09T10:00:00.000Z",
+      });
+      await stores.phases.completePlannedWork(trx, "pw-full", {
+        endedAt: "2026-11-09T10:10:00.000Z",
+        endedReason: "planned_complete",
+        pausedSec: 0,
+        pauseStartedAt: null,
+        timerFrozenAt: null,
+        paused: false,
+      });
+      await stores.phases.openDecision(trx, {
+        id: "dec-full",
+        sessionId: SESSION_ID,
+        cycleIndex: 1,
+        decisionWindowSec: 15,
+        decisionEndsAt: "2026-11-09T10:10:15.000Z",
+        startedAt: "2026-11-09T10:10:00.000Z",
+      });
+      await stores.phases.completeDecision(trx, "dec-full", {
+        endedAt: "2026-11-09T10:10:15.000Z",
+        durationSec: 15,
+        outcome: "ack_rest",
+      });
+      await stores.phases.openRest(trx, {
+        id: "rest-full",
+        sessionId: SESSION_ID,
+        cycleIndex: 1,
+        kind: "short_rest",
+        plannedDurationSec: 300,
+        plannedEndAt: "2026-11-09T10:15:15.000Z",
+        startedAt: "2026-11-09T10:10:15.000Z",
+      });
+      await stores.phases.completeRest(trx, "rest-full", {
+        endedAt: "2026-11-09T10:15:15.000Z",
+        actualDurationSec: 300,
+        endedReason: "completed",
+      });
+    });
+
+    const day = await analytics.dayStats("2026-11-09");
+    assert.equal(day.workedSec, 600);
+    assert.equal(day.deliberationSec, 15);
+    assert.equal(day.restSec, 300);
+    assert.equal(day.pausedSec, 0);
+  });
+
+  it("dayStats splits a midnight-spanning phase across adjacent client days", async () => {
+    const { db, stores, analytics } = await setup();
+    // IST midnight 2026-11-09 = 2026-11-08T18:30:00.000Z
+    await db.transaction(async (trx) => {
+      await stores.phases.openExtendedWork(trx, {
+        id: "ext-span",
+        sessionId: SESSION_ID,
+        cycleIndex: 1,
+        startedAt: "2026-11-08T18:20:00.000Z",
+      });
+      await stores.phases.completeExtendedWork(trx, "ext-span", {
+        endedAt: "2026-11-08T18:40:00.000Z",
+        actualDurationSec: 1200,
+        endedReason: "user_start_rest",
+      });
+    });
+
+    const before = await analytics.dayStats("2026-11-08");
+    const after = await analytics.dayStats("2026-11-09");
+    assert.equal(before.workedSec, 10 * 60);
+    assert.equal(after.workedSec, 10 * 60);
   });
 
   it("dayStats clips planned work spanning client midnight and subtracts clipped pauses", async () => {

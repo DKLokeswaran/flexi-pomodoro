@@ -149,7 +149,7 @@ Knex query builder over `better-sqlite3`. No ORM entities. Stores wrap table acc
 
 ### `AnalyticsService`
 
-Reads `settings.timezone`, computes client-timezone day bounds via Luxon helpers (`clientDay`), overlap-clips closed phases into `TodayStats`, and finalizes past days into `daily_stats` (`finalizeDueDays` — boot + scheduler client-date rollover). Kept out of `SessionService`.
+Reads `settings.timezone`, computes client-timezone day bounds via Luxon helpers (`clientDay`), overlap-clips closed phases into `TodayStats` with shared `overlapSecFromIso`, and finalizes past days into `daily_stats` (`finalizeDueDays` — boot + scheduler client-date rollover). Kept out of `SessionService`. The web client adds open-phase progress clipped to the response day window (`todayStats` / `useTodayDisplayStats`).
 
 ## SQLite tables (initial migration)
 

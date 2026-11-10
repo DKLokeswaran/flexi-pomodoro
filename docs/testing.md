@@ -224,15 +224,24 @@ Isolated `hardPauseStrategy` unit tests:
 |------|---------|
 | `clientDateAt` / `dayBoundsIso` | Client-timezone calendar date and half-open UTC window |
 | `addClientDays` | Calendar-day arithmetic |
-| `overlapSec` | Whole-second overlap clipping |
+| `overlapSecFromIso` | Shared helper clips ISO intervals to the day window |
 
 ### `apps/server/src/tests/services/analytics.service.test.ts`
 
 | Case | Asserts |
 |------|---------|
+| empty day | Zero totals for a day with no closed phases |
 | `dayStats` | Returns `clientDate` bounds + closed-phase aggregates (incl. pause subtraction from worked) |
+| full in-day phase | Attributes full worked / deliberation / rest for phases entirely inside the day |
+| midnight-spanning | Splits / clips phases across adjacent client days |
 | `todayStats` | Matches `dayStats` for the current client date |
 | `finalizeDueDays` | Backfills missing `daily_stats` through yesterday; leaves today open |
+
+### `apps/server/src/tests/routes/analytics.routes.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| GET today | Returns `todayStats()` body; day query params ignored |
 
 ### `apps/web/src/tests/utils/liveStats.test.ts`
 
@@ -279,6 +288,13 @@ Uses an in-memory `localStorage` stand-in (no browser globals).
 |------|---------|
 | First visit with UTC defaults | PUTs browser IANA once (no-op save when browser is already UTC); sets `TZ_SEEDED_KEY`; later calls are gated |
 | Non-UTC stored timezone | Does not overwrite; still sets the gate |
+
+### `apps/web/src/tests/utils/todayStats.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| `openPhaseProgressClippedToDay` | Clips open planned work / other phases to the day window; pause handling |
+| `todayDisplayStats` | Adds open-phase clip onto closed server today totals |
 
 ---
 

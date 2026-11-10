@@ -27,9 +27,10 @@ flexi-pomodoro/
 │       ├── package.json
 │       ├── tsconfig.json
 │       └── src/
-│           ├── index.ts         # Schemas, SESSION_API, phase/session types
+│           ├── index.ts         # Schemas, SESSION_API / ANALYTICS_API, phase/session types
 │           ├── bounds.ts        # Production SETTINGS_BOUNDS
-│           ├── liveStatsProgress.ts  # pausedSecAt / plannedWorkSecAt
+│           ├── liveStatsProgress.ts  # pausedSecAt / plannedWorkSecAt / plannedWorkProgressClockMs
+│           ├── overlapSec.ts         # day-window overlap helpers (ms + ISO)
 │           └── debug/
 │               ├── catalog.ts   # DEBUG_SERVER_FEATURES + parseDebugFlags
 │               ├── types.ts
@@ -74,7 +75,7 @@ flexi-pomodoro/
 │   │       ├── utils/
 │   │       │   ├── errorReply.ts         # HTTP mapping for SettingsError / SessionError
 │   │       │   ├── settingsValidation.ts # SettingsPatchSchema, parse/merge start+settings bodies
-│   │       │   ├── clientDay.ts          # Luxon client-timezone day bounds + overlapSec
+│   │       │   ├── clientDay.ts          # Luxon client-timezone day bounds
 │   │       │   ├── iso.ts                # msToIso / parseIso helpers
 │   │       │   └── asyncMutex.ts         # runExclusive / tryRunExclusive for session ticks
 │   │       └── tests/
@@ -83,6 +84,8 @@ flexi-pomodoro/
 │   │           │   ├── sessionStore.test.ts
 │   │           │   ├── phasesStore.test.ts
 │   │           │   └── analyticsStore.test.ts
+│   │           ├── routes/
+│   │           │   └── analytics.routes.test.ts
 │   │           ├── helpers/
 │   │           │   ├── mockSettingsStore.ts
 │   │           │   ├── mockSessionStores.ts  # in-memory SessionStore + PhasesStore
@@ -122,21 +125,22 @@ flexi-pomodoro/
 │           ├── lib/utils.ts     # cn() re-export for shadcn class merging
 │           ├── components/      # tabs + Logo + NumberField + Stubs
 │           ├── components/ui/   # shadcn primitives in use (button, card, field, …)
-│           ├── components/timer/  # IdleStartForm, ActiveTimer, TimerDial, timerDisplay
+│           ├── components/timer/  # IdleStartForm, ActiveTimer, TodayStatsRow, TimerDial, timerDisplay
 │           ├── components/about/
 │           ├── constants/
 │           ├── hooks/           # useNow, useSessionStream, useSeedTimezone, SSE transport
 │           ├── browserFlags/    # createFlagCatalog, createFlagStore, debug/, ui/ (classicTimer, hideContinueButton)
 │           ├── providers/       # Toast
-│           ├── queries/         # fetch helpers + React Query hooks
-│           ├── utils/           # time, liveStats, dialProgress, phaseClock, projections, alerts, ianaTimeZones, seedTimezone, …
+│           ├── queries/         # fetch helpers + React Query hooks (incl. analytics today)
+│           ├── utils/           # time, liveStats, todayStats, dialProgress, phaseClock, projections, alerts, ianaTimeZones, seedTimezone, …
 │           └── tests/
 │               └── utils/
 │                   ├── sessionProjection.test.ts
 │                   ├── activeSessionProjection.test.ts
 │                   ├── dialProgress.test.ts
 │                   ├── liveStats.test.ts
-│                   └── seedTimezone.test.ts
+│                   ├── seedTimezone.test.ts
+│                   └── todayStats.test.ts
 ```
 
 ## Top-level folder roles

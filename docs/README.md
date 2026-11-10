@@ -68,7 +68,7 @@ flowchart LR
   Sched -->|"tickIfIdle(nowMs)"| Sess
 ```
 
-Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`), by commands that tick under the mutex before mutating, and by one boot `runRecoveryTick` after `hydrateFromStore`; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT. `GET /api/analytics/today` returns closed-phase client-timezone day totals via `AnalyticsService`; boot and client-day rollover call `finalizeDueDays` to materialize past days into `daily_stats`. Mid-session resume survives container recreate when `/data` is kept.
+Request flow (session action): route → server Zod parsers (`settingsValidation`) → `await` `SettingsService` / `SessionService` (session mutations are async, mutex-serialized, and write-through to SQLite) → `SessionSnapshot` JSON (and SSE fan-out). Wall-clock catch-up is owned by the 250ms scheduler (`tickIfIdle`), by commands that tick under the mutex before mutating, and by one boot `runRecoveryTick` after `hydrateFromStore`; GET snapshot / SSE do not tick. Settings hydrate from SQLite at boot and persist on PUT. `GET /api/analytics/today` returns closed-phase client-timezone day totals via `AnalyticsService`; the timer idle/active surfaces show a separate Today row that adds open-phase progress clipped to that day window. Boot and client-day rollover call `finalizeDueDays` to materialize past days into `daily_stats`. Mid-session resume survives container recreate when `/data` is kept.
 
 ## Documentation index
 

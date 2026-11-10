@@ -49,7 +49,7 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 
 ### `src/index.ts`
 
-**Re-exports:** bounds, debug catalog, `getSettingsBounds`, `SHORT_DURATIONS_MIN_OVERLAY`, `shortDurationsServerFeature`, `pausedSecAt` / `plannedWorkSecAt` / `PlannedWorkProgressPhase`.
+**Re-exports:** bounds, debug catalog, `getSettingsBounds`, `SHORT_DURATIONS_MIN_OVERLAY`, `shortDurationsServerFeature`, `pausedSecAt` / `plannedWorkProgressClockMs` / `plannedWorkSecAt` / `PlannedWorkProgressPhase`, `overlapSec` / `overlapSecFromIso`.
 
 | Export | Kind |
 |--------|------|
@@ -69,7 +69,8 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 | `SessionStatus` | `"idle"\|"active"\|"completed"` |
 | `SessionLiveStats` | type (`workedSec`, `deliberationSec`, `restSec`, `pausedSec`) |
 | `TodayStats` / `TodayStatsResponse` | day-bucket alias of live stats + `clientDate` / `dayStart` / `dayEnd` |
-| `pausedSecAt`, `plannedWorkSecAt` | Planned-work progress helpers (`liveStatsProgress.ts`) |
+| `pausedSecAt`, `plannedWorkSecAt`, `plannedWorkProgressClockMs` | Planned-work progress helpers (`liveStatsProgress.ts`) |
+| `overlapSec`, `overlapSecFromIso` | Day-window overlap helpers (`overlapSec.ts`) — ms or ISO inputs |
 | `AlertEvent`, `ActiveSession` | types |
 | `IdleSnapshot`, `ActiveSnapshot`, `SessionSnapshot` | types (`IdleSnapshot.recoveryAbandonedMessage?`) |
 
@@ -278,9 +279,8 @@ Unknown errors are rethrown.
 | `addClientDays(clientDate, deltaDays)` | calendar-day arithmetic |
 | `dayBoundsIso(clientDate, timeZone)` | half-open UTC ISO + ms bounds |
 | `ClientDayBounds` | type |
-| `overlapSec(startedAt, endedAt, windowStartMs, windowEndMs)` | whole-second overlap |
 
-**Deps:** `luxon`.
+**Deps:** `luxon`. Overlap clipping uses shared `overlapSecFromIso`.
 
 ### `src/services/settings.service.ts`
 
@@ -307,7 +307,7 @@ Unknown errors are rethrown.
 | `AnalyticsService` | class |
 | `EMPTY_TODAY_STATS` | zeroed `TodayStats` |
 
-**Public methods:** `todayStats()`, `dayStats(clientDate)`, `finalizeDueDays()` — overlap-clip closed phases via `AnalyticsStore` + Luxon day bounds; finalize catch-up writes `daily_stats` through yesterday.
+**Public methods:** `todayStats()`, `dayStats(clientDate)`, `finalizeDueDays()` — overlap-clip closed phases via `AnalyticsStore` + Luxon day bounds + shared `overlapSecFromIso`; finalize catch-up writes `daily_stats` through yesterday.
 
 ### `src/services/session.service.ts`
 
@@ -345,7 +345,7 @@ Unknown errors are rethrown.
 
 ### Tests
 
-`src/tests/services/{session,settings,analytics}.service.test.ts`, `session.attribution.test.ts`, `session.recovery.test.ts`, `session.recovery.matrix.test.ts`, `settings.service.persist.test.ts`, `src/tests/db/{settings,session,phases,analytics}Store.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase}.ts`, `src/tests/pause/*`, `src/tests/utils/{asyncMutex,clientDay}.test.ts` — no production exports (see [testing.md](./testing.md)).
+`src/tests/services/{session,settings,analytics}.service.test.ts`, `session.attribution.test.ts`, `session.recovery.test.ts`, `session.recovery.matrix.test.ts`, `settings.service.persist.test.ts`, `src/tests/db/{settings,session,phases,analytics}Store.test.ts`, `src/tests/routes/analytics.routes.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase}.ts`, `src/tests/pause/*`, `src/tests/utils/{asyncMutex,clientDay}.test.ts` — no production exports (see [testing.md](./testing.md)).
 ---
 
 ## `apps/web` — entry & shell
@@ -377,7 +377,7 @@ Declares `__APP_VERSION__: string`.
 
 ### `src/constants/about.ts`
 
-Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, …), data arrays including `FEATURES` (Hard pause, Short-rest acknowledgement, Live session stats → `available`), `FONT_CREDITS`, `DESIGN_CREDIT` (Quiet Dark / flavors.design), and `CREDITS`.
+Exports: `GITHUB_REPO`, `TAGLINE`, `RELEASE_STATUS`, types (`FeatureStatus`, `AboutFeature`, …), data arrays including `FEATURES` (Hard pause, Short-rest acknowledgement, Live session stats, Idle today stats, SQLite persistence & crash recovery → `available`; Analytics dashboard → `soon`), `FONT_CREDITS`, `DESIGN_CREDIT` (Quiet Dark / flavors.design), and `CREDITS`.
 
 ---
 
@@ -458,7 +458,15 @@ Internal helpers `pad2` and `splitSec` back both formatters.
 
 | Export | Purpose |
 |--------|---------|
-| `liveStatsAt(snapshot, nowMs)` | Client-side live stats with in-phase extrapolation; uses shared `plannedWorkSecAt` / `pausedSecAt`; freezes worked while paused via local `plannedWorkProgressClockMs` |
+| `liveStatsAt(snapshot, nowMs)` | Client-side live stats with in-phase extrapolation; uses shared `plannedWorkSecAt` / `pausedSecAt` / `plannedWorkProgressClockMs` |
+
+### `src/utils/todayStats.ts`
+
+| Export | Purpose |
+|--------|---------|
+| `EMPTY_TODAY_STATS` | zeroed `SessionLiveStats` |
+| `openPhaseProgressClippedToDay(phase, dayStart, dayEnd, nowMs)` | Open-phase contribution clipped to the server day window |
+| `todayDisplayStats(serverToday, openPhaseClipped)` | Closed server today + open-phase clip (not full live session stats) |
 
 ### `src/utils/playAlerts.ts`
 
@@ -538,15 +546,26 @@ Uses `useEffectEvent` for snapshot/idle handlers.
 
 `fetchAlertSeq()`, `fetchSession()`, `postAction(path, body?)`
 
+### `src/queries/analytics.api.ts`
+
+`fetchTodayStats()` — `GET ANALYTICS_API.today`
+
 ### `src/queries/useHealthQuery.ts`
 
 `healthQueryKey`, `useHealthQuery()`
+
+### `src/queries/useTodayStatsQuery.ts`
+
+| Export | Kind |
+|--------|------|
+| `todayStatsQueryKey` | `["analytics", "today"]` |
+| `useTodayDisplayStats(phase, nowMs)` | Closed server today + open-phase day clip; invalidates on phase change / day roll |
 
 ### `src/queries/useSessionApi.ts`
 
 `settingsQueryKey`, `useSettingsQuery()`, `useSaveSettingsMutation()`, `useSessionActionMutation(onSnapshot)`
 
-**Side effects:** toasts (pause/resume copy follows locked session strategy; includes `ackWork`); query cache updates; alert playback on action success.
+**Side effects:** toasts (pause/resume copy follows locked session strategy; includes `ackWork`); query cache updates; alert playback on action success; invalidates `todayStatsQueryKey` after settings save and session actions.
 
 ---
 
@@ -664,7 +683,7 @@ Exports: `UI_FEATURE_IDS`, `UI_FEATURE_META`, `UiFeatureId`, `UiFlags`.
 | `SessionTimingDefaults` | type (duration fields) |
 | `IdleStartForm` | props `{ defaults, onStart }` |
 
-Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and approximate duration from per-session overrides via `sessionProjection`. Default layout uses a still `TimerDial` full ring; `classicTimer` UI flag keeps the plain clock.
+Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and approximate duration from per-session overrides via `sessionProjection`. Default layout uses a still `TimerDial` full ring; `classicTimer` UI flag keeps the plain clock. Renders `TodayStatsRow` via `useTodayDisplayStats(null, now)`.
 
 ### `src/components/timer/ActiveTimer.tsx`
 
@@ -673,9 +692,16 @@ Owns `useNow(IDLE_ESTIMATE_TICK_MS)`. Shows estimated end (locale time) and appr
 | `snapshot` | `ActiveSnapshot` |
 | `onAction` | `(path: string) => void` |
 
-Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Default layout: `TimerDial` with `dialProgress` / `cycleDotStates`, phase eyebrow, countdown, overtime comet, and Cycle / Phase ends / Estimated end readouts. Classic layout (`classicTimer` flag): plain `formatMmSs` clock via `timerDisplay` classes. Also renders hint, actions, and live-stats HUD (`liveStatsAt`: Worked / Deliberation / Rest / Paused via `formatHhMmSs`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
+Owns `useNow(ACTIVE_UI_TICK_MS)`. Derives `phase`, `params`, `pauseStrategy` from `snapshot.session`. Default layout: `TimerDial` with `dialProgress` / `cycleDotStates`, phase eyebrow, countdown, overtime comet, and Cycle / Phase ends / Estimated end readouts. Classic layout (`classicTimer` flag): plain `formatMmSs` clock via `timerDisplay` classes. Also renders hint, actions, live-stats HUD (`StatsCounters` + `liveStatsAt`), and a separate `TodayStatsRow` (`useTodayDisplayStats(phase, now)`). `short_rest_ack` reuses decision countdown fields. `hideContinueButton` UI flag filters Continue during work decision.
 
 Planned-work clock uses `timerFrozenAt` when set (hard pause). Pause button label and phase suffix follow `snapshot.session.pauseStrategy`. Phase end/duration/clock helpers come from `phaseClock`.
+
+### `src/components/timer/TodayStatsRow.tsx`
+
+| Export | Kind |
+|--------|------|
+| `StatsCounters` | Worked / Deliberation / Rest / Paused row (shared by live + today) |
+| `TodayStatsRow` | Labeled **Today** row wrapping `StatsCounters` |
 
 ### `src/components/timer/TimerDial.tsx`
 

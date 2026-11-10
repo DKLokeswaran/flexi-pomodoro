@@ -7,7 +7,7 @@
 | Server session | In-memory `SessionService` singleton hydrated from SQLite at boot; mutations + ticks serialized by `AsyncMutex`; SQLite write-through on transitions |
 | Server settings | In-process cache hydrated from SQLite `SettingsStore`; `update` write-through |
 | Server → clients | SSE snapshots + REST |
-| Client server cache | TanStack React Query (`settings`, `health`) |
+| Client server cache | TanStack React Query (`settings`, `health`, `analytics/today`) |
 | Client live session | `useState` in `useSessionStream` (not React Query) |
 | Client preferences | `localStorage` via providers/stores (incl. one-shot `flexi-pomodoro:tzSeeded` timezone seed gate) |
 | Client UI chrome | Local `useState` (tab, drafts, accordion) |
@@ -32,13 +32,14 @@ new QueryClient({
 |-----|------|-----|-------|
 | `["settings"]` | `useSettingsQuery` | `fetchSettings` | Default staleTime 30s |
 | `["health"]` | `useHealthQuery` | `fetchHealth` | `staleTime: Infinity` |
+| `["analytics", "today"]` | via `useTodayDisplayStats` | `fetchTodayStats` | Refetch on focus; invalidated on phase change / day roll / settings save / session actions |
 
 ### Mutations
 
 | Hook | Side effects |
 |------|----------------|
-| `useSaveSettingsMutation` | `setQueryData(settings)`; success/error toast |
-| `useSessionActionMutation` | Calls `onSnapshot`; `playAlerts`; success toast keyed by path |
+| `useSaveSettingsMutation` | `setQueryData(settings)`; invalidate today stats; success/error toast |
+| `useSessionActionMutation` | Calls `onSnapshot`; `playAlerts`; invalidate today stats; success toast keyed by path |
 
 Session live state is **not** stored in the query cache; mutations push into the stream state via `setSnapshot`.
 
@@ -135,8 +136,8 @@ Transport (`connectSessionStream`):
 |-----------|-------|
 | `App` | `tab: Tab` |
 | `SettingsTab` | draft minutes/cycles/decision; `timezone`; `enableHardPause`; session-only `experimentalMode` gate; UI + debug flag toggles |
-| `IdleStartForm` | override draft (min or sec depending on shortDurations); own `useNow(IDLE_ESTIMATE_TICK_MS)` for estimated end; shows optional `recoveryAbandonedMessage` from idle snapshot |
-| `ActiveTimer` | own `useNow(ACTIVE_UI_TICK_MS)` for countdown, dial/classic layout, live stats, and estimated end |
+| `IdleStartForm` | override draft (min or sec depending on shortDurations); own `useNow(IDLE_ESTIMATE_TICK_MS)` for estimated end; today display stats; shows optional `recoveryAbandonedMessage` from idle snapshot |
+| `ActiveTimer` | own `useNow(ACTIVE_UI_TICK_MS)` for countdown, dial/classic layout, live stats, today display stats, and estimated end |
 | `AboutAccordion` | `open` |
 | `ToastProvider` | current toast |
 
@@ -147,8 +148,8 @@ Transport (`connectSessionStream`):
 No dedicated selector library. Inline derivation examples:
 
 - `App`: `sessionIsActive = snapshot?.status === "active"`; settings fallback `DEFAULT_SETTINGS`; `useSeedTimezone` after settings load
-- `ActiveTimer`: dial vs classic via `classicTimer`; `dialProgress` / `cycleDotStates`; `displayClock`; `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`); `phaseHint`; `liveStatsAt` HUD (Worked / Deliberation / Rest / Paused); `activeEstimatedSessionEndMs`; strategy-aware pause labels
-- `IdleStartForm`: still dial ring vs classic via `classicTimer`; `estimatedSessionEndMs` / `nominalSessionDurationSec` from override draft
+- `ActiveTimer`: dial vs classic via `classicTimer`; `dialProgress` / `cycleDotStates`; `displayClock`; `actionsForPhase` (reads `hideContinueButton` via `useUiFlags`); `phaseHint`; `liveStatsAt` HUD; `useTodayDisplayStats` Today row; `activeEstimatedSessionEndMs`; strategy-aware pause labels
+- `IdleStartForm`: still dial ring vs classic via `classicTimer`; `estimatedSessionEndMs` / `nominalSessionDurationSec` from override draft; `useTodayDisplayStats` Today row
 - `AboutTab`: feature available/soon counts; health UI mapping
 
 ---
@@ -160,6 +161,7 @@ No dedicated selector library. Inline derivation examples:
 | `useNow(intervalMs)` | `number \| null` (`ACTIVE_UI_TICK_MS` / `IDLE_ESTIMATE_TICK_MS` / `null`) | `number` (Date.now at that cadence; frozen when `null`) |
 | `useSessionStream()` | — | `{ snapshot, setSnapshot }` |
 | `useSeedTimezone(settings)` | `Settings \| undefined` | void — one-shot browser IANA seed via `seedTimezoneIfNeeded` + settings query cache update |
+| `useTodayDisplayStats(phase, nowMs)` | open `Phase \| null`, local now | `SessionLiveStats` — closed today + open-phase day clip |
 | `useDebugFlags()` | — | debug flag store (throws if missing) |
 | `useUiFlags()` | — | UI preference store (throws if missing) |
 | `useToast()` | — | `{ pushToast }` |

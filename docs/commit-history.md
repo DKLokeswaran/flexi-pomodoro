@@ -6,11 +6,11 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 61 |
+| Total commits | 63 |
 | First commit date | 2026-07-12 |
-| Latest commit date | 2026-11-10 |
+| Latest commit date | 2026-11-11 |
 | Active contributors | 2 |
-| Most active contributor | Lokeswaran DK (59) |
+| Most active contributor | Lokeswaran DK (61) |
 | Conventional-commit prefix count (`feat`/`fix`/…) | 6 (`chore` × 4, `style` × 2) |
 | Tags | `v0.0.1-alpha.1` … `v0.0.1-alpha.4`, `v0.0.2-alpha.0` … `v0.0.2-alpha.3` (workspace version field `0.0.3-alpha.0`) |
 
@@ -22,7 +22,7 @@ Source: `git log HEAD` on branch `master` (working-tree changes excluded).
 | 2026-08 | 11 |
 | 2026-09 | 13 |
 | 2026-10 | 2 |
-| 2026-11 | 12 |
+| 2026-11 | 14 |
 
 ## Hotspot analysis (top changed paths across history)
 
@@ -255,6 +255,15 @@ High churn on PRD, App shell, styles, and the session engine reflects alpha prod
 
 - Register `GET /api/analytics/today` (`registerAnalyticsRoutes`) so clients fetch open-day totals without day query params.
 
+### 2026-11-10 — Finalize daily_stats on boot and day roll
+
+- Call `finalizeDueDays` after startup and when the scheduler observes a new client-timezone date so past days stay materialized in `daily_stats`.
+
+### 2026-11-11 — Today stats UI + shared day-overlap helpers
+
+- Add idle/active `TodayStatsRow` with open-phase day clipping via `useTodayDisplayStats` / `todayStats` helpers and `GET /api/analytics/today`.
+- Move `overlapSec` / `overlapSecFromIso` and `plannedWorkProgressClockMs` into `@flexi-pomodoro/shared`; mark Idle today stats and SQLite persistence available on About.
+
 ## Breaking changes
 
 No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from messages/tests):
@@ -270,6 +279,8 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 
 | Hash | Author | Date | Message |
 |------|--------|------|---------|
+| 2372613 | Lokeswaran DK | 2026-11-11 | Add Today stats on idle/active and share day-overlap helpers. |
+| 03946a4 | Lokeswaran DK | 2026-11-10 | Finalize daily_stats on boot and client-day rollover. |
 | 2959a68 | Lokeswaran DK | 2026-11-10 | Expose GET /api/analytics/today from settings timezone. |
 | 1ff6d1f | Lokeswaran DK | 2026-11-10 | Add analytics store and service with Luxon client-day bounds. |
 | 3fa3b05 | Lokeswaran DK | 2026-11-09 | Add shared analytics today API path and TodayStats types. |
@@ -332,4 +343,4 @@ No commit messages contain `BREAKING CHANGE`. Behavioral shifts of note (from me
 | 6583d56 | Lokeswaran DK | 2026-07-12 | Refine PRD with session, pause, and flow clarifications. |
 | 3b25f3e | Lokeswaran DK | 2026-07-12 | Add initial Flexi Pomodoro product requirements document. |
 
-Last Synced Commit: 2959a680b46225fbbbae1681dcc30d802652dd33
+Last Synced Commit: 2372613ca9fa9377a5368df090bbc9c1d13e76e7

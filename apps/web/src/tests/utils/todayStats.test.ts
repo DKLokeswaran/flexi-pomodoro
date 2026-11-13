@@ -32,6 +32,19 @@ function plannedWork(partial: {
 }
 
 describe("openPhaseProgressClippedToDay", () => {
+  it("clips open planned work that started before the client day", () => {
+    const startedAt = "2026-11-08T18:20:00.000Z"; // 10m before IST midnight
+    const nowMs = Date.parse("2026-11-08T18:40:00.000Z"); // 10m after
+    const stats = openPhaseProgressClippedToDay(
+      plannedWork({ startedAt }),
+      DAY_START,
+      DAY_END,
+      nowMs,
+    );
+    assert.equal(stats.workedSec, 10 * 60);
+    assert.equal(stats.pausedSec, 0);
+  });
+
   it("adds only the open pause to pausedSec and freezes worked", () => {
     const startedAt = "2026-11-09T10:00:00.000Z";
     const pauseAt = "2026-11-09T10:02:00.000Z";

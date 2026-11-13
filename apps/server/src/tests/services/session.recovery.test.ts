@@ -35,6 +35,23 @@ describe("SessionService boot hydrate + recovery", () => {
     return { ...ctx, session };
   }
 
+  it("hydrate restores mid planned work without advancing", async () => {
+    const { session, stores } = await openEngine();
+    await session.start(SHORT_PARAMS, T0, "soft");
+
+    const mid = new SessionService({
+      session: stores.session,
+      phases: stores.phases,
+    });
+    const restored = await mid.hydrateFromStore();
+    assert.equal(restored, true);
+    const snap = mid.getSnapshot(T0 + 30_000);
+    assert.equal(snap.status, "active");
+    if (snap.status !== "active") return;
+    assert.equal(snap.session.phase.kind, "planned_work");
+    assert.equal(snap.session.phase.cycleIndex, 1);
+  });
+
   it("hydrate restores alertSeq from session_runtime", async () => {
     const { session, stores } = await openEngine();
     await session.start(SHORT_PARAMS, T0, "soft");
@@ -234,6 +251,11 @@ describe("SessionService boot hydrate + recovery", () => {
     assert.equal(snap.session.phase.paused, true);
     assert.ok(snap.session.phase.timerFrozenAt);
     assert.ok(Date.parse(snap.session.phase.plannedEndAt) < recoveryAt);
+  });
+
+  it("hydrate returns false when idle (no runtime)", async () => {
+    const { session } = await openEngine();
+    assert.equal(await session.hydrateFromStore(), false);
   });
 
   it("CORRUPT_RUNTIME abandon clears runtime and surfaces idle notice", async () => {

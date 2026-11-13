@@ -99,6 +99,15 @@ describe("SettingsService", () => {
     assert.equal(store.saved.length, savesBefore);
   });
 
+  it("accepts a valid IANA timezone", async () => {
+    const store = createMockSettingsStore();
+    const settings = new SettingsService(store);
+    await settings.hydrate();
+    const next = await settings.update({ timezone: "Asia/Kolkata" });
+    assert.equal(next.timezone, "Asia/Kolkata");
+    assert.equal(store.saved.at(-1)?.timezone, "Asia/Kolkata");
+  });
+
   it("hydrate restores previously saved settings from the store", async () => {
     const store = createMockSettingsStore({
       ...DEFAULT_SETTINGS,

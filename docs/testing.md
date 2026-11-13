@@ -78,7 +78,7 @@ Imports parsers from `utils/settingsValidation.ts`.
 | Suite | Cases |
 |-------|-------|
 | `parseStartSessionBody` | Accepts 1s with flag; rejects 1s without; rejects unknown debug keys (`ZodError`) |
-| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; reject invalid IANA `timezone`; `update` calls `store.save`; load existing row on hydrate |
+| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; accept valid IANA `timezone`; reject invalid IANA; `update` calls `store.save`; load existing row on hydrate |
 
 ### `apps/server/src/tests/db/settingsStore.test.ts`
 
@@ -138,6 +138,7 @@ Engine + real SQLite: segment rows after live transitions (FR-FLOW-11 / FR-ACK-6
 
 | Case | Asserts |
 |------|---------|
+| Mid planned work hydrate | Restores phase without advancing |
 | alertSeq restore | Runtime `alertSeq` rebuilt |
 | Recovery past planned end | Work closed with `endedReason: "recovery"` |
 | recoveryTick flag reset | Later closes use live endedReason |
@@ -145,6 +146,7 @@ Engine + real SQLite: segment rows after live transitions (FR-FLOW-11 / FR-ACK-6
 | Soft-paused hydrate | Open pause slice restored |
 | Hard-paused recovery | Does not advance past original planned end while frozen |
 | Hard ack timeout + long downtime | Stays frozen planned_work past next planned end |
+| Idle hydrate | Returns `false` when no runtime |
 | CORRUPT_RUNTIME abandon | Clears runtime; idle `recoveryAbandonedMessage` |
 
 ### `apps/server/src/tests/services/session.recovery.matrix.test.ts`
@@ -156,6 +158,7 @@ Q9 Option A recovery scenarios via hydrate + `runRecoveryTick` on temp SQLite.
 | S3 | Through short rest → short_rest_ack (still in window) |
 | S5 | Through long rest end → idle session complete |
 | S6 | During extended → still extended; overtime includes downtime |
+| S7 | Soft-pause downtime included in `pausedSec` |
 | S8a | SHORT_REST_ACK inside window → restore ack |
 
 ### `apps/server/src/tests/services/settings.service.persist.test.ts`
@@ -206,15 +209,17 @@ Isolated `hardPauseStrategy` unit tests:
 
 | Case | Asserts |
 |------|---------|
-| `clientDateAt` | Client-timezone calendar date around local midnight |
+| `clientDateAt` / `dayBoundsIso` | Client-timezone calendar date and half-open UTC window |
+| `addClientDays` | Calendar-day arithmetic |
 | `overlapSecFromIso` | Shared helper clips ISO intervals to the day window |
 
 ### `apps/server/src/tests/services/analytics.service.test.ts`
 
 | Case | Asserts |
 |------|---------|
+| `dayStats` | Returns `clientDate` bounds + closed-phase aggregates (incl. pause subtraction from worked) |
 | full in-day phase | Attributes full worked / deliberation / rest for phases entirely inside the day |
-| midnight-spanning | Splits / clips phases across adjacent client days; subtracts clipped pauses from worked |
+| midnight-spanning | Splits / clips phases across adjacent client days |
 | `todayStats` | Matches `dayStats` for the current client date |
 | `finalizeDueDays` | Backfills missing `daily_stats` through yesterday; leaves today open |
 

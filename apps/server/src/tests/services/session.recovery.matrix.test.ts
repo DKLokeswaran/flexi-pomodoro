@@ -102,6 +102,22 @@ describe("Q9 S1–S8 recovery matrix", () => {
     assert.ok(snap.session.liveStats.workedSec >= 60 + 120);
   });
 
+  it("S7: soft-pause downtime is included in pausedSec", async () => {
+    const { session, stores } = await openEngine();
+    await session.start(SHORT_PARAMS, T0, "soft");
+    await session.pause(T0 + 20_000);
+    const mid = await reboot(stores);
+    const now = T0 + 40_000;
+    await mid.runRecoveryTick(now);
+    const snap = mid.getSnapshot(now);
+    assert.equal(snap.status, "active");
+    if (snap.status !== "active") return;
+    assert.equal(snap.session.phase.kind, "planned_work");
+    if (snap.session.phase.kind !== "planned_work") return;
+    assert.equal(snap.session.phase.paused, true);
+    assert.equal(snap.session.liveStats.pausedSec, 20);
+  });
+
   it("S8a: down during SHORT_REST_ACK inside window → restore ack", async () => {
     const { session, stores } = await openEngine();
     await session.start(SHORT_PARAMS, T0, "soft");

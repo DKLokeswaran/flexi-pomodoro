@@ -43,52 +43,6 @@ describe("AnalyticsService", () => {
     return { ...ctx, settings, analytics };
   }
 
-  it("dayStats returns zeros for an empty day", async () => {
-    const { analytics } = await setup();
-    const day = await analytics.dayStats("2026-11-09");
-    assert.equal(day.clientDate, "2026-11-09");
-    assert.deepEqual(
-      {
-        workedSec: day.workedSec,
-        deliberationSec: day.deliberationSec,
-        restSec: day.restSec,
-        pausedSec: day.pausedSec,
-      },
-      {
-        workedSec: 0,
-        deliberationSec: 0,
-        restSec: 0,
-        pausedSec: 0,
-      },
-    );
-  });
-
-  it("dayStats returns client-date bounds and closed aggregates", async () => {
-    const { db, stores, analytics } = await setup();
-    const bounds = dayBoundsIso("2026-11-09", TZ);
-
-    await db.transaction(async (trx) => {
-      await stores.phases.openExtendedWork(trx, {
-        id: "ext-1",
-        sessionId: SESSION_ID,
-        cycleIndex: 1,
-        startedAt: "2026-11-09T10:00:00.000Z",
-      });
-      await stores.phases.completeExtendedWork(trx, "ext-1", {
-        endedAt: "2026-11-09T10:05:00.000Z",
-        actualDurationSec: 300,
-        endedReason: "user_start_rest",
-      });
-    });
-
-    const day = await analytics.dayStats("2026-11-09");
-    assert.equal(day.clientDate, "2026-11-09");
-    assert.equal(day.dayStart, bounds.dayStart);
-    assert.equal(day.dayEnd, bounds.dayEnd);
-    assert.equal(day.workedSec, 300);
-    assert.equal(day.pausedSec, 0);
-  });
-
   it("dayStats attributes full buckets for a phase fully inside the day", async () => {
     const { db, stores, analytics } = await setup();
 

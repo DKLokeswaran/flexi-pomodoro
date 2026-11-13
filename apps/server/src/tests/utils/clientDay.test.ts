@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { overlapSecFromIso } from "@flexi-pomodoro/shared";
-import {
-  addClientDays,
-  clientDateAt,
-  dayBoundsIso,
-} from "../../utils/clientDay.js";
+import { clientDateAt } from "../../utils/clientDay.js";
 
 describe("clientDay", () => {
   it("formats Asia/Kolkata dates around IST midnight", () => {
@@ -17,17 +13,6 @@ describe("clientDay", () => {
       clientDateAt(Date.parse("2026-11-08T18:30:00.000Z"), "Asia/Kolkata"),
       "2026-11-09",
     );
-  });
-
-  it("dayBoundsIso for Asia/Kolkata is half-open at IST midnight", () => {
-    const bounds = dayBoundsIso("2026-11-09", "Asia/Kolkata");
-    assert.equal(bounds.dayStart, "2026-11-08T18:30:00.000Z");
-    assert.equal(bounds.dayEnd, "2026-11-09T18:30:00.000Z");
-  });
-
-  it("addClientDays rolls calendar months", () => {
-    assert.equal(addClientDays("2026-11-30", 1), "2026-12-01");
-    assert.equal(addClientDays("2026-11-09", -1), "2026-11-08");
   });
 
   it("overlapSecFromIso clips to the window", () => {

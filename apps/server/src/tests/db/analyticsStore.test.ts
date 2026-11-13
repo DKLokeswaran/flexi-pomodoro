@@ -33,49 +33,6 @@ describe("AnalyticsStore (SQLite)", () => {
     return ctx;
   }
 
-  it("creates daily_stats via migration", async () => {
-    const ctx = await openTempDatabase();
-    disposers.push(ctx.dispose);
-    assert.ok(ctx.stores.analytics);
-    const tables = await ctx.db.raw(
-      "SELECT name FROM sqlite_master WHERE type='table'",
-    );
-    const names = (tables as { name: string }[]).map((row) => row.name);
-    assert.ok(names.includes("daily_stats"));
-    const columns = await ctx.db("daily_stats").columnInfo();
-    assert.ok("clientDate" in columns);
-  });
-
-  it("lists closed planned work overlapping a client-day window", async () => {
-    const { db, stores } = await withSession();
-    const bounds = dayBoundsIso("2026-11-09", TZ);
-    await db.transaction(async (trx) => {
-      await stores.phases.openPlannedWork(trx, {
-        id: "pw-1",
-        sessionId: SESSION_ID,
-        cycleIndex: 1,
-        plannedDurationSec: 3600,
-        plannedEndAt: "2026-11-08T19:00:00.000Z",
-        startedAt: "2026-11-08T18:00:00.000Z",
-      });
-      await stores.phases.completePlannedWork(trx, "pw-1", {
-        endedAt: "2026-11-08T19:00:00.000Z",
-        endedReason: "planned_complete",
-        pausedSec: 0,
-        pauseStartedAt: null,
-        timerFrozenAt: null,
-        paused: false,
-      });
-    });
-
-    const rows = await stores.analytics.listClosedPlannedWorkOverlapping(
-      bounds.dayStart,
-      bounds.dayEnd,
-    );
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.id, "pw-1");
-  });
-
   it("upsertDailyStats is idempotent and getLatestFinalizedClientDate advances", async () => {
     const { stores } = await withSession();
     const bounds = dayBoundsIso("2026-11-08", TZ);

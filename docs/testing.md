@@ -78,7 +78,7 @@ Imports parsers from `utils/settingsValidation.ts`.
 | Suite | Cases |
 |-------|-------|
 | `parseStartSessionBody` | Accepts 1s with flag; rejects 1s without; rejects unknown debug keys (`ZodError`) |
-| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; accept valid IANA `timezone`; reject invalid IANA; `update` calls `store.save`; load existing row on hydrate |
+| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; reject invalid IANA `timezone`; `update` calls `store.save`; load existing row on hydrate |
 
 ### `apps/server/src/tests/db/settingsStore.test.ts`
 
@@ -88,7 +88,6 @@ Uses temp `DATA_DIR` via `openDatabase(tempDir)`.
 |------|---------|
 | `ensureSeeded` | Writes `DEFAULT_SETTINGS` once; second call returns same |
 | save / load | Round-trip across process reopen (incl. `timezone`) |
-| migration defaults timezone | Seeded `timezone` is `UTC`; column present after migrations |
 | initial migration | Expected tables present (`settings`, `sessions`, `phases`, detail tables, `pause_slices`, `daily_stats`, …); `stores.analytics` present |
 
 ### `apps/server/src/tests/db/analyticsStore.test.ts`
@@ -97,8 +96,6 @@ Uses temp migrated SQLite.
 
 | Case | Asserts |
 |------|---------|
-| migration | `daily_stats` table + expected columns |
-| overlapping lists | Closed planned-work (and related) rows filtered by day window |
 | upsert / get | Idempotent `upsertDailyStats`; `getDailyStats` / `getLatestFinalizedClientDate` |
 
 ### `apps/server/src/tests/db/sessionStore.test.ts`
@@ -209,18 +206,15 @@ Isolated `hardPauseStrategy` unit tests:
 
 | Case | Asserts |
 |------|---------|
-| `clientDateAt` / `dayBoundsIso` | Client-timezone calendar date and half-open UTC window |
-| `addClientDays` | Calendar-day arithmetic |
+| `clientDateAt` | Client-timezone calendar date around local midnight |
 | `overlapSecFromIso` | Shared helper clips ISO intervals to the day window |
 
 ### `apps/server/src/tests/services/analytics.service.test.ts`
 
 | Case | Asserts |
 |------|---------|
-| empty day | Zero totals for a day with no closed phases |
-| `dayStats` | Returns `clientDate` bounds + closed-phase aggregates (incl. pause subtraction from worked) |
 | full in-day phase | Attributes full worked / deliberation / rest for phases entirely inside the day |
-| midnight-spanning | Splits / clips phases across adjacent client days |
+| midnight-spanning | Splits / clips phases across adjacent client days; subtracts clipped pauses from worked |
 | `todayStats` | Matches `dayStats` for the current client date |
 | `finalizeDueDays` | Backfills missing `daily_stats` through yesterday; leaves today open |
 

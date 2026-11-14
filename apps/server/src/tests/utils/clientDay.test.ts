@@ -61,4 +61,32 @@ describe("clientDay", () => {
       0,
     );
   });
+
+  it("dayBoundsIso spans 23 hours when clocks go forward (America/New_York)", () => {
+    const bounds = dayBoundsIso("2026-03-08", "America/New_York");
+    assert.equal(bounds.dayStart, "2026-03-08T05:00:00.000Z");
+    assert.equal(bounds.dayEnd, "2026-03-09T04:00:00.000Z");
+    assert.equal(bounds.dayEndMs - bounds.dayStartMs, 23 * 3600_000);
+  });
+
+  it("dayBoundsIso spans 25 hours when clocks go back (America/New_York)", () => {
+    const bounds = dayBoundsIso("2026-11-01", "America/New_York");
+    assert.equal(bounds.dayStart, "2026-11-01T04:00:00.000Z");
+    assert.equal(bounds.dayEnd, "2026-11-02T05:00:00.000Z");
+    assert.equal(bounds.dayEndMs - bounds.dayStartMs, 25 * 3600_000);
+  });
+
+  it("clock-change days meet their neighbours with no gap or overlap", () => {
+    const zone = "America/New_York";
+    for (const clientDate of ["2026-03-08", "2026-11-01"]) {
+      const day = dayBoundsIso(clientDate, zone);
+      const next = dayBoundsIso(addClientDays(clientDate, 1), zone);
+      assert.equal(day.dayEnd, next.dayStart);
+      assert.equal(clientDateAt(day.dayEndMs - 1, zone), clientDate);
+      assert.equal(
+        clientDateAt(day.dayEndMs, zone),
+        addClientDays(clientDate, 1),
+      );
+    }
+  });
 });

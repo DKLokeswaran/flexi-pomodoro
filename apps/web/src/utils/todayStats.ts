@@ -16,14 +16,15 @@ export const EMPTY_TODAY_STATS: SessionLiveStats = {
 /**
  * Open-phase contribution clipped to `[dayStart, dayEnd)`.
  * Closed pause slices for the open phase are already in server today — only the
- * open pause window is added to `pausedSec`. Closed `pausedSec` still reduces
- * worked when the phase started inside the day (no client slice list).
+ * open pause window is added to `pausedSec`. Closed pause seconds inside the day
+ * still reduce worked.
  */
 export function openPhaseProgressClippedToDay(
   phase: Phase,
   dayStartIso: string,
   dayEndIso: string,
   nowMs: number,
+  serverPausedSec: number,
 ): SessionLiveStats {
   const dayStartMs = Date.parse(dayStartIso);
   const dayEndMs = Date.parse(dayEndIso);
@@ -38,8 +39,12 @@ export function openPhaseProgressClippedToDay(
         dayStartMs,
         dayEndMs,
       );
+      // Closed in-day pauses: phase total if it started today, else server today
+      // (a phase running since before midnight owns every slice in the day).
       const closedPaused =
-        Date.parse(phase.startedAt) >= dayStartMs ? phase.pausedSec : 0;
+        Date.parse(phase.startedAt) >= dayStartMs
+          ? phase.pausedSec
+          : serverPausedSec;
       stats.workedSec = Math.max(0, wall - closedPaused);
       if (phase.paused && phase.pauseStartedAt) {
         stats.pausedSec = overlapSec(

@@ -144,3 +144,65 @@ describe("todayDisplayStats", () => {
     });
   });
 });
+
+describe("openPhaseProgressClippedToDay open-phase cases", () => {
+  it("counts open extended work, clipped to the day start", () => {
+    const extended: Phase = {
+      kind: "extended_work",
+      cycleIndex: 1,
+      startedAt: "2026-11-08T18:25:00.000Z",
+    };
+    const stats = openPhaseProgressClippedToDay(
+      extended,
+      DAY_START,
+      DAY_END,
+      Date.parse("2026-11-08T18:42:00.000Z"),
+    );
+    assert.equal(stats.workedSec, 12 * 60);
+  });
+
+  it("stops counting an open rest at its planned end", () => {
+    const rest: Phase = {
+      kind: "long_rest",
+      cycleIndex: 1,
+      startedAt: "2026-11-09T10:00:00.000Z",
+      plannedDurationSec: 600,
+      plannedEndAt: "2026-11-09T10:10:00.000Z",
+    };
+    const stats = openPhaseProgressClippedToDay(
+      rest,
+      DAY_START,
+      DAY_END,
+      Date.parse("2026-11-09T10:25:00.000Z"),
+    );
+    assert.equal(stats.restSec, 600);
+  });
+
+  it("counts the open short-rest acknowledgement window as deliberation", () => {
+    const ack: Phase = {
+      kind: "short_rest_ack",
+      cycleIndex: 1,
+      startedAt: "2026-11-09T10:00:00.000Z",
+      decisionEndsAt: "2026-11-09T10:00:15.000Z",
+      decisionWindowSec: 15,
+    };
+    const stats = openPhaseProgressClippedToDay(
+      ack,
+      DAY_START,
+      DAY_END,
+      Date.parse("2026-11-09T10:00:09.000Z"),
+    );
+    assert.equal(stats.deliberationSec, 9);
+  });
+
+  it("does not subtract a pre-midnight pause from today's worked time", () => {
+    // Work started 10m before the day; its 2m closed pause is not today's.
+    const stats = openPhaseProgressClippedToDay(
+      plannedWork({ startedAt: "2026-11-08T18:20:00.000Z", pausedSec: 120 }),
+      DAY_START,
+      DAY_END,
+      Date.parse("2026-11-08T18:40:00.000Z"),
+    );
+    assert.equal(stats.workedSec, 10 * 60);
+  });
+});

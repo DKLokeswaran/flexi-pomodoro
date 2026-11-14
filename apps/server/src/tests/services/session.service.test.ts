@@ -4,6 +4,7 @@ import {
   SettingsError,
   SettingsService,
 } from "../../services/settings.service.js";
+import type { SessionSnapshot } from "@flexi-pomodoro/shared";
 import {
   SessionError,
   SessionService,
@@ -792,5 +793,243 @@ describe("SessionService", () => {
     }
     await Promise.all(ops);
     assert.equal(skipped, true);
+  });
+});
+
+/** Assert a command rejects with the given SessionError code. */
+async function assertSessionError(
+  run: () => Promise<unknown>,
+  code: string,
+): Promise<void> {
+  await assert.rejects(run, (error: unknown) => {
+    assert.ok(error instanceof SessionError);
+    assert.equal(error.code, code);
+    return true;
+  });
+}
+
+describe("SessionService rest lengths and rest_ack alert", () => {
+  it("long rest runs for the long rest duration, not the short one", async () => {
+    const { settings, session } = await servicesWithShortTimers(1);
+    await startSession(settings, session, SESSION_START_MS);
+    const afterWork = SESSION_START_MS + 60_000;
+    await activePhase(session, afterWork);
+    await session.ackRest(afterWork);
+
+    // Short rest would end at +60s; long rest must still be running then.
+    const phase = await activePhase(session, afterWork + 60_000);
+    assert.equal(phase.kind, "long_rest");
+    if (phase.kind !== "long_rest") throw new Error("expected long_rest");
+    assert.equal(phase.plannedDurationSec, 120);
+    assert.equal(
+      phase.plannedEndAt,
+      new Date(afterWork + 120_000).toISOString(),
+    );
+  });
+
+  it("ackRest emits rest_ack before the rest-start alert", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    await startSession(settings, session, SESSION_START_MS);
+    const afterWork = SESSION_START_MS + 60_000;
+    await activePhase(session, afterWork);
+
+    const ack = await session.ackRest(afterWork + 1_000);
+    assert.equal(ack.status, "active");
+    if (ack.status !== "active") throw new Error("expected active");
+    assert.deepEqual(
+      ack.session.pendingAlerts.map((alertEvent) => alertEvent.id),
+      ["rest_ack", "short_rest_start"],
+    );
+  });
+});
+
+describe("SessionService command rejections", () => {
+  it("pause when already paused → ALREADY_PAUSED and the open pause is kept", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    await startSession(settings, session, SESSION_START_MS);
+    const pauseAt = SESSION_START_MS + 20_000;
+    await session.pause(pauseAt);
+
+    await assertSessionError(
+      () => session.pause(pauseAt + 5_000),
+      "ALREADY_PAUSED",
+    );
+    const phase = await activePhase(session, pauseAt + 5_000);
+    if (phase.kind !== "planned_work") throw new Error("expected planned_work");
+    assert.equal(phase.pauseStartedAt, new Date(pauseAt).toISOString());
+  });
+
+  it("resume when not paused → NOT_PAUSED", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    await startSession(settings, session, SESSION_START_MS);
+    await assertSessionError(
+      () => session.resume(SESSION_START_MS + 5_000),
+      "NOT_PAUSED",
+    );
+  });
+
+  it("start while a session is running → SESSION_ACTIVE and the session is kept", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    const first = await startSession(settings, session, SESSION_START_MS);
+    assert.equal(first.status, "active");
+    if (first.status !== "active") throw new Error("expected active");
+
+    await assertSessionError(
+      () => startSession(settings, session, SESSION_START_MS + 5_000),
+      "SESSION_ACTIVE",
+    );
+    const snapshot = session.getSnapshot(SESSION_START_MS + 5_000);
+    assert.equal(snapshot.status, "active");
+    if (snapshot.status !== "active") throw new Error("expected active");
+    assert.equal(snapshot.session.id, first.session.id);
+    assert.equal(snapshot.session.startedAt, first.session.startedAt);
+  });
+
+  it("every action with no session → NO_SESSION", async () => {
+    const { session } = await servicesWithShortTimers(2);
+    const actions: Array<() => Promise<unknown>> = [
+      () => session.pause(SESSION_START_MS),
+      () => session.resume(SESSION_START_MS),
+      () => session.ackRest(SESSION_START_MS),
+      () => session.ackWork(SESSION_START_MS),
+      () => session.continueExtended(SESSION_START_MS),
+      () => session.startRest(SESSION_START_MS),
+      () => session.endLongRest(SESSION_START_MS),
+    ];
+    for (const action of actions) {
+      await assertSessionError(action, "NO_SESSION");
+    }
+  });
+});
+
+describe("SessionService subscriber updates", () => {
+  /** Subscribe and collect every pushed snapshot. */
+  function collectSnapshots(session: SessionService): SessionSnapshot[] {
+    const received: SessionSnapshot[] = [];
+    session.subscribe((snapshot) => received.push(snapshot));
+    return received;
+  }
+
+  /** Phase kind of the last pushed snapshot ("idle" when no session). */
+  function lastPhaseKind(received: SessionSnapshot[]): string {
+    const last = received.at(-1);
+    assert.ok(last, "expected at least one pushed snapshot");
+    return last.status === "active" ? last.session.phase.kind : "idle";
+  }
+
+  it("pushes a snapshot to subscribers after every command", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    const received = collectSnapshots(session);
+
+    await startSession(settings, session, SESSION_START_MS);
+    assert.equal(received.length, 1);
+    assert.equal(lastPhaseKind(received), "planned_work");
+
+    await session.pause(SESSION_START_MS + 10_000);
+    assert.equal(received.length, 2);
+    const paused = received[1];
+    assert.ok(paused.status === "active");
+    assert.ok(
+      paused.session.phase.kind === "planned_work" &&
+        paused.session.phase.paused,
+    );
+
+    await session.resume(SESSION_START_MS + 20_000);
+    assert.equal(received.length, 3);
+
+    const afterWork = SESSION_START_MS + 60_000;
+    assert.equal(await session.tickIfIdle(afterWork, false), true);
+    await session.continueExtended(afterWork + 1_000);
+    assert.equal(received.length, 4);
+    assert.equal(lastPhaseKind(received), "extended_work");
+
+    await session.startRest(afterWork + 2_000);
+    assert.equal(received.length, 5);
+    assert.equal(lastPhaseKind(received), "short_rest");
+
+    const afterShort = afterWork + 2_000 + 60_000;
+    assert.equal(await session.tickIfIdle(afterShort, false), true);
+    await session.ackWork(afterShort + 1_000);
+    assert.equal(received.length, 6);
+    assert.equal(lastPhaseKind(received), "planned_work");
+
+    const afterWork2 = afterShort + 1_000 + 60_000;
+    assert.equal(await session.tickIfIdle(afterWork2, false), true);
+    await session.ackRest(afterWork2 + 1_000);
+    assert.equal(received.length, 7);
+    assert.equal(lastPhaseKind(received), "long_rest");
+
+    await session.endLongRest(afterWork2 + 2_000);
+    assert.equal(received.length, 8);
+    assert.equal(lastPhaseKind(received), "idle");
+  });
+
+  it("pushes a snapshot with the new alerts when a scheduler tick changes phase", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    await startSession(settings, session, SESSION_START_MS);
+    const received = collectSnapshots(session);
+
+    // Nothing due yet: no push.
+    assert.equal(await session.tickIfIdle(SESSION_START_MS + 30_000), true);
+    assert.equal(received.length, 0);
+
+    assert.equal(await session.tickIfIdle(SESSION_START_MS + 60_000), true);
+    assert.equal(received.length, 1);
+    const pushed = received[0];
+    assert.ok(pushed.status === "active");
+    assert.equal(pushed.session.phase.kind, "decision");
+    assert.deepEqual(
+      pushed.session.pendingAlerts.map((alertEvent) => alertEvent.id),
+      ["work_planned_end"],
+    );
+  });
+
+  it("stops pushing after unsubscribe", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    const received: SessionSnapshot[] = [];
+    const unsubscribe = session.subscribe((snapshot) =>
+      received.push(snapshot),
+    );
+    await startSession(settings, session, SESSION_START_MS);
+    unsubscribe();
+    await session.pause(SESSION_START_MS + 10_000);
+    assert.equal(received.length, 1);
+  });
+});
+
+describe("SessionService snapshot totals inside the open phase", () => {
+  it("deliberation grows during the decision and short-rest ack windows", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    await startSession(settings, session, SESSION_START_MS);
+    const afterWork = SESSION_START_MS + 60_000;
+    assert.equal(
+      (await liveStatsAt(session, afterWork + 7_000)).deliberationSec,
+      7,
+    );
+
+    await session.ackRest(afterWork + 10_000);
+    const afterShort = afterWork + 10_000 + 60_000;
+    // 10s committed at the decision + 4s open in the ack window.
+    assert.equal(
+      (await liveStatsAt(session, afterShort + 4_000)).deliberationSec,
+      14,
+    );
+  });
+
+  it("rest grows during an open rest and stops at its planned end", async () => {
+    const { settings, session } = await servicesWithShortTimers(2);
+    await startSession(settings, session, SESSION_START_MS);
+    const afterWork = SESSION_START_MS + 60_000;
+    await activePhase(session, afterWork);
+    await session.ackRest(afterWork);
+
+    assert.equal((await liveStatsAt(session, afterWork + 25_000)).restSec, 25);
+
+    // Pure read past the planned end, before any tick closes the rest.
+    const overdue = session.getSnapshot(afterWork + 90_000, 0);
+    assert.equal(overdue.status, "active");
+    if (overdue.status !== "active") throw new Error("expected active");
+    assert.equal(overdue.session.phase.kind, "short_rest");
+    assert.equal(overdue.session.liveStats.restSec, 60);
   });
 });

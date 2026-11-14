@@ -557,3 +557,75 @@ Server tests extend the existing analytics test files and add one file per modul
 - **Fixed heatmap levels.** Hours in a day are bounded, so a colour means the same thing all year.
 - **One point per day on every chart.** Bars up to seven points and areas beyond, with no weekly or monthly grouping.
 - **Calendar view is a quick dashboard.** It shows only the current week and month. Past periods are reached through the Ranges presets.
+
+## Appendix: build order
+
+The execution order above is regrouped here into 12 units. Every unit ends on a green build, meaning typecheck and tests pass in the shared package, the server and the web app together.
+
+```mermaid
+flowchart TD
+  subgraph S1["Stage 1 (parallel)"]
+    U1["U1 Shared contract<br/>step 1"]
+    U2["U2 Day data reshape<br/>steps 2 + 4, today endpoint sums its parts"]
+    U3["U3 Chained day bounds<br/>step 3"]
+  end
+
+  subgraph S2["Stage 2 (parallel)"]
+    U4["U4 Storing days<br/>step 5, today endpoint uses the open day"]
+    U5["U5 Server aggregation<br/>step 6"]
+    U6["U6 Web foundations<br/>step 8, switch control, shadcn installs"]
+  end
+
+  subgraph S3["Stage 3 (parallel)"]
+    U7["U7 Heatmap and summary endpoints<br/>rest of step 7"]
+    U8["U8 Heatmap and streaks<br/>rest of step 10"]
+    U9["U9 Tiles and charts<br/>rest of step 11"]
+  end
+
+  subgraph S4["Stage 4"]
+    U10["U10 Analytics tab assembly<br/>rest of step 9"]
+  end
+
+  subgraph S5["Stage 5 (parallel)"]
+    U11["U11 Manual smoke<br/>manual part of step 12"]
+    U12["U12 Docs and About tab<br/>step 13"]
+  end
+
+  U2 --> U4
+  U3 --> U4
+  U1 --> U5
+  U2 --> U5
+  U1 --> U6
+  U4 --> U7
+  U5 --> U7
+  U6 --> U8
+  U6 --> U9
+  U7 --> U10
+  U8 --> U10
+  U9 --> U10
+  U10 --> U11
+  U10 --> U12
+```
+
+**Reading the diagram**
+
+- An arrow means the unit at its tail must be finished before the unit at its head starts.
+- The arrows are the only ordering rule. A stage box shows the earliest point a unit can start and is not a gate. U6 can start as soon as U1 is done, while U2 and U3 are still in progress.
+- Units with no arrow between them can run in parallel. After two parallel units are merged together, run the build again.
+
+**How the units differ from the execution order**
+
+| Unit | Difference | Reason |
+| --- | --- | --- |
+| U2 | Merges steps 2 and 4, and takes the part of step 7 where the today endpoint derives `workedSec` and `restSec` | The migration drops columns the store still writes, and the shared day calculation changes what the today endpoint receives. Neither is green without the others |
+| U4 | Takes the part of step 7 where the today endpoint uses the open day | The open day is introduced in this unit |
+| U6 | Takes `SegmentedSwitch` from step 9 and both shadcn installs from steps 10 and 11 | The switch is used by U8 and U10. Both installs edit the same lockfile and would conflict if done inside the parallel units U8 and U9 |
+| U7 | Holds only the heatmap and summary routes and their service methods | The rest of step 7 moved to U2 and U4 |
+| U10 | Step 9 comes after steps 10 and 11 | The tab is assembled from finished parts, so no placeholder components are needed |
+| All | The unit tests of step 12 are written inside the unit that adds the code they cover | Each unit must be green on its own. Only the manual smoke remains as U11 |
+
+**What is visible when**
+
+- After U2 and before U4, existing `daily_stats` rows hold zeros in the new columns. Nothing reads them in that interval.
+- U6, U8 and U9 compile and pass their tests, and nothing they add renders until U10 mounts the tab.
+- The Analytics tab shows the stub until U10.

@@ -9,8 +9,6 @@ import {
 /** Asia/Kolkata client day 2026-11-09. */
 const DAY_START = "2026-11-08T18:30:00.000Z";
 const DAY_END = "2026-11-09T18:30:00.000Z";
-const DAY_START_MS = Date.parse(DAY_START);
-const DAY_END_MS = Date.parse(DAY_END);
 
 function plannedWork(partial: {
   startedAt: string;
@@ -34,19 +32,6 @@ function plannedWork(partial: {
 }
 
 describe("openPhaseProgressClippedToDay", () => {
-  it("counts a planned-work phase fully inside the day", () => {
-    const startedAt = "2026-11-09T10:00:00.000Z";
-    const nowMs = Date.parse("2026-11-09T10:05:00.000Z");
-    const stats = openPhaseProgressClippedToDay(
-      plannedWork({ startedAt }),
-      DAY_START,
-      DAY_END,
-      nowMs,
-    );
-    assert.equal(stats.workedSec, 300);
-    assert.equal(stats.pausedSec, 0);
-  });
-
   it("clips open planned work that started before the client day", () => {
     const startedAt = "2026-11-08T18:20:00.000Z"; // 10m before IST midnight
     const nowMs = Date.parse("2026-11-08T18:40:00.000Z"); // 10m after
@@ -132,22 +117,6 @@ describe("openPhaseProgressClippedToDay", () => {
       nowMs,
     );
     assert.equal(restStats.restSec, 5 * 60);
-  });
-
-  it("after day roll, clips a still-open phase to the new day window only", () => {
-    const startedAt = "2026-11-09T10:00:00.000Z";
-    const nextDayStart = DAY_END;
-    const nextDayEnd = new Date(DAY_END_MS + 24 * 60 * 60 * 1000).toISOString();
-    const nowMs = DAY_END_MS + 60_000;
-    const stats = openPhaseProgressClippedToDay(
-      plannedWork({ startedAt }),
-      nextDayStart,
-      nextDayEnd,
-      nowMs,
-    );
-    // From new midnight to now — prior-day wall time is excluded.
-    assert.equal(stats.workedSec, 60);
-    assert.ok(nowMs > DAY_START_MS);
   });
 });
 

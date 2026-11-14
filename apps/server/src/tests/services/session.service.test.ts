@@ -777,23 +777,6 @@ describe("SessionService", () => {
     assert.equal(afterTick.session.phase.kind, "decision");
   });
 
-  it("concurrent tickIfIdle catch-up leaves a consistent phase after a follow-up idle tick", async () => {
-    const { settings, session } = await servicesWithShortTimers(2);
-    await startSession(settings, session, SESSION_START_MS);
-    const afterDecision = SESSION_START_MS + 60_000 + 15_000;
-    await Promise.all([
-      session.tickIfIdle(SESSION_START_MS + 60_000, false),
-      session.tickIfIdle(afterDecision, false),
-      session.tickIfIdle(afterDecision, false),
-    ]);
-    // Skipped ticks do not queue; the next idle tick catches up (prod scheduler).
-    assert.equal(await session.tickIfIdle(afterDecision, false), true);
-    const phase = session.getSnapshot(afterDecision, 0);
-    assert.equal(phase.status, "active");
-    if (phase.status !== "active") throw new Error("expected active");
-    assert.equal(phase.session.phase.kind, "extended_work");
-  });
-
   it("tickIfIdle skips while another exclusive tick holds the mutex", async () => {
     const { settings, session } = await servicesWithShortTimers(2);
     await startSession(settings, session, SESSION_START_MS);

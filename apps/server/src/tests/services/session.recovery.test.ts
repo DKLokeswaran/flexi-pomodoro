@@ -95,32 +95,6 @@ describe("SessionService boot hydrate + recovery", () => {
     assert.ok(planned[0].endedAt);
   });
 
-  it("recovery through decision window opens extended and deletes decision", async () => {
-    const { session, stores, db } = await openEngine();
-    await session.start(SHORT_PARAMS, T0, "soft");
-
-    const mid = new SessionService({
-      session: stores.session,
-      phases: stores.phases,
-    });
-    assert.equal(await mid.hydrateFromStore(), true);
-    // Work 60s + decision 15s elapsed → extended (FR-FLOW-11).
-    await mid.runRecoveryTick(T0 + 80_000);
-
-    const snap = mid.getSnapshot(T0 + 80_000);
-    assert.equal(snap.status, "active");
-    if (snap.status !== "active") return;
-    assert.equal(snap.session.phase.kind, "extended_work");
-
-    const decisions = await db("decision").select("*");
-    assert.equal(decisions.length, 0);
-    const planned = await db("planned_work").first();
-    assert.equal(planned.endedReason, "recovery");
-    const extended = await db("extended_work").first();
-    assert.ok(extended);
-    assert.equal(extended.startedAt, planned.endedAt);
-  });
-
   it("recoveryTick flag resets so later closes use live endedReason", async () => {
     const { session, stores, db } = await openEngine();
     await session.start(

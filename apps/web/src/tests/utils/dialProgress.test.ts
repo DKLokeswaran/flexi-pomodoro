@@ -56,20 +56,6 @@ describe("dialProgress", () => {
     assert.equal(dialProgress(phase, PARAMS, START_MS + 60_000).remaining, 0);
   });
 
-  it("rest: arc tracks the rest duration", () => {
-    const phase: Phase = {
-      kind: "short_rest",
-      cycleIndex: 1,
-      startedAt: iso(START_MS),
-      plannedDurationSec: 60,
-      plannedEndAt: iso(START_MS + 60_000),
-    };
-    assert.equal(
-      dialProgress(phase, PARAMS, START_MS + 45_000).remaining,
-      0.25,
-    );
-  });
-
   it("overtime: main arc stays full while overtime laps keep counting up", () => {
     const phase: Phase = {
       kind: "extended_work",

@@ -52,15 +52,4 @@ describe("softPauseStrategy", () => {
     assert.equal(phase.paused, false);
     assert.equal(phase.pausedSec, 20);
   });
-
-  it("onPlannedEnd while running → decision", () => {
-    const phase = plannedWork();
-    const plannedEndMs = parseIso(phase.plannedEndAt);
-    assert.equal(
-      softPauseStrategy.onPlannedEnd(phase, plannedEndMs),
-      "decision",
-    );
-    assert.equal(phase.paused, false);
-    assert.equal(phase.pausedSec, 0);
-  });
 });

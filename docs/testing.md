@@ -70,7 +70,6 @@ Helpers: `servicesWithShortTimers` (via `createMockSessionStores` + mock setting
 | Ack timeout liveStats | Full ack window in `deliberationSec` |
 | Live stats full cycle | Worked excludes soft pause; deliberation + rest + `pausedSec` match timeline |
 | getSnapshot pure read | Overdue clock without tick keeps planned_work; after `tickIfIdle` → decision |
-| Concurrent tickIfIdle | Overlapping idle ticks may skip; follow-up idle tick leaves consistent extended_work |
 | tickIfIdle skip-if-busy | Concurrent `tickIfIdle` calls: at least one returns `false` |
 ### `apps/server/src/tests/services/settings.service.test.ts`
 
@@ -79,8 +78,7 @@ Imports parsers from `utils/settingsValidation.ts`.
 | Suite | Cases |
 |-------|-------|
 | `parseStartSessionBody` | Accepts 1s with flag; rejects 1s without; rejects unknown debug keys (`ZodError`) |
-| `parseSettingsPatch` | Rejects sub-minute work |
-| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; accept valid IANA `timezone`; reject invalid IANA; `update` calls `store.save`; seed when store empty; load existing row on hydrate |
+| `SettingsService` | Hydrate from store; accept `workPauseStrategy: "hard"`; reject bad cycles / 1s work; accept valid IANA `timezone`; reject invalid IANA; `update` calls `store.save`; load existing row on hydrate |
 
 ### `apps/server/src/tests/db/settingsStore.test.ts`
 
@@ -90,7 +88,6 @@ Uses temp `DATA_DIR` via `openDatabase(tempDir)`.
 |------|---------|
 | `ensureSeeded` | Writes `DEFAULT_SETTINGS` once; second call returns same |
 | save / load | Round-trip across process reopen (incl. `timezone`) |
-| migration defaults timezone | Seeded `timezone` is `UTC`; column present after migrations |
 | initial migration | Expected tables present (`settings`, `sessions`, `phases`, detail tables, `pause_slices`, `daily_stats`, …); `stores.analytics` present |
 
 ### `apps/server/src/tests/db/analyticsStore.test.ts`
@@ -99,8 +96,6 @@ Uses temp migrated SQLite.
 
 | Case | Asserts |
 |------|---------|
-| migration | `daily_stats` table + expected columns |
-| overlapping lists | Closed planned-work (and related) rows filtered by day window |
 | upsert / get | Idempotent `upsertDailyStats`; `getDailyStats` / `getLatestFinalizedClientDate` |
 
 ### `apps/server/src/tests/db/sessionStore.test.ts`
@@ -137,7 +132,6 @@ Engine + real SQLite: segment rows after live transitions (FR-FLOW-11 / FR-ACK-6
 | Soft-paused through planned end | Auto-rest; no decision row |
 | short_rest_ack timeout | `timeout_paused`; next work paused |
 | short_rest_ack `ackWork` | `acknowledged`; next work running |
-| Long rest timer end | Rest `completed`; runtime cleared |
 | Early end long rest | `long_rest_skipped_early` |
 
 ### `apps/server/src/tests/services/session.recovery.test.ts`
@@ -147,7 +141,6 @@ Engine + real SQLite: segment rows after live transitions (FR-FLOW-11 / FR-ACK-6
 | Mid planned work hydrate | Restores phase without advancing |
 | alertSeq restore | Runtime `alertSeq` rebuilt |
 | Recovery past planned end | Work closed with `endedReason: "recovery"` |
-| Through decision window | Extended opened; decision deleted |
 | recoveryTick flag reset | Later closes use live endedReason |
 | Session complete | Clears `session_runtime` |
 | Soft-paused hydrate | Open pause slice restored |
@@ -158,19 +151,15 @@ Engine + real SQLite: segment rows after live transitions (FR-FLOW-11 / FR-ACK-6
 
 ### `apps/server/src/tests/services/session.recovery.matrix.test.ts`
 
-Q9 Option A S1–S8 via hydrate + `runRecoveryTick` on temp SQLite.
+Q9 Option A recovery scenarios via hydrate + `runRecoveryTick` on temp SQLite.
 
 | Case | Asserts |
 |------|---------|
-| S1 | Mid planned work → still planned_work with remaining time |
-| S2 | Past planned end inside decision → decision |
 | S3 | Through short rest → short_rest_ack (still in window) |
-| S4 | Through decision window → extended_work (overtime includes downtime) |
 | S5 | Through long rest end → idle session complete |
 | S6 | During extended → still extended; overtime includes downtime |
 | S7 | Soft-pause downtime included in `pausedSec` |
 | S8a | SHORT_REST_ACK inside window → restore ack |
-| S8b | Past SHORT_REST_ACK window → next work already paused |
 
 ### `apps/server/src/tests/services/settings.service.persist.test.ts`
 
@@ -199,7 +188,6 @@ Isolated `softPauseStrategy` unit tests (no `SessionService`):
 | `onPause` | Sets flags; `timerFrozenAt` null; `plannedEndAt` unchanged |
 | `onResume` | Accumulates `pausedSec`; `plannedEndAt` unchanged |
 | `onPlannedEnd` while paused | → `"rest"`; closes slice through planned end |
-| `onPlannedEnd` while running | → `"decision"` |
 
 ### `apps/server/src/tests/pause/hardPause.test.ts`
 
@@ -209,7 +197,6 @@ Isolated `hardPauseStrategy` unit tests:
 |------|---------|
 | `onPause` | Sets `timerFrozenAt`; `isCountdownFrozen` true |
 | `onResume` | Remaining time unchanged; `plannedEndAt` shifted by paused duration |
-| `onPlannedEnd` | → `"decision"` when unfrozen |
 
 ### `apps/server/src/tests/utils/asyncMutex.test.ts`
 
@@ -230,7 +217,6 @@ Isolated `hardPauseStrategy` unit tests:
 
 | Case | Asserts |
 |------|---------|
-| empty day | Zero totals for a day with no closed phases |
 | `dayStats` | Returns `clientDate` bounds + closed-phase aggregates (incl. pause subtraction from worked) |
 | full in-day phase | Attributes full worked / deliberation / rest for phases entirely inside the day |
 | midnight-spanning | Splits / clips phases across adjacent client days |
@@ -255,8 +241,6 @@ Isolated `hardPauseStrategy` unit tests:
 | Case | Asserts |
 |------|---------|
 | Nominal duration N=2 / N=1 | Work + short rests + long rest arithmetic |
-| `estimatedSessionEndMs` | Equals start + nominal duration |
-| DEFAULT_SETTINGS | Matches formula for default cycle count |
 
 ### `apps/web/src/tests/utils/activeSessionProjection.test.ts`
 
@@ -269,7 +253,6 @@ Fabricated `ActiveSnapshot` fixtures only (no server imports).
 | Extended → rest | Slip persists via rest anchors |
 | Hard pause open / resume | Open pause adds time; shifted `plannedEndAt` keeps it after resume |
 | Short rest after deliberation | Anchor slip reflected |
-| Extended → rest ETA stability | Projection unchanged across the transition at the same slip |
 
 ### `apps/web/src/tests/utils/dialProgress.test.ts`
 

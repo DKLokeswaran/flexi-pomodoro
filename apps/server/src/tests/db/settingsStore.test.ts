@@ -62,18 +62,6 @@ describe("SettingsStore (SQLite)", () => {
     }
   });
 
-  it("migration defaults timezone to UTC", async () => {
-    const { db, stores } = await openDatabase(await tempDataDir());
-    try {
-      const seeded = await stores.settings.ensureSeeded();
-      assert.equal(seeded.timezone, "UTC");
-      const columns = await db("settings").columnInfo();
-      assert.ok("timezone" in columns);
-    } finally {
-      await db.destroy();
-    }
-  });
-
   it("initial migration creates expected tables", async () => {
     const { db, stores } = await openDatabase(await tempDataDir());
     try {

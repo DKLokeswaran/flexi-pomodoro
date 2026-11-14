@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, afterEach, beforeEach, describe, it, mock } from "node:test";
 import { SESSION_API } from "@flexi-pomodoro/shared";
-import { buildApp } from "../../app.js";
-import { openDatabase } from "../../db/index.js";
+import { buildApp } from "../app.js";
+import { openDatabase } from "../db/index.js";
 
 const T0 = Date.parse("2026-07-12T10:00:00.000Z");
 const WORK_MS = 25 * 60_000;

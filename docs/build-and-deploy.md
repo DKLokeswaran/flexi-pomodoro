@@ -23,7 +23,7 @@
 | `dev` | `tsx watch src/index.ts` |
 | `build` | `tsc -p tsconfig.json` |
 | `start` | `node dist/index.js` |
-| `test` | `tsx --test src/tests/**/*.test.ts` |
+| `test` | `tsx --test "src/tests/**/*.test.ts"` |
 | `typecheck` | `tsc --noEmit` |
 
 ### `@flexi-pomodoro/web`
@@ -33,7 +33,7 @@
 | `dev` | `vite` (port 5173, `/api` proxy) |
 | `build` | `tsc --noEmit && vite build` → `dist/` |
 | `preview` | `vite preview` |
-| `test` | `tsx --test src/tests/**/*.test.ts` |
+| `test` | `tsx --test "src/tests/**/*.test.ts"` |
 | `typecheck` | `tsc --noEmit` |
 
 ### `@flexi-pomodoro/shared`

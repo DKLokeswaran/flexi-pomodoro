@@ -8,13 +8,13 @@ import type {
   TodayStatsResponse,
   WorkPauseStrategy,
 } from "@flexi-pomodoro/shared";
-import { UiFlagsProvider } from "../../browserFlags/ui";
-import { ActiveTimer } from "../../components/timer/ActiveTimer";
-import { todayStatsQueryKey } from "../../queries/useTodayStatsQuery";
-import { activeEstimatedSessionEndMs } from "../../utils/activeSessionProjection";
-import { formatLocalTime } from "../../utils/time";
-import { buildActiveSnapshot, iso } from "../helpers/activeSnapshot";
-import { installMemoryLocalStorage } from "../helpers/browserGlobals";
+import { UiFlagsProvider } from "../../../browserFlags/ui";
+import { ActiveTimer } from "../../../components/timer/ActiveTimer";
+import { todayStatsQueryKey } from "../../../queries/useTodayStatsQuery";
+import { activeEstimatedSessionEndMs } from "../../../utils/activeSessionProjection";
+import { formatLocalTime } from "../../../utils/time";
+import { buildActiveSnapshot, iso } from "../../helpers/activeSnapshot";
+import { installMemoryLocalStorage } from "../../helpers/browserGlobals";
 
 const START_MS = Date.parse("2026-07-12T10:00:00.000Z");
 const UI_FLAGS_KEY = "flexi-pomodoro:uiFlags";

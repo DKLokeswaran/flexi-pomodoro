@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it, mock } from "node:test";
-import { IntervalScheduler } from "../../scheduler.js";
+import { IntervalScheduler } from "../scheduler.js";
 
 describe("IntervalScheduler", () => {
   afterEach(() => {

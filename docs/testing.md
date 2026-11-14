@@ -15,8 +15,8 @@
 | Package | Script |
 |---------|--------|
 | Root | `npm test` → server then web |
-| `@flexi-pomodoro/server` | `tsx --test src/tests/**/*.test.ts` |
-| `@flexi-pomodoro/web` | `tsx --test src/tests/**/*.test.ts` |
+| `@flexi-pomodoro/server` | `tsx --test "src/tests/**/*.test.ts"` |
+| `@flexi-pomodoro/web` | `tsx --test "src/tests/**/*.test.ts"` |
 
 Server and web `tsconfig.json` files **exclude** `src/tests/**` from production typecheck/build (tests run via tsx only).
 
@@ -271,11 +271,16 @@ All routes registered through `openRoutesApp()` (in-memory stores); `mock.timers
 
 | Case | Asserts |
 |------|---------|
-| GET health | `{ ok: true }` |
 | PUT / GET settings | Patch saved and returned |
 | PUT invalid | 400 `INVALID_SETTINGS`; stored values unchanged |
 
-### `apps/server/src/tests/app/app.test.ts`
+### `apps/server/src/tests/routes/health.routes.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| GET health | `{ ok: true }` |
+
+### `apps/server/src/tests/app.test.ts`
 
 Boots the real `buildApp()` against a temp `DATA_DIR` with `Date` and `setInterval` mocked; closing and re-booting the app stands in for a process restart.
 
@@ -286,7 +291,7 @@ Boots the real `buildApp()` against a temp `DATA_DIR` with `Date` and `setInterv
 | Scheduler wiring | A scheduler tick advances the session with no request |
 | Day finalization | Yesterday finalized at boot; the day that ends while running is finalized on rollover |
 
-### `apps/server/src/tests/app/scheduler.test.ts`
+### `apps/server/src/tests/scheduler.test.ts`
 
 | Case | Asserts |
 |------|---------|
@@ -376,7 +381,7 @@ Installs `localStorage` and `Audio` stand-ins before importing the alert modules
 | New session | Alerts play again after the watermark syncs back to zero |
 | Watermark helpers | `advance` is monotonic; `sinceSeqQueryString`; `alertsFromSnapshot` for idle and active |
 
-### `apps/web/src/tests/components/ActiveTimer.test.ts`
+### `apps/web/src/tests/components/timer/ActiveTimer.test.ts`
 
 Renders `ActiveTimer` with `renderToStaticMarkup` under `QueryClientProvider` + `UiFlagsProvider`; `Date` is frozen. A `.ts` file using `createElement`, so the test glob picks it up.
 
@@ -406,7 +411,7 @@ Inline constants and helper factories only — no fixture files.
 
 ## Conventions
 
-- Layout: mirrored tree under `src/tests/` (not colocated with source), matching the area under test (`app/`, `routes/`, `services/`, `pause/`, `utils/`, `db/`, `components/`, `helpers/`); test files sit one folder below `src/tests/` because the script glob does not match files directly in it
+- Layout: mirrored tree under `src/tests/` (not colocated with source): a test for `src/<path>/<module>.ts` lives at `src/tests/<path>/<module>.test.ts` (e.g. `src/app.ts` → `src/tests/app.test.ts`, `src/components/timer/ActiveTimer.tsx` → `src/tests/components/timer/ActiveTimer.test.ts`); shared test helpers live in `src/tests/helpers/`. The test script quotes its glob so the runner matches test files at any depth
 - File naming: `<module>.test.ts` (e.g. `session.service.test.ts`, `sessionProjection.test.ts`)
 - Blocks: `describe("ClassOrFn", () => { it("behavior…", …) })`
 - Style: strict assert (`assert.equal`, `assert.ok`, `assert.throws`, `assert.deepEqual`)

@@ -3,18 +3,7 @@ import { describe, it } from "node:test";
 import { SESSION_API } from "@flexi-pomodoro/shared";
 import { openRoutesApp, ROUTE_TEST_TIMINGS } from "../helpers/routesApp.js";
 
-describe("settings and health routes", () => {
-  it("GET health reports ok", async () => {
-    const { app } = await openRoutesApp();
-    const response = await app.inject({
-      method: "GET",
-      url: SESSION_API.health,
-    });
-    assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.json(), { ok: true });
-    await app.close();
-  });
-
+describe("settings routes", () => {
   it("PUT settings saves the patch and GET returns it", async () => {
     const { app } = await openRoutesApp();
     const put = await app.inject({

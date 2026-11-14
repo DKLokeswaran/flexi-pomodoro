@@ -79,9 +79,8 @@ flexi-pomodoro/
 │   │       │   ├── iso.ts                # msToIso / parseIso helpers
 │   │       │   └── asyncMutex.ts         # runExclusive / tryRunExclusive for session ticks
 │   │       └── tests/
-│   │           ├── app/
-│   │           │   ├── app.test.ts           # buildApp boot wiring on a temp DATA_DIR
-│   │           │   └── scheduler.test.ts
+│   │           ├── app.test.ts               # buildApp boot wiring on a temp DATA_DIR
+│   │           ├── scheduler.test.ts
 │   │           ├── db/
 │   │           │   ├── settingsStore.test.ts
 │   │           │   ├── sessionStore.test.ts
@@ -89,8 +88,9 @@ flexi-pomodoro/
 │   │           │   └── analyticsStore.test.ts
 │   │           ├── routes/
 │   │           │   ├── analytics.routes.test.ts
+│   │           │   ├── health.routes.test.ts
 │   │           │   ├── session.routes.test.ts   # REST actions + SSE stream
-│   │           │   └── settings.routes.test.ts  # settings + health
+│   │           │   └── settings.routes.test.ts
 │   │           ├── helpers/
 │   │           │   ├── routesApp.ts          # Fastify + all routes over in-memory stores
 │   │           │   ├── mockSettingsStore.ts
@@ -141,7 +141,8 @@ flexi-pomodoro/
 │           ├── utils/           # time, liveStats, todayStats, dialProgress, phaseClock, projections, alerts, ianaTimeZones, seedTimezone, …
 │           └── tests/
 │               ├── components/
-│               │   └── ActiveTimer.test.ts   # server-rendered markup assertions
+│               │   └── timer/
+│               │       └── ActiveTimer.test.ts   # server-rendered markup assertions
 │               ├── helpers/
 │               │   ├── activeSnapshot.ts     # fabricated ActiveSnapshot builder
 │               │   └── browserGlobals.ts     # localStorage / Audio stand-ins
@@ -202,7 +203,7 @@ Counts exclude `node_modules`, build artifacts, and vendored `.agents` skill tre
 
 ## Test location convention
 
-Mirrored `src/tests/` trees (not colocated): server `app/` + `routes/` + `services/` + `pause/` + `utils/` + `db/` + `helpers/`; web `components/` + `utils/` + `helpers/`. Test files sit one folder below `src/tests/` (the test script's glob does not match files directly in `src/tests/`). Each package runs its own tests; packages do not import each other's application source for tests.
+Mirrored `src/tests/` trees (not colocated): a test for `src/<path>/<module>.ts` lives at `src/tests/<path>/<module>.test.ts`, with shared helpers in `src/tests/helpers/`. Each package runs its own tests; packages do not import each other's application source for tests.
 
 ## Config & build artifacts (ignored / not committed)
 

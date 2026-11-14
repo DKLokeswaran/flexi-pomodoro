@@ -40,6 +40,7 @@ describe("openPhaseProgressClippedToDay", () => {
       DAY_START,
       DAY_END,
       nowMs,
+      0,
     );
     assert.equal(stats.workedSec, 10 * 60);
     assert.equal(stats.pausedSec, 0);
@@ -60,6 +61,7 @@ describe("openPhaseProgressClippedToDay", () => {
       DAY_START,
       DAY_END,
       nowMs,
+      0,
     );
     assert.equal(stats.workedSec, 90); // wall to pause start minus closed 30
     assert.equal(stats.pausedSec, 180); // open pause only
@@ -80,6 +82,7 @@ describe("openPhaseProgressClippedToDay", () => {
       DAY_START,
       DAY_END,
       nowMs,
+      0,
     );
     // Worked frozen at pause start (before day) → 0 in today; open pause ∩ day = 10m
     assert.equal(stats.workedSec, 0);
@@ -100,6 +103,7 @@ describe("openPhaseProgressClippedToDay", () => {
       DAY_START,
       DAY_END,
       nowMs,
+      0,
     );
     assert.equal(deliberation.deliberationSec, 5 * 60);
 
@@ -115,8 +119,75 @@ describe("openPhaseProgressClippedToDay", () => {
       DAY_START,
       DAY_END,
       nowMs,
+      0,
     );
     assert.equal(restStats.restSec, 5 * 60);
+  });
+});
+
+describe("openPhaseProgressClippedToDay closed pauses across midnight", () => {
+  const startedAt = "2026-11-08T18:20:00.000Z"; // 10m before IST midnight
+
+  it("subtracts server-today closed pauses after resume past midnight", () => {
+    // Paused 18:35–18:38 (after midnight), resumed; now 18:40.
+    const nowMs = Date.parse("2026-11-08T18:40:00.000Z");
+    const stats = openPhaseProgressClippedToDay(
+      plannedWork({ startedAt, pausedSec: 3 * 60 }),
+      DAY_START,
+      DAY_END,
+      nowMs,
+      3 * 60,
+    );
+    assert.equal(stats.workedSec, 10 * 60 - 3 * 60);
+    assert.equal(stats.pausedSec, 0);
+  });
+
+  it("subtracts only the in-day part of a pause spanning midnight", () => {
+    // Paused 18:25–18:35 (5m each side of midnight), resumed; now 18:40.
+    const nowMs = Date.parse("2026-11-08T18:40:00.000Z");
+    const stats = openPhaseProgressClippedToDay(
+      plannedWork({ startedAt, pausedSec: 10 * 60 }),
+      DAY_START,
+      DAY_END,
+      nowMs,
+      5 * 60,
+    );
+    assert.equal(stats.workedSec, 10 * 60 - 5 * 60);
+  });
+
+  it("keeps worked frozen while paused again after an in-day resume", () => {
+    // Paused 18:32–18:34, resumed; hard-paused again at 18:37; now 18:40.
+    const pauseAt = "2026-11-08T18:37:00.000Z";
+    const nowMs = Date.parse("2026-11-08T18:40:00.000Z");
+    const stats = openPhaseProgressClippedToDay(
+      plannedWork({
+        startedAt,
+        paused: true,
+        pausedSec: 2 * 60,
+        pauseStartedAt: pauseAt,
+        timerFrozenAt: pauseAt,
+      }),
+      DAY_START,
+      DAY_END,
+      nowMs,
+      2 * 60,
+    );
+    assert.equal(stats.workedSec, 7 * 60 - 2 * 60);
+    assert.equal(stats.pausedSec, 3 * 60);
+  });
+
+  it("uses the phase total when the phase started inside the day", () => {
+    // Server today also holds 20m of pauses from an earlier closed cycle.
+    const inDayStart = "2026-11-09T10:00:00.000Z";
+    const nowMs = Date.parse("2026-11-09T10:10:00.000Z");
+    const stats = openPhaseProgressClippedToDay(
+      plannedWork({ startedAt: inDayStart, pausedSec: 60 }),
+      DAY_START,
+      DAY_END,
+      nowMs,
+      20 * 60 + 60,
+    );
+    assert.equal(stats.workedSec, 10 * 60 - 60);
   });
 });
 
@@ -157,6 +228,7 @@ describe("openPhaseProgressClippedToDay open-phase cases", () => {
       DAY_START,
       DAY_END,
       Date.parse("2026-11-08T18:42:00.000Z"),
+      0,
     );
     assert.equal(stats.workedSec, 12 * 60);
   });
@@ -174,6 +246,7 @@ describe("openPhaseProgressClippedToDay open-phase cases", () => {
       DAY_START,
       DAY_END,
       Date.parse("2026-11-09T10:25:00.000Z"),
+      0,
     );
     assert.equal(stats.restSec, 600);
   });
@@ -191,6 +264,7 @@ describe("openPhaseProgressClippedToDay open-phase cases", () => {
       DAY_START,
       DAY_END,
       Date.parse("2026-11-09T10:00:09.000Z"),
+      0,
     );
     assert.equal(stats.deliberationSec, 9);
   });
@@ -202,6 +276,7 @@ describe("openPhaseProgressClippedToDay open-phase cases", () => {
       DAY_START,
       DAY_END,
       Date.parse("2026-11-08T18:40:00.000Z"),
+      0,
     );
     assert.equal(stats.workedSec, 10 * 60);
   });

@@ -56,7 +56,13 @@ export function useTodayDisplayStats(
   if (!data) return EMPTY_TODAY_STATS;
 
   const open = phase
-    ? openPhaseProgressClippedToDay(phase, data.dayStart, data.dayEnd, nowMs)
+    ? openPhaseProgressClippedToDay(
+        phase,
+        data.dayStart,
+        data.dayEnd,
+        nowMs,
+        data.pausedSec,
+      )
     : EMPTY_TODAY_STATS;
   return todayDisplayStats(data, open);
 }

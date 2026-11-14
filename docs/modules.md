@@ -465,7 +465,7 @@ Internal helpers `pad2` and `splitSec` back both formatters.
 | Export | Purpose |
 |--------|---------|
 | `EMPTY_TODAY_STATS` | zeroed `SessionLiveStats` |
-| `openPhaseProgressClippedToDay(phase, dayStart, dayEnd, nowMs)` | Open-phase contribution clipped to the server day window |
+| `openPhaseProgressClippedToDay(phase, dayStart, dayEnd, nowMs, serverPausedSec)` | Open-phase contribution clipped to the server day window; closed pauses reduce worked using the phase total when the phase started inside the day, or server-today `pausedSec` when it started before the day |
 | `todayDisplayStats(serverToday, openPhaseClipped)` | Closed server today + open-phase clip (not full live session stats) |
 
 ### `src/utils/playAlerts.ts`

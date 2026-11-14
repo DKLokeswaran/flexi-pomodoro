@@ -345,7 +345,7 @@ Unknown errors are rethrown.
 
 ### Tests
 
-`src/tests/services/{session,settings,analytics}.service.test.ts`, `session.attribution.test.ts`, `session.recovery.test.ts`, `session.recovery.matrix.test.ts`, `settings.service.persist.test.ts`, `src/tests/db/{settings,session,phases,analytics}Store.test.ts`, `src/tests/routes/analytics.routes.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase}.ts`, `src/tests/pause/*`, `src/tests/utils/{asyncMutex,clientDay}.test.ts` — no production exports (see [testing.md](./testing.md)).
+`src/tests/services/{session,settings,analytics}.service.test.ts`, `session.attribution.test.ts`, `session.recovery.test.ts`, `session.recovery.matrix.test.ts`, `settings.service.persist.test.ts`, `src/tests/db/{settings,session,phases,analytics}Store.test.ts`, `src/tests/routes/{analytics,session,settings}.routes.test.ts`, `src/tests/app/{app,scheduler}.test.ts`, `src/tests/helpers/{mockSettingsStore,mockSessionStores,tempDatabase,routesApp}.ts`, `src/tests/pause/*`, `src/tests/utils/{asyncMutex,clientDay}.test.ts` — no production exports (see [testing.md](./testing.md)).
 ---
 
 ## `apps/web` — entry & shell

@@ -79,14 +79,20 @@ flexi-pomodoro/
 │   │       │   ├── iso.ts                # msToIso / parseIso helpers
 │   │       │   └── asyncMutex.ts         # runExclusive / tryRunExclusive for session ticks
 │   │       └── tests/
+│   │           ├── app/
+│   │           │   ├── app.test.ts           # buildApp boot wiring on a temp DATA_DIR
+│   │           │   └── scheduler.test.ts
 │   │           ├── db/
 │   │           │   ├── settingsStore.test.ts
 │   │           │   ├── sessionStore.test.ts
 │   │           │   ├── phasesStore.test.ts
 │   │           │   └── analyticsStore.test.ts
 │   │           ├── routes/
-│   │           │   └── analytics.routes.test.ts
+│   │           │   ├── analytics.routes.test.ts
+│   │           │   ├── session.routes.test.ts   # REST actions + SSE stream
+│   │           │   └── settings.routes.test.ts  # settings + health
 │   │           ├── helpers/
+│   │           │   ├── routesApp.ts          # Fastify + all routes over in-memory stores
 │   │           │   ├── mockSettingsStore.ts
 │   │           │   ├── mockSessionStores.ts  # in-memory SessionStore + PhasesStore
 │   │           │   └── tempDatabase.ts       # openTempDatabase (migrated temp SQLite)
@@ -134,12 +140,19 @@ flexi-pomodoro/
 │           ├── queries/         # fetch helpers + React Query hooks (incl. analytics today)
 │           ├── utils/           # time, liveStats, todayStats, dialProgress, phaseClock, projections, alerts, ianaTimeZones, seedTimezone, …
 │           └── tests/
+│               ├── components/
+│               │   └── ActiveTimer.test.ts   # server-rendered markup assertions
+│               ├── helpers/
+│               │   ├── activeSnapshot.ts     # fabricated ActiveSnapshot builder
+│               │   └── browserGlobals.ts     # localStorage / Audio stand-ins
 │               └── utils/
 │                   ├── sessionProjection.test.ts
 │                   ├── activeSessionProjection.test.ts
 │                   ├── dialProgress.test.ts
 │                   ├── liveStats.test.ts
+│                   ├── playAlerts.test.ts
 │                   ├── seedTimezone.test.ts
+│                   ├── time.test.ts
 │                   └── todayStats.test.ts
 ```
 
@@ -189,7 +202,7 @@ Counts exclude `node_modules`, build artifacts, and vendored `.agents` skill tre
 
 ## Test location convention
 
-Mirrored `src/tests/` trees (not colocated): server `services/` + `pause/` + `utils/` + `db/` + `helpers/`; web `utils/`. Each package runs its own tests; packages do not import each other's application source for tests.
+Mirrored `src/tests/` trees (not colocated): server `app/` + `routes/` + `services/` + `pause/` + `utils/` + `db/` + `helpers/`; web `components/` + `utils/` + `helpers/`. Test files sit one folder below `src/tests/` (the test script's glob does not match files directly in `src/tests/`). Each package runs its own tests; packages do not import each other's application source for tests.
 
 ## Config & build artifacts (ignored / not committed)
 

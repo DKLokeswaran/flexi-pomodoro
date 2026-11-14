@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ActiveSnapshot } from "@flexi-pomodoro/shared";
-import { activeEstimatedSessionEndMs } from "../../utils/activeSessionProjection";
+import {
+  activeEstimatedSessionEndMs,
+  remainingActiveSessionSec,
+} from "../../utils/activeSessionProjection";
 import { estimatedSessionEndMs } from "../../utils/sessionProjection";
 
 const START_MS = Date.parse("2026-07-12T10:00:00.000Z");
@@ -201,6 +204,93 @@ describe("activeSessionProjection", () => {
     assert.equal(
       activeEstimatedSessionEndMs(snapshot, nowMs),
       estimatedSessionEndMs(PARAMS, START_MS) + 1_000,
+    );
+  });
+});
+
+describe("activeSessionProjection across cycles and rests", () => {
+  const FOUR_CYCLES = { ...PARAMS, cyclesBeforeLongRest: 4 };
+
+  function fourCycleSnapshot(
+    phase: ActiveSnapshot["session"]["phase"],
+  ): ActiveSnapshot {
+    const snapshot = activeSnapshot(phase);
+    snapshot.session.params = FOUR_CYCLES;
+    return snapshot;
+  }
+
+  it("includes every remaining short rest in a 4-cycle session", () => {
+    const snapshot = fourCycleSnapshot({
+      kind: "planned_work",
+      cycleIndex: 1,
+      startedAt: new Date(START_MS).toISOString(),
+      plannedDurationSec: 60,
+      plannedEndAt: new Date(START_MS + 60_000).toISOString(),
+      paused: false,
+      pausedSec: 0,
+      pauseStartedAt: null,
+      timerFrozenAt: null,
+    });
+    // 4 work + 3 short rests + long rest = 240 + 180 + 120.
+    assert.equal(
+      activeEstimatedSessionEndMs(snapshot, START_MS + 30_000),
+      START_MS + 540_000,
+    );
+    assert.equal(
+      activeEstimatedSessionEndMs(snapshot, START_MS + 30_000),
+      estimatedSessionEndMs(FOUR_CYCLES, START_MS),
+    );
+  });
+
+  it("short rest in cycle 2 of 4 still counts the later short rest", () => {
+    const restStartMs = START_MS + 180_000;
+    const snapshot = fourCycleSnapshot({
+      kind: "short_rest",
+      cycleIndex: 2,
+      startedAt: new Date(restStartMs).toISOString(),
+      plannedDurationSec: 60,
+      plannedEndAt: new Date(restStartMs + 60_000).toISOString(),
+    });
+    // 40s rest left + work 3 + short rest + work 4 + long rest.
+    assert.equal(
+      remainingActiveSessionSec(snapshot, restStartMs + 20_000),
+      40 + 60 + 60 + 60 + 120,
+    );
+  });
+
+  it("long rest: projected end is the long rest's planned end", () => {
+    const restStartMs = START_MS + 200_000;
+    const plannedEndMs = restStartMs + 120_000;
+    const snapshot = activeSnapshot({
+      kind: "long_rest",
+      cycleIndex: 2,
+      startedAt: new Date(restStartMs).toISOString(),
+      plannedDurationSec: 120,
+      plannedEndAt: new Date(plannedEndMs).toISOString(),
+    });
+    assert.equal(
+      remainingActiveSessionSec(snapshot, restStartMs + 30_000),
+      90,
+    );
+    assert.equal(
+      activeEstimatedSessionEndMs(snapshot, restStartMs + 30_000),
+      plannedEndMs,
+    );
+  });
+
+  it("short-rest acknowledgement window: remaining is the next cycles plus long rest", () => {
+    const ackStartMs = START_MS + 121_000;
+    const snapshot = activeSnapshot({
+      kind: "short_rest_ack",
+      cycleIndex: 1,
+      startedAt: new Date(ackStartMs).toISOString(),
+      decisionEndsAt: new Date(ackStartMs + 15_000).toISOString(),
+      decisionWindowSec: 15,
+    });
+    // Cycle 2 work + long rest, measured from now.
+    assert.equal(
+      remainingActiveSessionSec(snapshot, ackStartMs + 4_000),
+      60 + 120,
     );
   });
 });

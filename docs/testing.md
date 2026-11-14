@@ -6,7 +6,7 @@
 |-------|--------|
 | Runner | Node.js built-in `node:test` via `tsx --test` |
 | Assertions | `node:assert/strict` |
-| Mocking library | Not found (tests construct real services / fabricated snapshots) |
+| Mocking library | None added; `node:test` `mock.timers` freezes `Date` / `setInterval` where a test needs a clock (tests otherwise construct real services / fabricated snapshots) |
 | Coverage tooling | Not found in committed scripts |
 | E2E / browser | Not found |
 
@@ -27,8 +27,10 @@ Server and web `tsconfig.json` files **exclude** `src/tests/**` from production 
 | Type | Present? |
 |------|----------|
 | Unit (server services, pause plugins, settings validation) | Yes |
-| Unit (web projection / liveStats / dialProgress helpers) | Yes |
-| Integration (HTTP Fastify inject) | Not found |
+| Unit (web projection / liveStats / todayStats / dialProgress / time / alert helpers) | Yes |
+| Integration (HTTP Fastify inject; SSE over a real local socket) | Yes |
+| Integration (`buildApp` boot wiring on a temp `DATA_DIR`) | Yes |
+| Component render (`react-dom/server` markup, no DOM library) | Yes — `ActiveTimer` only; click handling and other components are not covered |
 | E2E / browser | Not found |
 | Snapshot tests | Not found |
 | Contract tests | Not found |
@@ -71,6 +73,18 @@ Helpers: `servicesWithShortTimers` (via `createMockSessionStores` + mock setting
 | Live stats full cycle | Worked excludes soft pause; deliberation + rest + `pausedSec` match timeline |
 | getSnapshot pure read | Overdue clock without tick keeps planned_work; after `tickIfIdle` → decision |
 | tickIfIdle skip-if-busy | Concurrent `tickIfIdle` calls: at least one returns `false` |
+| Long rest length | Long rest keeps `longRestDurationSec`; still running when a short rest would have ended |
+| `rest_ack` alert | `ackRest` emits `rest_ack` then the rest-start alert |
+| Pause when already paused | `ALREADY_PAUSED`; the open pause keeps its start |
+| Resume when not paused | `NOT_PAUSED` |
+| Start while active | `SESSION_ACTIVE`; the running session is kept |
+| Any action with no session | `NO_SESSION` for all seven actions |
+| Subscriber push after commands | One snapshot per command across a whole session, ending idle |
+| Subscriber push after tick | No push when nothing is due; phase change pushes the snapshot with its alerts |
+| Unsubscribe | No further pushes |
+| Open-phase deliberation | `deliberationSec` grows inside decision and short-rest ack windows |
+| Open-phase rest | `restSec` grows inside a rest and stops at its planned end |
+
 ### `apps/server/src/tests/services/settings.service.test.ts`
 
 Imports parsers from `utils/settingsValidation.ts`.
@@ -160,6 +174,11 @@ Q9 Option A recovery scenarios via hydrate + `runRecoveryTick` on temp SQLite.
 | S6 | During extended → still extended; overtime includes downtime |
 | S7 | Soft-pause downtime included in `pausedSec` |
 | S8a | SHORT_REST_ACK inside window → restore ack |
+| S8b | SHORT_REST_ACK past window → `timeout_paused` row; cycle-2 work paused from window end; deliberation + paused totals |
+| Totals after restart | Worked, deliberation, rest and paused totals all restored |
+| Timings after restart | `params` unchanged; the next short rest keeps its own length |
+| Down from planned work past decision window | Extended work starts at planned end (snapshot, worked total, `extended_work` row) |
+| Down during decision past its end | Same, from a restored decision row |
 
 ### `apps/server/src/tests/services/settings.service.persist.test.ts`
 
@@ -174,6 +193,10 @@ In-memory `SettingsStore` double for service unit tests (`load` / `save` / `ensu
 ### `apps/server/src/tests/helpers/mockSessionStores.ts`
 
 `createMockSessionStores()` — in-memory `SessionStore` + `PhasesStore` for `SessionService` unit tests (no SQLite).
+
+### `apps/server/src/tests/helpers/routesApp.ts`
+
+`openRoutesApp()` — Fastify instance with every route registered over mock settings + session stores and short session timings.
 
 ### `apps/server/src/tests/helpers/tempDatabase.ts`
 
@@ -212,6 +235,7 @@ Isolated `hardPauseStrategy` unit tests:
 | `clientDateAt` / `dayBoundsIso` | Client-timezone calendar date and half-open UTC window |
 | `addClientDays` | Calendar-day arithmetic |
 | `overlapSecFromIso` | Shared helper clips ISO intervals to the day window |
+| Daylight saving (America/New_York) | 23-hour and 25-hour day bounds; clock-change days meet their neighbours with no gap or overlap |
 
 ### `apps/server/src/tests/services/analytics.service.test.ts`
 
@@ -229,12 +253,58 @@ Isolated `hardPauseStrategy` unit tests:
 |------|---------|
 | GET today | Returns `todayStats()` body; day query params ignored |
 
+### `apps/server/src/tests/routes/session.routes.test.ts`
+
+All routes registered through `openRoutesApp()` (in-memory stores); `mock.timers` freezes `Date` for the REST cases. The SSE cases listen on a local port and read the stream over real HTTP.
+
+| Case | Asserts |
+|------|---------|
+| POST start | Saved settings and saved pause strategy drive the new session |
+| POST start overrides | Body overrides applied; out-of-range override → 400 `INVALID_SETTINGS` |
+| Action routes | start, pause, resume, continue, start-rest, ack-work, ack-rest, end-long-rest each run their own action through a whole session |
+| Rejections | `NO_SESSION` / `SESSION_ACTIVE` → 409; `NOT_PAUSED` / `ALREADY_PAUSED` / `INVALID_PHASE` → 400 |
+| GET session / alert-seq | Idle and active bodies; no watermark replays nothing; `sinceSeq` selects the alert delta |
+| SSE stream | Current snapshot on connect, then one frame per command and per phase-changing tick (with alerts) |
+| SSE disconnect | A closed stream receives no further frames; other streams keep receiving |
+
+### `apps/server/src/tests/routes/settings.routes.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| GET health | `{ ok: true }` |
+| PUT / GET settings | Patch saved and returned |
+| PUT invalid | 400 `INVALID_SETTINGS`; stored values unchanged |
+
+### `apps/server/src/tests/app/app.test.ts`
+
+Boots the real `buildApp()` against a temp `DATA_DIR` with `Date` and `setInterval` mocked; closing and re-booting the app stands in for a process restart.
+
+| Case | Asserts |
+|------|---------|
+| Restart mid-session | Same session id resumes in `planned_work` with its worked time |
+| Catch-up at boot | Phase that ended while down is closed with `endedReason: "recovery"` |
+| Scheduler wiring | A scheduler tick advances the session with no request |
+| Day finalization | Yesterday finalized at boot; the day that ends while running is finalized on rollover |
+
+### `apps/server/src/tests/app/scheduler.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| Before start | No ticks |
+| Ticking | One `onTick` per interval with the injected clock |
+| Double start | Tick rate unchanged |
+| Stop / restart | Ticks stop, then resume |
+
 ### `apps/web/src/tests/utils/liveStats.test.ts`
 
 | Case | Asserts |
 |------|---------|
 | Soft pause | `pausedSec` grows with wall clock; `workedSec` holds at pause start |
 | Hard pause | Same paused growth; worked holds while `timerFrozenAt` set |
+| Running planned work | `workedSec` ticks locally; `pausedSec` holds |
+| Decision / short-rest ack | `deliberationSec` ticks on top of earlier totals |
+| Extended work | `workedSec` ticks with overtime |
+| Short / long rest | `restSec` ticks and stops at the planned end |
 
 ### `apps/web/src/tests/utils/sessionProjection.test.ts`
 
@@ -253,6 +323,9 @@ Fabricated `ActiveSnapshot` fixtures only (no server imports).
 | Extended → rest | Slip persists via rest anchors |
 | Hard pause open / resume | Open pause adds time; shifted `plannedEndAt` keeps it after resume |
 | Short rest after deliberation | Anchor slip reflected |
+| 4-cycle session | Every remaining short rest counted (from work and from a mid-session short rest) |
+| Long rest | Projected end is the long rest's planned end |
+| Short-rest ack window | Remaining = next cycles + long rest |
 
 ### `apps/web/src/tests/utils/dialProgress.test.ts`
 
@@ -278,12 +351,54 @@ Uses an in-memory `localStorage` stand-in (no browser globals).
 |------|---------|
 | `openPhaseProgressClippedToDay` | Clips open planned work / other phases to the day window; pause handling |
 | `todayDisplayStats` | Adds open-phase clip onto closed server today totals |
+| Open extended work | Counted as worked, clipped to the day start |
+| Open rest past planned end | Stops at the planned end |
+| Open short-rest ack | Counted as deliberation |
+| Pre-midnight pause | Not subtracted from today's worked time |
+
+### `apps/web/src/tests/utils/time.test.ts`
+
+| Case | Asserts |
+|------|---------|
+| `formatMmSs` / `formatHhMmSs` | Padding; minutes past one hour; switch to `hh:mm:ss` |
+| `secFromIso` / `remainingSecFromIso` / `elapsedFromIso` | Whole-second arithmetic, sign and zero floors |
+| `minutesToSec` / `secToMinutes` | Conversions and rounding |
+
+### `apps/web/src/tests/utils/playAlerts.test.ts`
+
+Installs `localStorage` and `Audio` stand-ins before importing the alert modules (singleton watermark store).
+
+| Case | Asserts |
+|------|---------|
+| New alerts | Each alert's own sound, in order; watermark stored |
+| Repeated delivery | Alerts arriving again (action response, then SSE) are not replayed |
+| Partial overlap | Only alerts newer than the watermark play |
+| New session | Alerts play again after the watermark syncs back to zero |
+| Watermark helpers | `advance` is monotonic; `sinceSeqQueryString`; `alertsFromSnapshot` for idle and active |
+
+### `apps/web/src/tests/components/ActiveTimer.test.ts`
+
+Renders `ActiveTimer` with `renderToStaticMarkup` under `QueryClientProvider` + `UiFlagsProvider`; `Date` is frozen. A `.ts` file using `createElement`, so the test glob picks it up.
+
+| Case | Asserts |
+|------|---------|
+| Actions per phase | Exact button list for every phase and both pause strategies |
+| Hide Continue preference | Decision shows only Acknowledge rest |
+| Running work | Countdown, cycle, estimated end, live worked total |
+| Paused work | Pause label; phase end shows `Paused` |
+| Extended work | Planned length + overtime; open end; hint |
+| Decision | Hint with time left |
+| Today row | Server closed totals + open phase |
+
+### `apps/web/src/tests/helpers/`
+
+`activeSnapshot.ts` — `buildActiveSnapshot()` fabricates an `ActiveSnapshot` around one phase. `browserGlobals.ts` — in-memory `localStorage` and a recording `Audio` stand-in.
 
 ---
 
 ## Mocking patterns
 
-Settings unit tests inject `createMockSettingsStore()`. `SessionService` tests inject `createMockSessionStores()` (no SQLite) with deterministic `nowMs`. Store tests use `openTempDatabase()` or `openDatabase` temp dirs. Web projection tests build plain snapshot objects. Scheduler is not exercised in these unit tests.
+Settings unit tests inject `createMockSettingsStore()`. `SessionService` tests inject `createMockSessionStores()` (no SQLite) with deterministic `nowMs`. Store tests use `openTempDatabase()` or `openDatabase` temp dirs. Route tests register every route over the same mock stores via `openRoutesApp()`. Boot-wiring tests run the real `buildApp()` on a temp `DATA_DIR`. Tests that need a clock use `node:test` `mock.timers` (`Date`, and `setInterval` for the scheduler). Web projection tests build plain snapshot objects; alert and component tests install `localStorage` / `Audio` stand-ins.
 
 ## Fixtures
 
@@ -291,7 +406,7 @@ Inline constants and helper factories only — no fixture files.
 
 ## Conventions
 
-- Layout: mirrored tree under `src/tests/` (not colocated with source), matching the area under test (`services/`, `pause/`, `utils/`, `db/`, `helpers/`)
+- Layout: mirrored tree under `src/tests/` (not colocated with source), matching the area under test (`app/`, `routes/`, `services/`, `pause/`, `utils/`, `db/`, `components/`, `helpers/`); test files sit one folder below `src/tests/` because the script glob does not match files directly in it
 - File naming: `<module>.test.ts` (e.g. `session.service.test.ts`, `sessionProjection.test.ts`)
 - Blocks: `describe("ClassOrFn", () => { it("behavior…", …) })`
 - Style: strict assert (`assert.equal`, `assert.ok`, `assert.throws`, `assert.deepEqual`)

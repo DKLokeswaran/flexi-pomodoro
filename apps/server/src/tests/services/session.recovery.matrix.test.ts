@@ -137,4 +137,125 @@ describe("Q9 S1–S8 recovery matrix", () => {
     if (snap.status !== "active") return;
     assert.equal(snap.session.phase.kind, "short_rest_ack");
   });
+
+  it("totals for deciding, resting and paused survive a restart", async () => {
+    const { session, stores } = await openEngine();
+    await session.start(SHORT_PARAMS, T0, "soft");
+    await session.pause(T0 + 10_000);
+    await session.resume(T0 + 20_000);
+    assert.equal(await session.tickIfIdle(T0 + 60_000, false), true);
+    await session.ackRest(T0 + 65_000);
+    const afterShort = T0 + 65_000 + 60_000;
+    assert.equal(await session.tickIfIdle(afterShort, false), true);
+    const workStart = afterShort + 3_000;
+    await session.ackWork(workStart);
+
+    const mid = await reboot(stores);
+    const now = workStart + 10_000;
+    await mid.runRecoveryTick(now);
+    const snap = mid.getSnapshot(now);
+    assert.equal(snap.status, "active");
+    if (snap.status !== "active") return;
+    // Worked 50 + 10 open; deliberation 5 + 3; one full short rest; 10s pause.
+    assert.deepEqual(snap.session.liveStats, {
+      workedSec: 60,
+      deliberationSec: 8,
+      restSec: 60,
+      pausedSec: 10,
+    });
+  });
+
+  it("session timings come back unchanged, so rests keep their own lengths", async () => {
+    const { session, stores } = await openEngine();
+    await session.start(SHORT_PARAMS, T0, "soft");
+
+    const mid = await reboot(stores);
+    await mid.runRecoveryTick(T0 + 60_000);
+    let snap = mid.getSnapshot(T0 + 60_000);
+    assert.equal(snap.status, "active");
+    if (snap.status !== "active") return;
+    assert.deepEqual(snap.session.params, SHORT_PARAMS);
+
+    await mid.ackRest(T0 + 60_000);
+    snap = mid.getSnapshot(T0 + 60_000);
+    assert.equal(snap.status, "active");
+    if (snap.status !== "active") return;
+    assert.equal(snap.session.phase.kind, "short_rest");
+    if (snap.session.phase.kind !== "short_rest") return;
+    assert.equal(snap.session.phase.plannedDurationSec, 60);
+  });
+
+  /** Extended work must start at planned end, whatever the restart time. */
+  async function assertExtendedFromPlannedEnd(
+    mid: SessionService,
+    db: Awaited<ReturnType<typeof openEngine>>["db"],
+    now: number,
+  ) {
+    const plannedEndIso = new Date(T0 + 60_000).toISOString();
+    const snap = mid.getSnapshot(now);
+    assert.equal(snap.status, "active");
+    if (snap.status !== "active") return;
+    assert.equal(snap.session.phase.kind, "extended_work");
+    assert.equal(snap.session.phase.startedAt, plannedEndIso);
+    assert.equal(
+      snap.session.liveStats.workedSec,
+      60 + Math.floor((now - (T0 + 60_000)) / 1000),
+    );
+    assert.equal(snap.session.liveStats.deliberationSec, 0);
+    const extended = await db("extended_work").first();
+    assert.equal(extended.startedAt, plannedEndIso);
+  }
+
+  it("down from planned work past the decision window → extended timed from planned end", async () => {
+    const { session, stores, db } = await openEngine();
+    await session.start(SHORT_PARAMS, T0, "soft");
+    const mid = await reboot(stores);
+    const now = T0 + 60_000 + 15_000 + 30_000;
+    await mid.runRecoveryTick(now);
+    await assertExtendedFromPlannedEnd(mid, db, now);
+  });
+
+  it("down during the decision window past its end → extended timed from planned end", async () => {
+    const { session, stores, db } = await openEngine();
+    await session.start(SHORT_PARAMS, T0, "soft");
+    assert.equal(await session.tickIfIdle(T0 + 65_000, false), true);
+    const mid = await reboot(stores);
+    const now = T0 + 60_000 + 15_000 + 30_000;
+    await mid.runRecoveryTick(now);
+    await assertExtendedFromPlannedEnd(mid, db, now);
+  });
+
+  it("S8b: down during SHORT_REST_ACK past the window → timeout_paused, work paused from window end", async () => {
+    const { session, stores, db } = await openEngine();
+    await session.start(SHORT_PARAMS, T0, "soft");
+    assert.equal(await session.tickIfIdle(T0 + 60_000, false), true);
+    await session.ackRest(T0 + 61_000);
+    const ackStart = T0 + 61_000 + 60_000;
+    assert.equal(await session.tickIfIdle(ackStart, false), true);
+
+    const mid = await reboot(stores);
+    const windowEnd = ackStart + 15_000;
+    const now = windowEnd + 20_000;
+    await mid.runRecoveryTick(now);
+
+    const snap = mid.getSnapshot(now);
+    assert.equal(snap.status, "active");
+    if (snap.status !== "active") return;
+    const phase = snap.session.phase;
+    assert.equal(phase.kind, "planned_work");
+    if (phase.kind !== "planned_work") return;
+    assert.equal(phase.cycleIndex, 2);
+    assert.equal(phase.paused, true);
+    assert.equal(phase.startedAt, new Date(windowEnd).toISOString());
+    assert.equal(phase.pauseStartedAt, new Date(windowEnd).toISOString());
+    // 1s at the work decision + the full 15s ack window; paused since window end.
+    assert.equal(snap.session.liveStats.deliberationSec, 16);
+    assert.equal(snap.session.liveStats.pausedSec, 20);
+
+    const acks = await db("short_rest_ack").select("*");
+    assert.equal(acks.length, 1);
+    assert.equal(acks[0].outcome, "timeout_paused");
+    assert.equal(acks[0].durationSec, 15);
+    assert.equal(acks[0].endedAt, new Date(windowEnd).toISOString());
+  });
 });

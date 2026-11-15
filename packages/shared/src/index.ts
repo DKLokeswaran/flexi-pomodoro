@@ -58,7 +58,87 @@ export const SESSION_API = {
  */
 export const ANALYTICS_API = {
   today: "/api/analytics/today",
+  heatmap: "/api/analytics/heatmap",
+  summary: "/api/analytics/summary",
 } as const;
+
+export const AnalyticsPeriodSchema = z.enum([
+  "today",
+  "week",
+  "month",
+  "7d",
+  "30d",
+  "all",
+  "last_week",
+  "last_month",
+]);
+export type AnalyticsPeriod = z.infer<typeof AnalyticsPeriodSchema>;
+
+export interface HeatmapDay {
+  clientDate: string;
+  workedSec: number;
+}
+
+export interface StreakValue {
+  current: number;
+  longest: number;
+}
+
+export interface Streaks {
+  work: StreakValue;
+  cycle: StreakValue;
+}
+
+export interface HeatmapResponse {
+  todayClientDate: string;
+  from: string;
+  to: string;
+  firstYear: number;
+  days: HeatmapDay[];
+  streaks: Streaks;
+}
+
+export interface BestDay {
+  clientDate: string;
+  workedSec: number;
+}
+
+export interface PeriodStats {
+  plannedWorkSec: number;
+  extendedWorkSec: number;
+  cyclesCompleted: number;
+  cyclesExtended: number;
+  avgExtendedSec: number | null;
+  shortRestSec: number;
+  longRestSec: number;
+  pausedSec: number;
+  sessionsCompleted: number;
+  avgCyclesPerSession: number | null;
+  daysInPeriod: number;
+  daysWorked: number;
+  cycleDays: number;
+  bestDay: BestDay | null;
+}
+
+export interface ChartPoint {
+  clientDate: string;
+  plannedWorkSec: number | null;
+  extendedWorkSec: number | null;
+  sessionsCompleted: number | null;
+}
+
+export interface SummaryResponse {
+  period: AnalyticsPeriod;
+  todayClientDate: string;
+  from: string;
+  to: string;
+  stats: PeriodStats;
+  comparison: PeriodStats | null;
+  chart: {
+    points: ChartPoint[];
+    truncated: boolean;
+  };
+}
 
 export const WorkPauseStrategySchema = z.enum(["soft", "hard"]);
 export type WorkPauseStrategy = z.infer<typeof WorkPauseStrategySchema>;

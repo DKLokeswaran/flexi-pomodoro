@@ -1,10 +1,10 @@
 ---
 name: M4 Analytics
-overview: "Implement M4: an Analytics tab with a Calendar view (year heatmap, two streaks, current week and month dashboard with deltas) and a Ranges view (Today, 7 days, 30 days, All, Last week, Last month). Reshapes daily_stats into per-day time splits and counts, stores a day only after every session running during it has ended, keeps totals exact across timezone changes, and does all aggregation in AnalyticsService behind a heatmap endpoint and a summary endpoint."
+overview: "Implement M4: an Analytics tab with a Calendar view (year heatmap, two streaks, current week and month dashboard with deltas) and a Ranges view (Today, 7 days, 30 days, All, Last week, Last month). Reshapes daily_stats into per-day time splits and counts, stores a day only after every session running during it has ended, keeps totals exact across timezone changes, and aggregates base sums in AnalyticsService behind a heatmap endpoint and a summary endpoint with derived totals computed on the web."
 todos:
   - id: shared-contract
     content: Add ANALYTICS_API.heatmap and .summary, AnalyticsPeriod, HeatmapResponse, SummaryResponse, PeriodStats, ChartPoint and Streaks to packages/shared
-    status: pending
+    status: completed
   - id: daily-stats-migration
     content: Migration adding eight value columns and statsVersion to daily_stats and dropping workedSec and restSec
     status: pending
@@ -66,7 +66,7 @@ Sources: [docs/product/PRD.md](docs/product/PRD.md) §4.8 (FR-AN-4, FR-AN-5, FR-
 - Ranges view with six presets
 - Stat tiles and two charts, shared by both views
 - Reshaped `daily_stats`, the wait rule for storing days, the timezone seam rule, and a one-time rebuild of existing rows
-- `GET /api/analytics/heatmap` and `GET /api/analytics/summary`, with every multi-day calculation done on the server
+- `GET /api/analytics/heatmap` and `GET /api/analytics/summary`, with base sums aggregated on the server and derived totals computed on the web from the returned parts
 - Unit tests, manual smoke, and doc updates
 
 **Out:**
@@ -91,7 +91,7 @@ Sources: [docs/product/PRD.md](docs/product/PRD.md) §4.8 (FR-AN-4, FR-AN-5, FR-
 | Stored day | A day that has a row in `daily_stats`. A stored day never changes after it is written, except by the one-time rebuild |
 | Pending day | A day after the last stored day that is not stored yet. Its values are computed from the raw tables on every request |
 | Open day | The pending day whose window contains the current instant. This is "today" everywhere in the app |
-| Worked seconds | `plannedWorkSec + extendedWorkSec` for a day. Always derived, never stored |
+| Worked seconds | `plannedWorkSec + extendedWorkSec` for a day. Derived on the web, never stored and never sent as a separate field in summary responses |
 | Cycle | Starts when a `planned_work` phase starts and ends when the `rest` phase with the same `sessionId` and `cycleIndex` ends. It includes everything in between |
 | Completed cycle | A cycle whose `rest` row has a non-null `endedAt`, with any `endedReason` |
 | Extended cycle | A completed cycle that has an `extended_work` row with the same `sessionId` and `cycleIndex`. A cycle extends at most once |
@@ -210,27 +210,33 @@ Date arithmetic works on `YYYY-MM-DD` labels only.
 
 ## Stats (locked)
 
-`PeriodStats` is computed over one span from the summed day values. Values with a zero divisor are `null`.
+`PeriodStats` carries base sums over one span from the summed day values. The web derives focus, rest, rate and per-day averages from those parts. Values with a zero divisor are `null`.
 
 | Field | Formula | Rounding |
 | --- | --- | --- |
-| `focusSec` | Σ worked seconds | none |
 | `plannedWorkSec`, `extendedWorkSec` | Σ of each | none |
 | `cyclesCompleted`, `cyclesExtended` | Σ of each | none |
-| `extendedRatePct` | Σ `cyclesExtended` ÷ Σ `cyclesCompleted` × 100, `null` when no completed cycles | two decimal places |
 | `avgExtendedSec` | Σ `extendedCycleSec` ÷ Σ `cyclesExtended`, `null` when no extended cycles | nearest second |
-| `restSec`, `shortRestSec`, `longRestSec` | `restSec` is the sum of the other two | none |
+| `shortRestSec`, `longRestSec` | Σ of each | none |
 | `pausedSec` | Σ `pausedSec` | none |
 | `sessionsCompleted` | Σ `sessionsCompleted` | none |
 | `avgCyclesPerSession` | Σ `completedSessionCycles` ÷ Σ `sessionsCompleted`, `null` when no sessions | two decimal places |
 | `daysInPeriod` | number of labels in the span | none |
 | `daysWorked` | number of days worked in the span | none |
 | `cycleDays` | number of cycle days in the span | none |
-| `avgPerWorkedDaySec` | `focusSec` ÷ `daysWorked`, `null` when `daysWorked` is 0 | nearest second |
-| `avgPerDaySec` | `focusSec` ÷ `daysInPeriod` | nearest second |
 | `bestDay` | label and worked seconds of the day with the most worked seconds. Ties go to the most recent day. `null` when every day is zero | none |
 
-Every value that is not a whole number is rounded to two decimal places. That covers `extendedRatePct` and `avgCyclesPerSession`. Averages measured in seconds are rounded to the nearest second, because the app displays durations in hours and minutes. The web app shows a two-decimal value without trailing zeros, so `25`, `25.4` and `33.33` are all valid displays.
+Web-derived from `PeriodStats` parts:
+
+| Field | Formula | Rounding |
+| --- | --- | --- |
+| `focusSec` | `plannedWorkSec + extendedWorkSec` | none |
+| `restSec` | `shortRestSec + longRestSec` | none |
+| `extendedRatePct` | `cyclesExtended ÷ cyclesCompleted × 100`, `null` when no completed cycles | two decimal places |
+| `avgPerWorkedDaySec` | `focusSec ÷ daysWorked`, `null` when `daysWorked` is 0 | nearest second |
+| `avgPerDaySec` | `focusSec ÷ daysInPeriod` | nearest second |
+
+Every value that is not a whole number is rounded to two decimal places. That covers `avgCyclesPerSession` and the web-derived `extendedRatePct`. Averages measured in seconds are rounded to the nearest second, because the app displays durations in hours and minutes. The web app shows a two-decimal value without trailing zeros, so `25`, `25.4` and `33.33` are all valid displays.
 
 **Streaks** are computed on the server over the whole history, stored and pending days together.
 
@@ -245,7 +251,7 @@ Every value that is not a whole number is rounded to two decimal places. That co
 
 ## API (locked)
 
-All multi-day calculation happens in the server. The web app formats and draws.
+Server aggregation returns base sums. The web app derives focus, rest, rate and per-day averages and then formats and draws.
 
 ### `GET /api/analytics/heatmap` (`ANALYTICS_API.heatmap`)
 
@@ -356,13 +362,13 @@ Tiles follow the Stats component in `DESIGN.md`. Grid of two columns, three from
 
 | Order | Label | Main value | Second line | Delta compares |
 | --- | --- | --- | --- | --- |
-| 1 | Focus | `focusSec` | planned and extended durations | `focusSec` |
-| 2 | Extended | `N of M cycles (P%)` from `cyclesExtended`, `cyclesCompleted`, `extendedRatePct` | `avgExtendedSec` | `extendedRatePct` |
-| 3 | Rest | `restSec` | short and long durations | `restSec` |
+| 1 | Focus | derived `focusSec` (`plannedWorkSec + extendedWorkSec`) | planned and extended durations | derived `focusSec` |
+| 2 | Extended | `N of M cycles (P%)` from `cyclesExtended`, `cyclesCompleted`, derived `extendedRatePct` | `avgExtendedSec` | derived `extendedRatePct` |
+| 3 | Rest | derived `restSec` (`shortRestSec + longRestSec`) | short and long durations | derived `restSec` |
 | 4 | Paused | `pausedSec` | none | `pausedSec` |
 | 5 | Sessions | `sessionsCompleted` | `avgCyclesPerSession` | `sessionsCompleted` |
 | 6 | Active days | `Days worked A of D` from `daysWorked`, `daysInPeriod` | `Cycle days C of D` from `cycleDays` | `daysWorked` |
-| 7 | Daily average | `avgPerWorkedDaySec`, labelled per day worked | `avgPerDaySec`, labelled per day | `avgPerWorkedDaySec` |
+| 7 | Daily average | derived `avgPerWorkedDaySec`, labelled per day worked | derived `avgPerDaySec`, labelled per day | derived `avgPerWorkedDaySec` |
 | 8 | Best day | that day's worked duration | that day's date | best day's worked duration |
 
 Tiles 6, 7 and 8 do not render for Today.
@@ -415,7 +421,7 @@ The heatmap and summary queries refetch when the Analytics tab mounts, when the 
 **File:** [`packages/shared/src/index.ts`](packages/shared/src/index.ts)
 
 - Add `ANALYTICS_API.heatmap` (`/api/analytics/heatmap`) and `ANALYTICS_API.summary` (`/api/analytics/summary`).
-- Add `AnalyticsPeriod`, `HeatmapResponse`, `SummaryResponse`, `PeriodStats`, `ChartPoint` and `Streaks` with exactly the fields listed under API and Stats.
+- Add `AnalyticsPeriod`, `HeatmapResponse`, `SummaryResponse`, `PeriodStats`, `ChartPoint` and `Streaks` with the minimal base fields listed under API and Stats. Derived focus, rest, rate and per-day averages are computed on the web.
 
 ### 2. Migration
 
@@ -546,7 +552,7 @@ Tests follow the mirrored layout in [docs/structure.md](docs/structure.md): the 
 
 ## Key design decisions
 
-- **Aggregation lives in the server.** `AnalyticsService` computes periods, stats, streaks and chart points. The web app receives finished values and never raw day history.
+- **Base sums on the server, derivation on the web.** `AnalyticsService` computes periods, base stats, streaks and chart points. The web derives focus, rest, rate and per-day averages from the returned parts and never receives raw day history.
 - **Bounded responses instead of pagination.** A summary is one object, the heatmap is one year, and chart points are capped at 366. Nothing returned is a list a person pages through.
 - **Span-based summary logic.** Presets become a span in one place, so a custom range later needs only route parameters and a picker.
 - **Per-day rows only, with no derived columns.** One table holds one row per day. Worked and rest totals are sums of their stored parts.

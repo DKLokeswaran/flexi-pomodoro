@@ -55,7 +55,8 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 |--------|------|
 | `AlertIdSchema` / `AlertId` | Zod enum / type |
 | `SESSION_API` | path constants object |
-| `ANALYTICS_API` | `{ today: "/api/analytics/today" }` — day bounds from settings timezone (no day query params) |
+| `ANALYTICS_API` | `{ today, heatmap, summary }` — day bounds from settings timezone (no day query params); heatmap/summary paths reserved for M4 routes |
+| `AnalyticsPeriodSchema` / `AnalyticsPeriod` | Zod enum / type (`today`, `week`, `month`, `7d`, `30d`, `all`, `last_week`, `last_month`) |
 | `WorkPauseStrategySchema` / `WorkPauseStrategy` | `"soft" \| "hard"` |
 | `sessionParamsSchemaForBounds(bounds)` | Zod object for session timing fields |
 | `SessionParamsSchema` / `SessionParams` | production-bounds Zod / type |
@@ -69,6 +70,13 @@ Every committed TypeScript/TSX source file with exported symbols, key types, dep
 | `SessionStatus` | `"idle"\|"active"\|"completed"` |
 | `SessionLiveStats` | type (`workedSec`, `deliberationSec`, `restSec`, `pausedSec`) |
 | `TodayStats` / `TodayStatsResponse` | day-bucket alias of live stats + `clientDate` / `dayStart` / `dayEnd` |
+| `HeatmapDay` | type (`clientDate`, `workedSec`) |
+| `StreakValue` / `Streaks` | types (`current`/`longest` for `work`/`cycle`) |
+| `HeatmapResponse` | type (`todayClientDate`, `from`/`to`, `firstYear`, `days`, `streaks`) |
+| `BestDay` | type (`clientDate`, `workedSec`) |
+| `PeriodStats` | minimal base sums (`plannedWorkSec`, `extendedWorkSec`, `cyclesCompleted`, `cyclesExtended`, `avgExtendedSec`, `shortRestSec`, `longRestSec`, `pausedSec`, `sessionsCompleted`, `avgCyclesPerSession`, `daysInPeriod`, `daysWorked`, `cycleDays`, `bestDay`); focus/rest/rate/per-day averages derived on web |
+| `ChartPoint` | type (`clientDate`, nullable `plannedWorkSec`/`extendedWorkSec`/`sessionsCompleted`) |
+| `SummaryResponse` | type (`period`, `todayClientDate`, `from`/`to`, `stats`, `comparison`, `chart{points,truncated}`) |
 | `pausedSecAt`, `plannedWorkSecAt`, `plannedWorkProgressClockMs` | Planned-work progress helpers (`liveStatsProgress.ts`) |
 | `overlapSec`, `overlapSecFromIso` | Day-window overlap helpers (`overlapSec.ts`) — ms or ISO inputs |
 | `AlertEvent`, `ActiveSession` | types |

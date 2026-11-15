@@ -497,7 +497,7 @@ These are pure functions over day values. They read no database and no clock. `A
 
 ### 12. Tests and smoke
 
-Server tests extend the existing analytics test files and add one file per module in `apps/server/src/services/analytics/`. Web tests go in `apps/web/src/tests/utils/` and cover `heatmap.ts` and `delta.ts`.
+Tests follow the mirrored layout in [docs/structure.md](docs/structure.md): the test for `src/<path>/<module>.ts` is `src/tests/<path>/<module>.test.ts` in the same package. Server tests extend the existing analytics test files and add one file per new module at `apps/server/src/tests/services/analytics/<module>.test.ts`. Web tests are `apps/web/src/tests/utils/analytics/heatmap.test.ts` and `apps/web/src/tests/utils/analytics/delta.test.ts`.
 
 | Case | Expect |
 | --- | --- |
